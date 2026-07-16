@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App de Cobros</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" href="iconos/icon-192.png">
+  <link rel="apple-touch-icon" href="iconos/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cobros">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="login-screen" class="pantalla">
+    <div class="logo-login">💰</div>
+    <h1>App de Cobros</h1>
+    <p class="subtitulo">Gestiona tus créditos y rutas de cobro</p>
+    <input type="email" id="email" placeholder="Correo electrónico">
+    <input type="password" id="password" placeholder="Contraseña">
+    <button onclick="iniciarSesion()">Entrar</button>
+    <button onclick="registrarUsuario()" class="secundario">Crear cuenta nueva</button>
+    <p class="link-olvide" onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</p>
+    <p id="mensaje-error"></p>
+  </div>
+
+  <div id="app-principal" class="app-oculto oculto">
+
+    <header class="top-bar">
+      <h2>💰 App de Cobros</h2>
+      <div class="top-bar-acciones">
+        <button onclick="abrirBusquedaGlobal()" class="btn-icono">🔍</button>
+        <button onclick="toggleModoOscuro()" class="btn-icono">🌙</button>
+        <button onclick="cerrarSesion()" class="btn-salir">Salir</button>
+      </div>
+    </header>
+
+    <main id="contenido">
+
+      <section id="seccion-inicio" class="seccion">
+        <h3>Resumen de hoy</h3>
+        <div id="resumen-dia" class="resumen-dia"></div>
+        <div id="resumen-cartera" class="resumen-dia"></div>
+
+        <h4>Meta de recaudo <span class="link-editar-meta" onclick="editarMetas()">✏️ editar</span></h4>
+        <div id="metas-progreso"></div>
+
+        <h4>Recaudo últimos 7 días</h4>
+        <div id="grafico-semana" class="grafico-semana"></div>
+
+        <h4>Pendientes por cobrar hoy</h4>
+        <div id="lista-pendientes-hoy"></div>
+      </section>
+
+      <section id="seccion-cobrar" class="seccion oculto">
+        <h3>Cobrar</h3>
+        <div class="fila-filtros">
+          <input type="text" id="buscar-cliente-cobrar" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesCobrar()">
+          <select id="filtro-ruta-cobrar" onchange="filtrarClientesCobrar()">
+            <option value="">Todas las rutas</option>
+          </select>
+        </div>
+        <div id="lista-clientes-cobrar"></div>
+      </section>
+
+      <section id="seccion-clientes" class="seccion oculto">
+        <h3>Clientes</h3>
+        <form onsubmit="crearCliente(event)" class="tarjeta-form">
+          <input type="text" id="cliente-nombre" placeholder="Nombre completo" required>
+          <input type="text" id="cliente-telefono" placeholder="Teléfono">
+          <input type="text" id="cliente-direccion" placeholder="Dirección">
+          <textarea id="cliente-notas" placeholder="Notas (ej: vive cerca del parque)" rows="2"></textarea>
+          <select id="cliente-ruta" required>
+            <option value="">Selecciona una ruta</option>
+          </select>
+          <button type="submit">+ Agregar cliente</button>
+        </form>
+        <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesLista()">
+        <div id="lista-clientes"></div>
+      </section>
+
+      <section id="seccion-prestamos" class="seccion oculto">
+        <h3>Nuevo préstamo</h3>
+        <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
+          <select id="prestamo-cliente" required>
+            <option value="">Selecciona un cliente</option>
+          </select>
+          <input type="text" id="prestamo-monto" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
+          <input type="number" id="prestamo-interes" placeholder="Interés % (opcional, ej: 20)">
+          <input type="number" id="prestamo-cuotas" placeholder="Número de cuotas (ej: 20)" required>
+          <select id="prestamo-frecuencia" required>
+            <option value="">Frecuencia de pago</option>
+            <option value="diario">Diario</option>
+            <option value="semanal">Semanal</option>
+          </select>
+          <input type="date" id="prestamo-fecha" required>
+
+          <label class="check-label">
+            <input type="checkbox" id="prestamo-mora-check" onchange="toggleCampoMora()">
+            Aplicar interés por mora (opcional)
+          </label>
+          <input type="number" id="prestamo-mora-porcentaje" placeholder="% de recargo por mora" class="oculto">
+
+          <button type="submit">+ Registrar préstamo</button>
+        </form>
+      </section>
+
+      <section id="seccion-rutas" class="seccion oculto">
+        <h3>Rutas</h3>
+        <form onsubmit="crearRuta(event)" class="tarjeta-form">
+          <input type="text" id="ruta-nombre" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
+          <input type="text" id="ruta-descripcion" placeholder="Descripción (opcional)">
+          <button type="submit">+ Agregar ruta</button>
+        </form>
+        <div id="lista-rutas"></div>
+      </section>
+
+      <section id="seccion-reportes" class="seccion oculto">
+        <h3>Reportes</h3>
+        <select id="reporte-tipo" onchange="cambiarTipoReporte()">
+          <option value="dia">Reporte diario</option>
+          <option value="semana">Reporte semanal</option>
+          <option value="mes" selected>Reporte mensual</option>
+          <option value="anio">Reporte anual</option>
+        </select>
+        <input type="date" id="reporte-fecha-dia" class="oculto">
+        <input type="month" id="reporte-mes">
+        <input type="number" id="reporte-anio" class="oculto" placeholder="Ej: 2026" min="2020" max="2100">
+        <div id="resumen-mes" class="resumen-dia"></div>
+        <div id="comparacion-mes" class="comparacion-mes oculto"></div>
+
+        <div id="respaldo-recordatorio" class="oculto"></div>
+        <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar respaldo (CSV)</button>
+
+        <h4>Gastos operativos</h4>
+        <form onsubmit="crearGasto(event)" class="tarjeta-form">
+          <input type="text" id="gasto-concepto" placeholder="Concepto (ej: gasolina)" required>
+          <input type="text" id="gasto-monto" inputmode="numeric" placeholder="Monto (ej: 20.000)" required>
+          <input type="date" id="gasto-fecha" required>
+          <button type="submit">+ Registrar gasto</button>
+        </form>
+        <div id="lista-gastos"></div>
+      </section>
+
+    </main>
+
+    <nav class="menu-inferior">
+      <button onclick="mostrarSeccion('inicio')" class="nav-btn" data-nav="inicio">🏠<br>Inicio</button>
+      <button onclick="mostrarSeccion('cobrar')" class="nav-btn" data-nav="cobrar">💰<br>Cobrar</button>
+      <button onclick="mostrarSeccion('clientes')" class="nav-btn" data-nav="clientes">👤<br>Clientes</button>
+      <button onclick="mostrarSeccion('prestamos')" class="nav-btn" data-nav="prestamos">💵<br>Préstamos</button>
+      <button onclick="mostrarSeccion('rutas')" class="nav-btn" data-nav="rutas">📍<br>Rutas</button>
+      <button onclick="mostrarSeccion('reportes')" class="nav-btn" data-nav="reportes">📊<br>Reportes</button>
+    </nav>
+
+  </div>
+
+  <div id="modal-generico" class="modal-overlay oculto">
+    <div class="modal-caja" id="modal-generico-contenido"></div>
+  </div>
+
+  <div id="modal-recibo" class="modal-overlay oculto">
+    <div class="modal-caja" id="contenido-recibo"></div>
+  </div>
+
+  <div id="modal-detalle" class="modal-overlay oculto">
+    <div class="modal-caja modal-grande">
+      <div class="detalle-header">
+        <h3 id="detalle-nombre-cliente"></h3>
+        <button class="btn-cerrar-detalle" onclick="cerrarDetalleCliente()">✕</button>
+      </div>
+      <div class="tabs-detalle">
+        <button class="tab-btn activo" data-tab="info" onclick="cambiarTabDetalle('info')">Info</button>
+        <button class="tab-btn" data-tab="prestamos" onclick="cambiarTabDetalle('prestamos')">Préstamos</button>
+        <button class="tab-btn" data-tab="historial" onclick="cambiarTabDetalle('historial')">Historial</button>
+      </div>
+      <div id="tab-info" class="tab-contenido"></div>
+      <div id="tab-prestamos" class="tab-contenido oculto"></div>
+      <div id="tab-historial" class="tab-contenido oculto"></div>
+    </div>
+  </div>
+
+  <div id="modal-busqueda" class="modal-overlay oculto">
+    <div class="modal-caja modal-grande">
+      <div class="detalle-header">
+        <h3>Buscar cliente</h3>
+        <button class="btn-cerrar-detalle" onclick="cerrarBusquedaGlobal()">✕</button>
+      </div>
+      <input type="text" id="input-busqueda-global" placeholder="Escribe un nombre..." oninput="ejecutarBusquedaGlobal()">
+      <div id="resultados-busqueda-global"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/rutas.js"></script>
+  <script src="js/clientes.js"></script>
+  <script src="js/prestamos.js"></script>
+  <script src="js/pagos.js"></script>
+  <script src="js/reportes.js"></script>
+  <script src="js/gastos.js"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js")
+          .then(() => console.log("Service worker registrado"))
+          .catch((err) => console.error("Error registrando service worker:", err));
+      });
+    }
+  </script>
+</body>
+</html>
