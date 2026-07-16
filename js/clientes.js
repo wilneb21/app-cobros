@@ -1,4 +1,5 @@
 let clientesCache = [];
+let mostrandoArchivados = false;
 
 async function crearCliente(event) {
   event.preventDefault();
@@ -24,17 +25,31 @@ async function crearCliente(event) {
 
 async function cargarClientes() {
   mostrarCargando("lista-clientes");
-  const { data, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").order("nombre");
+  const { data, error } = await supabaseClient
+    .from("clientes").select("*, rutas(nombre)")
+    .eq("archivado", mostrandoArchivados)
+    .order("nombre");
   if (error) { console.error(error); return; }
   clientesCache = data;
   pintarClientesLista(data);
+}
+
+function toggleVerArchivados() {
+  mostrandoArchivados = !mostrandoArchivados;
+  document.getElementById("link-ver-archivados").innerText = mostrandoArchivados
+    ? "← Volver a clientes activos"
+    : "📦 Ver clientes archivados";
+  document.getElementById("form-nuevo-cliente").classList.toggle("oculto", mostrandoArchivados);
+  cargarClientes();
 }
 
 function pintarClientesLista(data) {
   const contenedor = document.getElementById("lista-clientes");
 
   if (data.length === 0) {
-    contenedor.innerHTML = `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Usa el formulario de arriba para agregar el primero.</div>`;
+    contenedor.innerHTML = mostrandoArchivados
+      ? `<div class="estado-vacio">📦 No tienes clientes archivados.</div>`
+      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Usa el formulario de arriba para agregar el primero.</div>`;
     return;
   }
 
@@ -100,9 +115,14 @@ function cambiarTabDetalle(tab) {
   if (tab === "historial") pintarTabHistorial();
 }
 
-function pintarTabInfo(cliente) {
+async function pintarTabInfo(cliente) {
   const telefonoLimpio = (cliente.telefono || "").replace(/\D/g, "");
   const riesgo = cliente.riesgo || "bueno";
+
+  const { count } = await supabaseClient
+    .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", cliente.id);
+  const tieneHistorial = count > 0;
+
   document.getElementById("tab-info").innerHTML = `
     <form onsubmit="guardarEdicionCliente(event, ${cliente.id})" class="tarjeta-form">
       <input type="text" id="editar-nombre" value="${cliente.nombre}" required>
@@ -118,8 +138,15 @@ function pintarTabInfo(cliente) {
       <button type="submit" class="btn-editar-cliente">💾 Guardar cambios</button>
     </form>
     ${telefonoLimpio ? `<button class="btn-whatsapp" onclick="window.open('https://wa.me/${armarNumeroWhatsapp(cliente.telefono)}')">💬 Enviar WhatsApp</button>` : ""}
-    <button class="btn-pdf" onclick="exportarEstadoCuentaPDF(${cliente.id})">🧾 Exportar estado de cuenta</button>
-    <button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">🗑️ Eliminar cliente</button>
+    ${tieneHistorial ? `<button class="btn-pdf" onclick="exportarEstadoCuentaPDF(${cliente.id})">🧾 Exportar estado de cuenta</button>` : ""}
+
+    ${cliente.archivado
+      ? `<button class="btn-editar-cliente" onclick="desarchivarCliente(${cliente.id})">📤 Desarchivar cliente</button>`
+      : tieneHistorial
+        ? `<button class="btn-eliminar" onclick="archivarCliente(${cliente.id})">📦 Archivar cliente</button>
+           <p class="nota-ayuda">Este cliente tiene ${count} préstamo(s) en su historial, por eso no se puede eliminar — se archiva para proteger tus reportes.</p>`
+        : `<button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">🗑️ Eliminar cliente</button>`
+    }
   `;
 }
 
@@ -176,14 +203,7 @@ async function exportarEstadoCuentaPDF(clienteId) {
 }
 
 async function eliminarCliente(clienteId) {
-  const { count } = await supabaseClient
-    .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", clienteId).eq("estado", "activo");
-
-  if (count > 0) {
-    mostrarAlerta(`No se puede eliminar: este cliente tiene ${count} préstamo(s) activo(s). Debe pagarlos o refinanciarlos primero.`);
-    return;
-  }
-
+  // Solo se llega aquí cuando el cliente NO tiene ningún préstamo en su historial
   const confirmado = await mostrarConfirmacion("¿Seguro que quieres eliminar este cliente? Esto no se puede deshacer.");
   if (!confirmado) return;
 
@@ -191,6 +211,30 @@ async function eliminarCliente(clienteId) {
   if (error) { mostrarAlerta("Error: " + error.message); return; }
 
   cerrarDetalleCliente();
+  cargarClientes();
+}
+
+async function archivarCliente(clienteId) {
+  const confirmado = await mostrarConfirmacion("Este cliente se ocultará de tu lista de clientes activos, pero todo su historial de préstamos y pagos se conserva intacto.<br><br>¿Deseas archivarlo?");
+  if (!confirmado) return;
+
+  const { error } = await supabaseClient.from("clientes").update({ archivado: true }).eq("id", clienteId);
+  if (error) { mostrarAlerta("Error: " + error.message); return; }
+
+  mostrarAlerta("📦 Cliente archivado");
+  cerrarDetalleCliente();
+  cargarClientes();
+}
+
+async function desarchivarCliente(clienteId) {
+  const { error } = await supabaseClient.from("clientes").update({ archivado: false }).eq("id", clienteId);
+  if (error) { mostrarAlerta("Error: " + error.message); return; }
+
+  mostrarAlerta("✅ Cliente desarchivado, ya aparece de nuevo en tu lista activa.");
+  cerrarDetalleCliente();
+  mostrandoArchivados = false;
+  document.getElementById("link-ver-archivados").innerText = "📦 Ver clientes archivados";
+  document.getElementById("form-nuevo-cliente").classList.remove("oculto");
   cargarClientes();
 }
 

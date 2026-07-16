@@ -4,7 +4,7 @@ function toggleCampoMora() {
 }
 
 async function cargarClientesEnSelector() {
-  const { data, error } = await supabaseClient.from("clientes").select("id, nombre").order("nombre");
+  const { data, error } = await supabaseClient.from("clientes").select("id, nombre").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
   const selector = document.getElementById("prestamo-cliente");
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
@@ -50,7 +50,7 @@ let clientesCobrarCache = [];
 
 async function cargarClientesParaCobrar() {
   mostrarCargando("lista-clientes-cobrar");
-  const { data: clientes, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").order("nombre");
+  const { data: clientes, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
   clientesCobrarCache = clientes;
   actualizarSelectorFiltroRuta(clientes);

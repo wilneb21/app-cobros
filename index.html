@@ -73,7 +73,7 @@
 
       <section id="seccion-clientes" class="seccion oculto">
         <h3>Clientes</h3>
-        <form onsubmit="crearCliente(event)" class="tarjeta-form">
+        <form id="form-nuevo-cliente" onsubmit="crearCliente(event)" class="tarjeta-form">
           <input type="text" id="cliente-nombre" placeholder="Nombre completo" required>
           <input type="text" id="cliente-telefono" placeholder="Teléfono">
           <input type="text" id="cliente-direccion" placeholder="Dirección">
@@ -84,6 +84,7 @@
           <button type="submit">+ Agregar cliente</button>
         </form>
         <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesLista()">
+        <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
         <div id="lista-clientes"></div>
       </section>
 
