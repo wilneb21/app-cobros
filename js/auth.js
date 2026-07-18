@@ -144,7 +144,10 @@ let estadoNavActual = { seccion: "inicio", modal: null };
 function prepararNavegacionMovil() {
   if (navegacionMovilPreparada) return;
   estadoNavActual = { seccion: "inicio", modal: null };
-  window.history.replaceState(estadoNavActual, "");
+  // OJO: debe ser pushState (no replaceState). Así queda un "colchón" en el
+  // historial debajo de nuestro estado; si no, con una sola entrada el botón
+  // atrás sale directo de la app sin darle chance a este código de actuar.
+  window.history.pushState(estadoNavActual, "");
   navegacionMovilPreparada = true;
 
   window.addEventListener("popstate", async (evento) => {
