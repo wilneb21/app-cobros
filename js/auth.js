@@ -79,14 +79,12 @@ function mostrarAppPrincipal() {
   iniciarControlInactividad();
 }
 
-supabaseClient.auth.getSession().then(({ data: { session } }) => {
-  if (session) mostrarAppPrincipal();
-  ocultarSplash();
-});
-
 // --- PANTALLA DE BIENVENIDA (animación de entrada) ---
 const horaInicioSplash = Date.now();
+let splashYaOculto = false;
 function ocultarSplash() {
+  if (splashYaOculto) return;
+  splashYaOculto = true;
   const splash = document.getElementById("pantalla-splash");
   if (!splash) return;
   const transcurrido = Date.now() - horaInicioSplash;
@@ -96,6 +94,17 @@ function ocultarSplash() {
     setTimeout(() => splash.remove(), 500);
   }, espera);
 }
+
+// Si la conexión es lenta o falla, jamás dejamos al usuario atrapado en la
+// pantalla de carga: a los 4 segundos se oculta sí o sí y aparece el login.
+setTimeout(ocultarSplash, 4000);
+
+supabaseClient.auth.getSession().then(({ data: { session } }) => {
+  if (session) mostrarAppPrincipal();
+  ocultarSplash();
+}).catch(() => {
+  ocultarSplash();
+});
 
 // --- Cierre de sesión automático por inactividad (30 minutos) ---
 let temporizadorInactividad;
