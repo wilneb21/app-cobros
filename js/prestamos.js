@@ -220,7 +220,7 @@ async function cargarPrestamosDeCliente(clienteId) {
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const diferencia = totalPagado - montoEsperado;
 
-    let claseMora, textoMora, recargoTexto = "";
+    let claseMora, textoMora, recargoTexto = "", botonAlDia = "";
     if (diferencia >= 0) {
       claseMora = "estado-al-dia";
       textoMora = diferencia > 0 ? `🟢 Al día (adelantado ${formatoPesos(diferencia)})` : "🟢 Al día";
@@ -228,6 +228,12 @@ async function cargarPrestamosDeCliente(clienteId) {
       const montoDebe = Math.abs(diferencia);
       claseMora = montoDebe < Number(p.cuota) * 2 ? "estado-atencion" : "estado-mora";
       textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)}`;
+
+      // Si debe más de 1 cuota, "Pagó ✅" solo registraría el valor de UNA cuota
+      // y el cliente seguiría atrasado. Este botón precarga el total que debe
+      // (todas las cuotas atrasadas juntas) para ponerlo al día de un solo pago.
+      const montoDebeRedondeado = Math.round(montoDebe);
+      botonAlDia = `<button type="button" class="btn-al-dia" onclick="abrirPonerseAlDia(${p.id}, ${clienteId}, ${montoDebeRedondeado})">📅 Ponerse al día (${formatoPesos(montoDebeRedondeado)})</button>`;
 
       if (p.interes_mora_habilitado && p.interes_mora_porcentaje > 0) {
         const recargo = Math.round(montoDebe * (p.interes_mora_porcentaje / 100));
@@ -240,25 +246,41 @@ async function cargarPrestamosDeCliente(clienteId) {
 
     return `
       <div class="subtarjeta ${claseMora}" id="subtarjeta-${p.id}">
-        <span class="badge-estado">${textoMora}</span>
-        ${recargoTexto}
-        ${moraTexto}
-        <span>Cuota ${p.frecuencia}: ${formatoPesos(p.cuota)}</span><br>
-        <span><strong>Saldo pendiente: ${formatoPesos(saldoPendiente)}</strong></span><br>
-        <span class="ultimo-registro">${textoUltimo}</span>
-        ${textoRacha}
+        <div class="fila-resumen-credito">
+          <span class="badge-estado">${textoMora}</span>
+          <strong class="saldo-credito">${formatoPesos(saldoPendiente)}</strong>
+        </div>
+        <div class="subinfo-credito">
+          <span>Cuota ${p.frecuencia}: ${formatoPesos(p.cuota)}</span>
+          <span class="ultimo-registro">${textoUltimo}</span>
+          ${textoRacha}
+        </div>
+        ${botonAlDia}
         <div class="botones-pago">
           <button class="btn-pago pago-si" onclick="registrarPago(${p.id}, ${p.cuota}, 'pago', ${clienteId})">Pagó ✅</button>
           <button class="btn-pago pago-parcial" onclick="abrirPagoParcial(${p.id}, ${clienteId})">Parcial ⚠️</button>
           <button class="btn-pago pago-no" onclick="registrarPago(${p.id}, 0, 'no_pago', ${clienteId})">No pagó ❌</button>
         </div>
-        <button class="btn-historial" onclick="verHistorial(${p.id})">Ver historial completo</button>
-        <div id="historial-${p.id}" class="historial oculto"></div>
-        <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>
+        <p class="link-mas-opciones" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
+        <div id="mas-opciones-${p.id}" class="mas-opciones oculto">
+          ${recargoTexto}
+          ${moraTexto}
+          <button class="btn-historial" onclick="verHistorial(${p.id})">Ver historial completo</button>
+          <div id="historial-${p.id}" class="historial oculto"></div>
+          <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>
+        </div>
       </div>`;
   });
 
   contenedor.innerHTML = tarjetas.join("");
+}
+
+// Despliega/oculta las acciones secundarias (historial, refinanciar, mora) de
+// una tarjeta de cobro, para que la vista de "Cobrar" no se vea tan llena de
+// botones — las 3 acciones del día a día (Pagó/Parcial/No pagó) quedan siempre
+// visibles y el resto queda a un toque de distancia.
+function toggleMasOpciones(prestamoId) {
+  document.getElementById("mas-opciones-" + prestamoId)?.classList.toggle("oculto");
 }
 
 // Convierte el recargo por mora, hasta ahora solo un estimado en pantalla,

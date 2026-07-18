@@ -56,6 +56,24 @@ async function abrirPagoParcial(prestamoId, clienteId) {
   await registrarPago(prestamoId, montoLimpio, "parcial", clienteId);
 }
 
+// --- PONERSE AL DÍA (cliente atrasado en varias cuotas) ---
+// El botón "Pagó ✅" solo registra el valor de UNA cuota. Cuando el cliente
+// debe más de una (por ejemplo, se atrasó 3 semanas y hoy quiere pagar todo
+// junto), este flujo precarga el monto TOTAL que debe y lo deja editable —
+// el cobrador escribe cuánto recibió realmente. Si paga el total, queda
+// registrado como "Pagó ✅" (al día); si paga menos, como "Parcial ⚠️".
+// Importante: sigue existiendo un solo registro de pago por día — el monto
+// que se escriba aquí reemplaza (no se suma a) cualquier pago ya registrado
+// hoy para este mismo préstamo.
+async function abrirPonerseAlDia(prestamoId, clienteId, montoDebe) {
+  const monto = await mostrarPrompt(`Este cliente debe ${formatoPesos(montoDebe)} de cuotas atrasadas. ¿Cuánto te pagó hoy para ponerse al día?`, montoDebe, true);
+  if (monto === null) return;
+  const montoLimpio = parseFloat(String(monto).replace(/\D/g, ""));
+  if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
+  const estado = montoLimpio >= montoDebe ? "pago" : "parcial";
+  await registrarPago(prestamoId, montoLimpio, estado, clienteId);
+}
+
 async function verHistorial(prestamoId) {
   const contenedor = document.getElementById("historial-" + prestamoId);
   if (!contenedor.classList.contains("oculto")) { contenedor.classList.add("oculto"); return; }

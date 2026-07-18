@@ -406,11 +406,30 @@ button.secundario {
 .estado-atencion { border-left-color: var(--warning); background-color: #fffdf3; }
 .estado-mora { border-left-color: var(--danger); background-color: #fff5f5; }
 
+.fila-resumen-credito {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .badge-estado {
-  display: block;
   font-weight: 700;
   font-size: 12px;
-  margin-bottom: 6px;
+}
+
+.saldo-credito {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.subinfo-credito {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
 .ultimo-registro {
@@ -418,6 +437,22 @@ button.secundario {
   color: var(--text-muted);
   font-style: italic;
 }
+
+.link-mas-opciones {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 8px 0 0;
+  cursor: pointer;
+}
+
+.mas-opciones {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e5f5;
+}
+body.modo-oscuro .mas-opciones { border-color: #3a4152; }
 
 .nota-cliente {
   background: #fff9e6;
@@ -454,6 +489,17 @@ button.secundario {
   margin-top: 6px;
   border-radius: 8px;
 }
+
+.btn-al-dia {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 9px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: #1d4ed8;
+}
+body.modo-oscuro .btn-al-dia { background: #2b4fc4; }
 
 .btn-historial { background: #1565c0; }
 .btn-refinanciar { background: #6a1b9a; }
