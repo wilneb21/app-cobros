@@ -1,35 +1,13 @@
 let clientesCache = [];
 let mostrandoArchivados = false;
 
-async function crearCliente(event) {
-  event.preventDefault();
-  const nombre = document.getElementById("cliente-nombre").value;
-  const telefono = document.getElementById("cliente-telefono").value;
-  const direccion = document.getElementById("cliente-direccion").value;
-  const notas = document.getElementById("cliente-notas").value;
-  const rutaId = document.getElementById("cliente-ruta").value;
-  const { data: userData } = await supabaseClient.auth.getUser();
-
-  const { error } = await supabaseClient.from("clientes").insert({
-    nombre, telefono, direccion, notas, ruta_id: rutaId, user_id: userData.user.id
-  });
-
-  if (error) { mostrarAlerta("Error al crear cliente: " + error.message); return; }
-
-  document.getElementById("cliente-nombre").value = "";
-  document.getElementById("cliente-telefono").value = "";
-  document.getElementById("cliente-direccion").value = "";
-  document.getElementById("cliente-notas").value = "";
-  cargarClientes();
-}
-
 async function cargarClientes() {
   mostrarCargando("lista-clientes");
   const { data, error } = await supabaseClient
     .from("clientes").select("*, rutas(nombre)")
     .eq("archivado", mostrandoArchivados)
     .order("nombre");
-  if (error) { console.error(error); return; }
+  if (error) { mostrarAlerta("No fue posible cargar los clientes."); return; }
   clientesCache = data;
   pintarClientesLista(data);
 }
@@ -39,7 +17,6 @@ function toggleVerArchivados() {
   document.getElementById("link-ver-archivados").innerText = mostrandoArchivados
     ? "← Volver a clientes activos"
     : "📦 Ver clientes archivados";
-  document.getElementById("form-nuevo-cliente").classList.toggle("oculto", mostrandoArchivados);
   cargarClientes();
 }
 
@@ -49,7 +26,7 @@ function pintarClientesLista(data) {
   if (data.length === 0) {
     contenedor.innerHTML = mostrandoArchivados
       ? `<div class="estado-vacio">📦 No tienes clientes archivados.</div>`
-      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Usa el formulario de arriba para agregar el primero.</div>`;
+      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Toca <strong>Nuevo</strong> para crearlo junto con su primer préstamo.</div>`;
     return;
   }
 
@@ -59,10 +36,10 @@ function pintarClientesLista(data) {
     const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
     contenedor.innerHTML += `
       <div class="tarjeta cliente-clickable" onclick="abrirDetalleCliente(${cliente.id})">
-        <strong>${iconoRiesgo} ${cliente.nombre}</strong>
-        <span>📞 ${cliente.telefono || "sin teléfono"}</span><br>
-        <span>📍 ${cliente.rutas ? cliente.rutas.nombre : "sin ruta"}</span>
-        ${cliente.notas ? `<div class="nota-cliente">📝 ${cliente.notas}</div>` : ""}
+        <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
+        <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span><br>
+        <span>📍 ${escaparHtml(cliente.rutas ? cliente.rutas.nombre : "sin ruta")}</span>
+        ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
       </div>`;
   });
 }
@@ -72,7 +49,7 @@ function filtrarClientesLista() {
   const filtrados = clientesCache.filter(c => c.nombre.toLowerCase().includes(texto));
 
   if (filtrados.length === 0 && texto) {
-    document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">🔍 Ningún cliente coincide con "${texto}".</div>`;
+    document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">🔍 Ningún cliente coincide con "${escaparHtml(texto)}".</div>`;
     return;
   }
   pintarClientesLista(filtrados);
@@ -122,13 +99,25 @@ async function pintarTabInfo(cliente) {
   const { count } = await supabaseClient
     .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", cliente.id);
   const tieneHistorial = count > 0;
+  const { data: activos } = await supabaseClient.from("prestamos")
+    .select("id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, numero_cuotas")
+    .eq("cliente_id", cliente.id).eq("estado", "activo");
+  const idsActivos = (activos || []).map(prestamo => prestamo.id);
+  const { data: pagosActivos } = idsActivos.length
+    ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado, fecha_pago").in("prestamo_id", idsActivos)
+    : { data: [] };
+  const pagadoPorPrestamo = {};
+  (pagosActivos || []).forEach(pago => pagadoPorPrestamo[pago.prestamo_id] = (pagadoPorPrestamo[pago.prestamo_id] || 0) + Number(pago.monto_pagado));
+  const saldoActivo = (activos || []).reduce((total, prestamo) => total + Math.max(Number(prestamo.monto_prestado) * (1 + Number(prestamo.interes_porcentaje) / 100) - (pagadoPorPrestamo[prestamo.id] || 0), 0), 0);
+  const proximaCuota = (activos || []).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
 
   document.getElementById("tab-info").innerHTML = `
+    ${activos?.length ? `<div class="resumen-cliente-operativo"><div><small>Saldo activo</small><b>${formatoPesos(saldoActivo)}</b></div><div><small>Créditos activos</small><b>${activos.length}</b></div><div><small>Cuota siguiente</small><b>${formatoPesos(proximaCuota.cuota)}</b></div></div>` : `<div class="resumen-cliente-operativo sin-credito"><span>Sin créditos activos</span><button type="button" onclick="abrirPrestamoParaCliente(${cliente.id})">Crear préstamo</button></div>`}
     <form onsubmit="guardarEdicionCliente(event, ${cliente.id})" class="tarjeta-form">
-      <input type="text" id="editar-nombre" value="${cliente.nombre}" required>
-      <input type="text" id="editar-telefono" value="${cliente.telefono || ""}" placeholder="Teléfono">
-      <input type="text" id="editar-direccion" value="${cliente.direccion || ""}" placeholder="Dirección">
-      <textarea id="editar-notas" rows="2" placeholder="Notas">${cliente.notas || ""}</textarea>
+      <input type="text" id="editar-nombre" value="${escaparHtml(cliente.nombre)}" required>
+      <input type="text" id="editar-telefono" value="${escaparHtml(cliente.telefono || "")}" placeholder="Teléfono">
+      <input type="text" id="editar-direccion" value="${escaparHtml(cliente.direccion || "")}" placeholder="Dirección">
+      <textarea id="editar-notas" rows="2" placeholder="Notas">${escaparHtml(cliente.notas || "")}</textarea>
       <label class="etiqueta-select">Nivel de riesgo</label>
       <select id="editar-riesgo">
         <option value="bueno" ${riesgo === "bueno" ? "selected" : ""}>🟢 Bueno</option>
@@ -138,6 +127,7 @@ async function pintarTabInfo(cliente) {
       <button type="submit" class="btn-editar-cliente">💾 Guardar cambios</button>
     </form>
     ${telefonoLimpio ? `<button class="btn-whatsapp" onclick="window.open('https://wa.me/${armarNumeroWhatsapp(cliente.telefono)}')">💬 Enviar WhatsApp</button>` : ""}
+    ${cliente.direccion ? `<button class="btn-mapa" onclick="abrirMapaCliente(${cliente.id})">🗺️ Abrir ubicación en el mapa</button>` : ""}
     ${tieneHistorial ? `<button class="btn-pdf" onclick="exportarEstadoCuentaPDF(${cliente.id})">🧾 Exportar estado de cuenta</button>` : ""}
 
     ${cliente.archivado
@@ -150,13 +140,32 @@ async function pintarTabInfo(cliente) {
   `;
 }
 
+async function abrirMapaCliente(clienteId) {
+  const { data: cliente, error } = await supabaseClient.from("clientes").select("direccion").eq("id", clienteId).single();
+  if (error || !cliente?.direccion) { mostrarAlerta("Este cliente no tiene dirección registrada."); return; }
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cliente.direccion)}`, "_blank", "noopener");
+}
+
+function abrirPrestamoParaCliente(clienteId) {
+  cerrarDetalleCliente();
+  mostrarSeccion("prestamos");
+  const seleccionar = () => {
+    const selector = document.getElementById("prestamo-cliente");
+    if (!selector.querySelector(`option[value="${clienteId}"]`)) return setTimeout(seleccionar, 100);
+    seleccionarClientePrestamo("existente");
+    selector.value = String(clienteId);
+  };
+  seleccionar();
+}
+
 async function guardarEdicionCliente(event, clienteId) {
   event.preventDefault();
-  const nombre = document.getElementById("editar-nombre").value;
-  const telefono = document.getElementById("editar-telefono").value;
-  const direccion = document.getElementById("editar-direccion").value;
-  const notas = document.getElementById("editar-notas").value;
+  const nombre = document.getElementById("editar-nombre").value.trim();
+  const telefono = document.getElementById("editar-telefono").value.trim();
+  const direccion = document.getElementById("editar-direccion").value.trim();
+  const notas = document.getElementById("editar-notas").value.trim();
   const riesgo = document.getElementById("editar-riesgo").value;
+  if (!nombre) return mostrarAlerta("El nombre del cliente es obligatorio.");
 
   const { error } = await supabaseClient.from("clientes").update({ nombre, telefono, direccion, notas, riesgo }).eq("id", clienteId);
   if (error) { mostrarAlerta("Error al guardar: " + error.message); return; }
@@ -169,7 +178,8 @@ async function guardarEdicionCliente(event, clienteId) {
 // --- Exportar estado de cuenta (usa el diálogo de impresión del navegador, "Guardar como PDF") ---
 async function exportarEstadoCuentaPDF(clienteId) {
   const { data: cliente } = await supabaseClient.from("clientes").select("*").eq("id", clienteId).single();
-  const { data: prestamos } = await supabaseClient.from("prestamos").select("*").eq("cliente_id", clienteId).order("fecha_inicio", { ascending: false });
+  const { data: prestamos, error: errorPrestamos } = await supabaseClient.from("prestamos").select("*").eq("cliente_id", clienteId).order("fecha_inicio", { ascending: false });
+  if (!cliente || errorPrestamos) return mostrarAlerta("No fue posible generar el estado de cuenta.");
 
   let filasPrestamos = "";
   for (const p of prestamos) {
@@ -178,22 +188,22 @@ async function exportarEstadoCuentaPDF(clienteId) {
     const totalConInteres = Number(p.monto_prestado) + (Number(p.monto_prestado) * Number(p.interes_porcentaje) / 100);
 
     filasPrestamos += `
-      <h3>Préstamo del ${p.fecha_inicio} — ${p.estado}</h3>
+      <h3>Préstamo del ${p.fecha_inicio} — ${escaparHtml(p.estado)}</h3>
       <p>Monto: ${formatoPesos(p.monto_prestado)} | Interés: ${p.interes_porcentaje}% | Total a pagar: ${formatoPesos(totalConInteres)}</p>
       <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(totalConInteres - totalPagado)}</p>
       <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px;">
         <tr><th>Fecha</th><th>Estado</th><th>Monto</th></tr>
-        ${(pagos || []).map(pg => `<tr><td>${pg.fecha_pago}</td><td>${pg.estado}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}
+        ${(pagos || []).map(pg => `<tr><td>${pg.fecha_pago}</td><td>${escaparHtml(pg.estado)}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}
       </table><br>`;
   }
 
   const ventana = window.open("", "_blank");
   ventana.document.write(`
-    <html><head><title>Estado de cuenta - ${cliente.nombre}</title></head>
+    <html><head><title>Estado de cuenta - ${escaparHtml(cliente.nombre)}</title></head>
     <body style="font-family:Arial,sans-serif;padding:24px;">
       <h1>Estado de cuenta</h1>
-      <h2>${cliente.nombre}</h2>
-      <p>Teléfono: ${cliente.telefono || "N/A"} | Dirección: ${cliente.direccion || "N/A"}</p>
+      <h2>${escaparHtml(cliente.nombre)}</h2>
+      <p>Teléfono: ${escaparHtml(cliente.telefono || "N/A")} | Dirección: ${escaparHtml(cliente.direccion || "N/A")}</p>
       <hr>
       ${filasPrestamos || "<p>Sin préstamos registrados.</p>"}
     </body></html>
@@ -234,7 +244,6 @@ async function desarchivarCliente(clienteId) {
   cerrarDetalleCliente();
   mostrandoArchivados = false;
   document.getElementById("link-ver-archivados").innerText = "📦 Ver clientes archivados";
-  document.getElementById("form-nuevo-cliente").classList.remove("oculto");
   cargarClientes();
 }
 
@@ -244,7 +253,8 @@ async function pintarTabPrestamos() {
 }
 
 async function pintarTabHistorial() {
-  const { data: prestamos } = await supabaseClient.from("prestamos").select("id").eq("cliente_id", clienteDetalleActualId);
+  const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id").eq("cliente_id", clienteDetalleActualId);
+  if (error) { document.getElementById("tab-historial").textContent = "No fue posible cargar el historial."; return; }
   const idsPrestamos = prestamos.map(p => p.id);
 
   if (idsPrestamos.length === 0) {

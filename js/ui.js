@@ -1,12 +1,15 @@
 function mostrarConfirmacion(mensaje) {
   return new Promise(resolve => {
     const cont = document.getElementById("modal-generico-contenido");
-    cont.innerHTML = `
-      <p class="modal-mensaje">${mensaje}</p>
-      <div class="modal-botones">
-        <button class="btn-modal-cancelar" id="modal-btn-no">Cancelar</button>
-        <button class="btn-modal-confirmar" id="modal-btn-si">Confirmar</button>
-      </div>`;
+    cont.replaceChildren();
+    const texto = document.createElement("p");
+    texto.className = "modal-mensaje";
+    texto.textContent = mensaje.replace(/<br\s*\/?\s*>/gi, "\n");
+    texto.style.whiteSpace = "pre-line";
+    const botones = document.createElement("div");
+    botones.className = "modal-botones";
+    botones.innerHTML = '<button class="btn-modal-cancelar" id="modal-btn-no">Cancelar</button><button class="btn-modal-confirmar" id="modal-btn-si">Confirmar</button>';
+    cont.append(texto, botones);
     document.getElementById("modal-generico").classList.remove("oculto");
     document.getElementById("modal-btn-si").onclick = () => { cerrarModalGenerico(); resolve(true); };
     document.getElementById("modal-btn-no").onclick = () => { cerrarModalGenerico(); resolve(false); };
@@ -16,13 +19,9 @@ function mostrarConfirmacion(mensaje) {
 function mostrarPrompt(mensaje, valorDefault = "") {
   return new Promise(resolve => {
     const cont = document.getElementById("modal-generico-contenido");
-    cont.innerHTML = `
-      <p class="modal-mensaje">${mensaje}</p>
-      <input type="text" id="modal-input-valor" value="${valorDefault}">
-      <div class="modal-botones">
-        <button class="btn-modal-cancelar" id="modal-btn-cancelar">Cancelar</button>
-        <button class="btn-modal-confirmar" id="modal-btn-aceptar">Aceptar</button>
-      </div>`;
+    cont.innerHTML = '<p class="modal-mensaje"></p><input type="text" id="modal-input-valor"><div class="modal-botones"><button class="btn-modal-cancelar" id="modal-btn-cancelar">Cancelar</button><button class="btn-modal-confirmar" id="modal-btn-aceptar">Aceptar</button></div>';
+    cont.querySelector(".modal-mensaje").textContent = mensaje;
+    document.getElementById("modal-input-valor").value = valorDefault;
     document.getElementById("modal-generico").classList.remove("oculto");
     document.getElementById("modal-input-valor").focus();
     document.getElementById("modal-btn-aceptar").onclick = () => {
@@ -36,7 +35,9 @@ function mostrarPrompt(mensaje, valorDefault = "") {
 
 function mostrarAlerta(mensaje) {
   const cont = document.getElementById("modal-generico-contenido");
-  cont.innerHTML = `<p class="modal-mensaje">${mensaje}</p><button id="modal-btn-ok">Aceptar</button>`;
+  cont.innerHTML = '<p class="modal-mensaje"></p><button id="modal-btn-ok">Aceptar</button>';
+  cont.querySelector(".modal-mensaje").textContent = mensaje.replace(/<br\s*\/?\s*>/gi, "\n");
+  cont.querySelector(".modal-mensaje").style.whiteSpace = "pre-line";
   document.getElementById("modal-generico").classList.remove("oculto");
   document.getElementById("modal-btn-ok").onclick = cerrarModalGenerico;
 }

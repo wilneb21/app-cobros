@@ -1,26 +1,48 @@
 async function registrarPago(prestamoId, monto, estado, clienteId) {
-  const { data: userData } = await supabaseClient.auth.getUser();
   const fecha = obtenerFechaLocal();
+  if (!["pago", "parcial", "no_pago"].includes(estado) || (estado !== "no_pago" && !validarMontoPositivo(monto, "El pago"))) return;
 
-  const { data: pagoExistente } = await supabaseClient
-    .from("pagos").select("id").eq("prestamo_id", prestamoId).eq("fecha_pago", fecha).maybeSingle();
+  // Sin conexión: guarda el pago en el celular y lo sincroniza más tarde, sin bloquear al cobrador.
+  if (!navigator.onLine) {
+    agregarPagoACola({ prestamoId, monto, estado, fecha, clienteId, guardadoEn: Date.now() });
+    marcarSubtarjetaPendienteSync(prestamoId);
+    mostrarAlerta("📴 Sin conexión. El pago quedó guardado en tu celular y se enviará solo cuando vuelva la señal.");
+    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+    return;
+  }
 
-  let error;
+  let pagoExistente = null;
+  try {
+    const respuesta = await supabaseClient
+      .from("pagos").select("id").eq("prestamo_id", prestamoId).eq("fecha_pago", fecha).maybeSingle();
+    pagoExistente = respuesta.data;
+  } catch {
+    // Falla de red al verificar duplicado: seguimos, registrar_pago igual protege con upsert.
+  }
+
   if (pagoExistente) {
     const confirmado = await mostrarConfirmacion("Ya registraste un pago hoy para este cliente.<br>¿Quieres corregirlo con este nuevo valor?");
     if (!confirmado) return;
-    const resultado = await supabaseClient.from("pagos").update({ monto_pagado: monto, estado }).eq("id", pagoExistente.id);
-    error = resultado.error;
-  } else {
-    const resultado = await supabaseClient.from("pagos").insert({
-      prestamo_id: prestamoId, fecha_pago: fecha, monto_pagado: monto, estado, user_id: userData.user.id
-    });
-    error = resultado.error;
   }
 
-  if (error) { mostrarAlerta("Error al registrar pago: " + error.message); return; }
+  let error;
+  try {
+    ({ error } = await supabaseClient.rpc("registrar_pago", {
+      p_prestamo_id: prestamoId, p_monto_pagado: monto, p_estado: estado, p_fecha_pago: fecha
+    }));
+  } catch (excepcion) {
+    error = excepcion;
+  }
 
-  await verificarSiQuedoPagado(prestamoId);
+  if (error) {
+    // Puede ser una caída de señal justo al enviar: no se pierde el cobro, se reintenta solo.
+    agregarPagoACola({ prestamoId, monto, estado, fecha, clienteId, guardadoEn: Date.now() });
+    marcarSubtarjetaPendienteSync(prestamoId);
+    mostrarAlerta("⚠️ No fue posible conectar con el servidor. El pago quedó guardado y se reintentará automáticamente.");
+    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+    return;
+  }
+
   cargarPrestamosDeCliente(clienteId);
 
   if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
@@ -31,7 +53,7 @@ async function abrirPagoParcial(prestamoId, clienteId) {
   if (monto === null) return;
   const montoLimpio = parseFloat(monto.replace(/\D/g, ""));
   if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
-  registrarPago(prestamoId, montoLimpio, "parcial", clienteId);
+  await registrarPago(prestamoId, montoLimpio, "parcial", clienteId);
 }
 
 async function verHistorial(prestamoId) {
@@ -56,11 +78,22 @@ async function mostrarRecibo(clienteId, monto, fecha, estado) {
   document.getElementById("contenido-recibo").innerHTML = `
     <div class="recibo-titulo">🧾 Comprobante de pago</div>
     <div class="recibo-monto">${formatoPesos(monto)}</div>
-    <div class="recibo-linea"><span>Cliente</span><span>${cliente ? cliente.nombre : ""}</span></div>
+    <div class="recibo-linea"><span>Cliente</span><span>${escaparHtml(cliente ? cliente.nombre : "")}</span></div>
     <div class="recibo-linea"><span>Fecha</span><span>${fecha}</span></div>
     <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>
-    <button onclick="cerrarRecibo()" style="margin-top:16px;">Cerrar</button>`;
+    <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}')">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
   document.getElementById("modal-recibo").classList.remove("oculto");
+}
+
+async function compartirRecibo(clienteId, monto, fecha, estado) {
+  const { data: cliente } = await supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single();
+  const texto = `Comprobante de pago\nCliente: ${cliente?.nombre || "Cliente"}\nMonto: ${formatoPesos(monto)}\nFecha: ${fecha}\nTipo: ${estado === "pago" ? "Pago de cuota" : "Abono parcial"}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "Comprobante de pago", text: texto });
+    else { await navigator.clipboard.writeText(texto); mostrarAlerta("Comprobante copiado. Ya puedes pegarlo en WhatsApp."); }
+  } catch (error) {
+    if (error.name !== "AbortError") mostrarAlerta("No fue posible compartir el comprobante.");
+  }
 }
 
 function cerrarRecibo() {

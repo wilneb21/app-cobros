@@ -3,17 +3,54 @@ function toggleCampoMora() {
   document.getElementById("prestamo-mora-porcentaje").classList.toggle("oculto", !check.checked);
 }
 
+function actualizarVistaPreviaPrestamo() {
+  const monto = obtenerValorNumerico(document.getElementById("prestamo-monto"));
+  const interes = parseFloat(document.getElementById("prestamo-interes").value) || 0;
+  const cuotas = parseInt(document.getElementById("prestamo-cuotas").value, 10);
+  const vista = document.getElementById("vista-previa-prestamo");
+  if (!monto || !cuotas || cuotas <= 0 || interes < 0) {
+    vista.textContent = "Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.";
+    return;
+  }
+  const total = monto * (1 + interes / 100);
+  const cuota = total / cuotas;
+  vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
+}
+
+let tipoClientePrestamo = "existente";
+
+function seleccionarClientePrestamo(tipo) {
+  tipoClientePrestamo = tipo;
+  document.querySelectorAll(".tipo-cliente").forEach(boton => boton.classList.toggle("activo", boton.dataset.tipoCliente === tipo));
+  document.getElementById("bloque-cliente-existente").classList.toggle("oculto", tipo !== "existente");
+  document.getElementById("bloque-cliente-nuevo").classList.toggle("oculto", tipo !== "nuevo");
+  document.getElementById("prestamo-cliente").required = tipo === "existente";
+  document.getElementById("prestamo-nuevo-nombre").required = tipo === "nuevo";
+}
+
+function abrirPrestamoParaNuevoCliente() {
+  mostrarSeccion("prestamos");
+  seleccionarClientePrestamo("nuevo");
+  document.getElementById("prestamo-nuevo-nombre").focus();
+}
+
 async function cargarClientesEnSelector() {
   const { data, error } = await supabaseClient.from("clientes").select("id, nombre").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
   const selector = document.getElementById("prestamo-cliente");
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
-  data.forEach(c => selector.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
+  data.forEach(c => selector.innerHTML += `<option value="${c.id}">${escaparHtml(c.nombre)}</option>`);
+
+  const { data: rutas } = await supabaseClient.from("rutas").select("id, nombre").order("nombre");
+  const selectorRuta = document.getElementById("prestamo-nuevo-ruta");
+  selectorRuta.innerHTML = '<option value="">Sin ruta por ahora</option>';
+  (rutas || []).forEach(ruta => selectorRuta.innerHTML += `<option value="${ruta.id}">${escaparHtml(ruta.nombre)}</option>`);
+  if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = obtenerFechaLocal();
 }
 
 async function crearPrestamo(event) {
   event.preventDefault();
-  const clienteId = document.getElementById("prestamo-cliente").value;
+  let clienteId = document.getElementById("prestamo-cliente").value;
   const monto = obtenerValorNumerico(document.getElementById("prestamo-monto"));
   const interes = parseFloat(document.getElementById("prestamo-interes").value) || 0;
   const numeroCuotas = parseInt(document.getElementById("prestamo-cuotas").value);
@@ -21,19 +58,59 @@ async function crearPrestamo(event) {
   const fechaInicio = document.getElementById("prestamo-fecha").value;
   const moraHabilitada = document.getElementById("prestamo-mora-check").checked;
   const moraPorcentaje = moraHabilitada ? (parseFloat(document.getElementById("prestamo-mora-porcentaje").value) || 0) : 0;
+  if (!fechaInicio || !validarMontoPositivo(monto, "El monto prestado") || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0 || interes < 0 || moraPorcentaje < 0) {
+    mostrarAlerta("Revisa los valores del préstamo: cuotas enteras y porcentajes no negativos.");
+    return;
+  }
 
   const totalConInteres = monto + (monto * interes / 100);
-  const cuota = totalConInteres / numeroCuotas;
-  const { data: userData } = await supabaseClient.auth.getUser();
+  const cuota = Math.round((totalConInteres / numeroCuotas) * 100) / 100;
+  const user = await obtenerUsuarioActual();
+
+  if (tipoClientePrestamo === "nuevo") {
+    const nombre = document.getElementById("prestamo-nuevo-nombre").value.trim();
+    const telefono = document.getElementById("prestamo-nuevo-telefono").value.trim();
+    const direccion = document.getElementById("prestamo-nuevo-direccion").value.trim();
+    const notas = document.getElementById("prestamo-nuevo-notas").value.trim();
+    const rutaId = document.getElementById("prestamo-nuevo-ruta").value;
+    if (!nombre) { mostrarAlerta("Indica el nombre del nuevo cliente."); return; }
+
+    if (telefono) {
+      const { data: posiblesDuplicados } = await supabaseClient
+        .from("clientes").select("nombre, archivado").eq("telefono", telefono);
+      if (posiblesDuplicados && posiblesDuplicados.length > 0) {
+        const nombresExistentes = posiblesDuplicados
+          .map(c => escaparHtml(c.nombre) + (c.archivado ? " (archivado)" : ""))
+          .join(", ");
+        const continuar = await mostrarConfirmacion(
+          `Ya existe un cliente registrado con este teléfono: <strong>${nombresExistentes}</strong>.<br><br>¿Seguro que quieres crear <strong>${escaparHtml(nombre)}</strong> como un cliente nuevo de todas formas?`
+        );
+        if (!continuar) return;
+      }
+    }
+
+    const { data: clienteNuevo, error: errorCliente } = await supabaseClient.from("clientes").insert({
+      nombre, telefono, direccion, notas, ruta_id: rutaId || null, user_id: user.id
+    }).select("id").single();
+    if (errorCliente) { mostrarAlerta("No fue posible crear el cliente: " + errorCliente.message); return; }
+    clienteId = clienteNuevo.id;
+  }
+
+  if (!clienteId) { mostrarAlerta("Selecciona un cliente o crea uno nuevo."); return; }
 
   const { error } = await supabaseClient.from("prestamos").insert({
     cliente_id: clienteId, monto_prestado: monto, interes_porcentaje: interes,
     cuota, numero_cuotas: numeroCuotas, frecuencia, fecha_inicio: fechaInicio,
-    estado: "activo", user_id: userData.user.id,
+    estado: "activo", user_id: user.id,
     interes_mora_habilitado: moraHabilitada, interes_mora_porcentaje: moraPorcentaje
   });
 
-  if (error) { mostrarAlerta("Error al crear préstamo: " + error.message); return; }
+  if (error) {
+    mostrarAlerta(tipoClientePrestamo === "nuevo"
+      ? "El cliente fue creado, pero no se pudo registrar el préstamo: " + error.message
+      : "Error al crear préstamo: " + error.message);
+    return;
+  }
 
   document.getElementById("prestamo-monto").value = "";
   document.getElementById("prestamo-interes").value = "";
@@ -42,19 +119,57 @@ async function crearPrestamo(event) {
   document.getElementById("prestamo-mora-check").checked = false;
   document.getElementById("prestamo-mora-porcentaje").value = "";
   document.getElementById("prestamo-mora-porcentaje").classList.add("oculto");
+  ["prestamo-nuevo-nombre", "prestamo-nuevo-telefono", "prestamo-nuevo-direccion", "prestamo-nuevo-notas"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("prestamo-nuevo-ruta").value = "";
+  seleccionarClientePrestamo("existente");
+  cargarClientesEnSelector();
+  cargarClientes();
   mostrarAlerta("✅ Préstamo registrado con éxito");
 }
 
 // --- COBRAR ---
 let clientesCobrarCache = [];
+let clientesConSaldoIds = new Set();
+let filtroEstadoCobrar = "todos";
 
 async function cargarClientesParaCobrar() {
   mostrarCargando("lista-clientes-cobrar");
   const { data: clientes, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("archivado", false).order("nombre");
-  if (error) { console.error(error); return; }
+  if (error) { mostrarAlerta("No fue posible cargar los clientes para cobrar."); return; }
   clientesCobrarCache = clientes;
+  const ids = (clientes || []).map(cliente => cliente.id);
+  const { data: prestamosActivos } = ids.length
+    ? await supabaseClient.from("prestamos").select("cliente_id").in("cliente_id", ids).eq("estado", "activo")
+    : { data: [] };
+  clientesConSaldoIds = new Set((prestamosActivos || []).map(prestamo => prestamo.cliente_id));
   actualizarSelectorFiltroRuta(clientes);
-  pintarClientesCobrar(clientes);
+  filtrarClientesCobrar();
+}
+
+async function cargarCuentasPorCobrar() {
+  const activas = document.getElementById("lista-cuentas-activas");
+  const pagados = document.getElementById("lista-clientes-pagados");
+  activas.innerHTML = '<div class="cargando">Cargando cuentas...</div>';
+  const { data: prestamos, error } = await supabaseClient
+    .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
+    .eq("estado", "activo").order("fecha_inicio");
+  if (error) { activas.textContent = "No fue posible cargar las cuentas por cobrar."; return; }
+  const ids = (prestamos || []).map(p => p.id);
+  const { data: pagos } = ids.length ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids) : { data: [] };
+  const acumulados = {};
+  (pagos || []).forEach(p => acumulados[p.prestamo_id] = (acumulados[p.prestamo_id] || 0) + Number(p.monto_pagado));
+
+  activas.innerHTML = !prestamos?.length ? '<div class="estado-vacio">🎉 No tienes cuentas activas por cobrar.</div>' : prestamos.map(p => {
+    const total = Number(p.monto_prestado) * (1 + Number(p.interes_porcentaje) / 100);
+    const saldo = Math.max(total - (acumulados[p.id] || 0), 0);
+    return `<div class="tarjeta tarjeta-cuenta" onclick="abrirDetalleCliente(${p.cliente_id})"><div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div><div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div></div>`;
+  }).join("");
+
+  const { data: finalizados, error: errorFinalizados } = await supabaseClient
+    .from("prestamos").select("cliente_id, clientes(id, nombre, telefono, rutas(nombre))").eq("estado", "pagado");
+  if (errorFinalizados) { pagados.textContent = "No fue posible cargar los clientes finalizados."; return; }
+  const clientesUnicos = [...new Map((finalizados || []).filter(p => p.clientes).map(p => [p.cliente_id, p.clientes])).values()];
+  pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" onclick="abrirDetalleCliente(${c.id})"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
 }
 
 // Llena el selector de "filtrar por ruta" con las rutas que realmente tienen clientes
@@ -67,7 +182,7 @@ function actualizarSelectorFiltroRuta(clientes) {
 
   selector.innerHTML = '<option value="">Todas las rutas</option>';
   rutasUnicas.forEach(([id, nombre]) => {
-    selector.innerHTML += `<option value="${id}">${nombre}</option>`;
+    selector.innerHTML += `<option value="${id}">${escaparHtml(nombre)}</option>`;
   });
   selector.value = valorPrevio;
 }
@@ -84,9 +199,9 @@ function pintarClientesCobrar(clientes) {
   for (const cliente of clientes) {
     contenedor.innerHTML += `
       <div class="tarjeta">
-        <strong>${cliente.nombre}</strong>
-        <span>📍 ${cliente.rutas ? cliente.rutas.nombre : "sin ruta"}</span>
-        ${cliente.notas ? `<div class="nota-cliente">📝 ${cliente.notas}</div>` : ""}
+        <strong>${escaparHtml(cliente.nombre)}</strong>
+        <span>📍 ${escaparHtml(cliente.rutas ? cliente.rutas.nombre : "sin ruta")}</span>
+        ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
         <div id="prestamos-cliente-${cliente.id}" class="prestamos-cliente">Cargando préstamos...</div>
       </div>`;
   }
@@ -99,8 +214,16 @@ function filtrarClientesCobrar() {
 
   let filtrados = clientesCobrarCache.filter(c => c.nombre.toLowerCase().includes(texto));
   if (rutaId) filtrados = filtrados.filter(c => String(c.ruta_id) === rutaId);
+  if (filtroEstadoCobrar === "saldo") filtrados = filtrados.filter(c => clientesConSaldoIds.has(c.id));
+  if (filtroEstadoCobrar === "aldia") filtrados = filtrados.filter(c => !clientesConSaldoIds.has(c.id));
 
   pintarClientesCobrar(filtrados);
+}
+
+function cambiarFiltroCobrar(estado) {
+  filtroEstadoCobrar = estado;
+  document.querySelectorAll(".chip-cobrar").forEach(chip => chip.classList.toggle("activo", chip.dataset.estadoCobro === estado));
+  filtrarClientesCobrar();
 }
 
 async function cargarPrestamosDeCliente(clienteId) {
@@ -114,9 +237,10 @@ async function cargarPrestamosDeCliente(clienteId) {
 
   contenedor.innerHTML = "";
   for (const p of prestamos) {
-    const { data: pagos } = await supabaseClient
+    const { data: pagos, error: errorPagos } = await supabaseClient
       .from("pagos").select("monto_pagado, fecha_pago, estado")
       .eq("prestamo_id", p.id).order("fecha_pago", { ascending: false });
+    if (errorPagos) { contenedor.textContent = "No fue posible cargar los pagos."; return; }
 
     const totalPagado = pagos ? pagos.reduce((s, pg) => s + Number(pg.monto_pagado), 0) : 0;
     const totalConInteres = Number(p.monto_prestado) + (Number(p.monto_prestado) * Number(p.interes_porcentaje) / 100);
@@ -155,7 +279,7 @@ async function cargarPrestamosDeCliente(clienteId) {
     }
 
     contenedor.innerHTML += `
-      <div class="subtarjeta ${claseMora}">
+      <div class="subtarjeta ${claseMora}" id="subtarjeta-${p.id}">
         <span class="badge-estado">${textoMora}</span>
         ${recargoTexto}
         <span>Cuota ${p.frecuencia}: ${formatoPesos(p.cuota)}</span><br>
@@ -186,38 +310,47 @@ async function verificarSiQuedoPagado(prestamoId) {
 }
 
 async function refinanciarPrestamo(prestamoIdViejo, clienteId, saldoPendiente, interesActual, frecuenciaActual) {
-  const confirmado = await mostrarConfirmacion(`Saldo pendiente actual: ${formatoPesos(saldoPendiente)}<br><br>¿Deseas refinanciar este crédito?`);
-  if (!confirmado) return;
+  const cont = document.getElementById("modal-generico-contenido");
+  cont.innerHTML = `
+    <p class="modal-mensaje">Saldo pendiente actual: <strong>${formatoPesos(saldoPendiente)}</strong></p>
+    <label class="etiqueta-select">¿Cuánto dinero ADICIONAL le vas a prestar? (deja $0 si solo renuevas)</label>
+    <input type="text" id="refi-adicional" inputmode="numeric" value="$0">
+    <label class="etiqueta-select">¿En cuántas cuotas nuevas va a pagar?</label>
+    <input type="number" id="refi-cuotas" min="1" step="1" value="20">
+    <label class="etiqueta-select">¿Qué interés % aplicamos?</label>
+    <input type="number" id="refi-interes" min="0" step="0.01" value="${interesActual}">
+    <div class="modal-botones">
+      <button class="btn-modal-cancelar" id="refi-btn-cancelar">Cancelar</button>
+      <button class="btn-modal-confirmar" id="refi-btn-confirmar">Refinanciar</button>
+    </div>`;
+  document.getElementById("modal-generico").classList.remove("oculto");
+  formatearMoneda(document.getElementById("refi-adicional"));
 
-  const adicionalTexto = await mostrarPrompt("¿Cuánto dinero ADICIONAL le vas a prestar? (0 si solo renuevas)", "0");
-  if (adicionalTexto === null) return;
-  const montoAdicional = parseFloat(adicionalTexto.replace(/\D/g, "")) || 0;
+  document.getElementById("refi-btn-cancelar").onclick = cerrarModalGenerico;
+  document.getElementById("refi-btn-confirmar").onclick = async () => {
+    const montoAdicional = obtenerValorNumerico(document.getElementById("refi-adicional"));
+    const numeroCuotas = parseInt(document.getElementById("refi-cuotas").value, 10);
+    const nuevoInteres = parseFloat(document.getElementById("refi-interes").value);
+    if (!numeroCuotas || numeroCuotas <= 0) { mostrarAlerta("Número de cuotas inválido."); return; }
+    if (!Number.isFinite(nuevoInteres) || nuevoInteres < 0 || montoAdicional < 0) { mostrarAlerta("Ingresa valores válidos y no negativos."); return; }
 
-  const cuotasTexto = await mostrarPrompt("¿En cuántas cuotas nuevas va a pagar?", "20");
-  if (cuotasTexto === null) return;
-  const numeroCuotas = parseInt(cuotasTexto);
-  if (!numeroCuotas || numeroCuotas <= 0) { mostrarAlerta("Número de cuotas inválido."); return; }
+    cerrarModalGenerico();
+    const nuevoMontoPrestado = Math.round(saldoPendiente + montoAdicional);
+    const totalConInteres = nuevoMontoPrestado + (nuevoMontoPrestado * nuevoInteres / 100);
+    const nuevaCuota = Math.round(totalConInteres / numeroCuotas);
+    const { error } = await supabaseClient.rpc("refinanciar_prestamo", {
+      p_prestamo_id: prestamoIdViejo,
+      p_monto_adicional: montoAdicional,
+      p_numero_cuotas: numeroCuotas,
+      p_interes_porcentaje: nuevoInteres,
+      p_fecha_inicio: obtenerFechaLocal()
+    });
 
-  const interesTexto = await mostrarPrompt("¿Qué interés % aplicamos?", interesActual);
-  const nuevoInteres = parseFloat(interesTexto) || 0;
+    if (error) { mostrarAlerta("Error al crear nuevo préstamo: " + error.message); return; }
 
-  const nuevoMontoPrestado = saldoPendiente + montoAdicional;
-  const totalConInteres = nuevoMontoPrestado + (nuevoMontoPrestado * nuevoInteres / 100);
-  const nuevaCuota = totalConInteres / numeroCuotas;
-  const { data: userData } = await supabaseClient.auth.getUser();
-
-  await supabaseClient.from("prestamos").update({ estado: "refinanciado" }).eq("id", prestamoIdViejo);
-
-  const { error } = await supabaseClient.from("prestamos").insert({
-    cliente_id: clienteId, monto_prestado: nuevoMontoPrestado, interes_porcentaje: nuevoInteres,
-    cuota: nuevaCuota, numero_cuotas: numeroCuotas, frecuencia: frecuenciaActual,
-    fecha_inicio: obtenerFechaLocal(), estado: "activo",
-    prestamo_anterior_id: prestamoIdViejo, user_id: userData.user.id
-  });
-
-  if (error) { mostrarAlerta("Error al crear nuevo préstamo: " + error.message); return; }
-
-  mostrarAlerta(`✅ Crédito refinanciado.<br>Nuevo monto: ${formatoPesos(nuevoMontoPrestado)}<br>Nueva cuota: ${formatoPesos(nuevaCuota)}`);
-  cargarPrestamosDeCliente(clienteId);
+    mostrarAlerta(`✅ Crédito refinanciado.<br>Nuevo monto: ${formatoPesos(nuevoMontoPrestado)}<br>Nueva cuota: ${formatoPesos(nuevaCuota)}`);
+    cargarPrestamosDeCliente(clienteId);
+  };
 }
 formatearMoneda(document.getElementById("prestamo-monto"));
+document.getElementById("prestamo-monto").addEventListener("input", actualizarVistaPreviaPrestamo);

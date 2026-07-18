@@ -7,7 +7,7 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#4f46e5">
+  <meta name="theme-color" content="#0f9f91">
   <link rel="icon" href="iconos/icon-192.png">
   <link rel="apple-touch-icon" href="iconos/icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,7 +27,7 @@
     <input type="email" id="email" placeholder="Correo electrónico">
     <input type="password" id="password" placeholder="Contraseña">
     <button onclick="iniciarSesion()">Entrar</button>
-    <button onclick="registrarUsuario()" class="secundario">Crear cuenta nueva</button>
+    <button onclick="abrirModalCrearCuenta()" class="secundario">Crear cuenta nueva</button>
     <p class="link-olvide" onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</p>
     <p id="mensaje-error"></p>
   </div>
@@ -37,31 +37,68 @@
     <header class="top-bar">
       <h2>💰 App de Cobros</h2>
       <div class="top-bar-acciones">
+        <button id="indicador-offline" class="btn-icono indicador-offline oculto" onclick="sincronizarColaOffline(false)" title="Tocar para sincronizar ahora">⏳</button>
         <button onclick="abrirBusquedaGlobal()" class="btn-icono">🔍</button>
         <button onclick="toggleModoOscuro()" class="btn-icono">🌙</button>
         <button onclick="cerrarSesion()" class="btn-salir">Salir</button>
       </div>
     </header>
 
+    <div id="banner-sin-conexion" class="banner-sin-conexion oculto">📴 Sin conexión — los cobros se guardan en tu celular y se envían solos cuando regrese la señal</div>
+
     <main id="contenido">
 
       <section id="seccion-inicio" class="seccion">
-        <h3>Resumen de hoy</h3>
+        <div class="inicio-hero">
+          <span id="saludo-inicio">Buenos días</span>
+          <h3>Tu jornada de cobro</h3>
+          <p id="fecha-inicio"></p>
+        </div>
+        <div class="filtros-periodo" role="group" aria-label="Periodo del resumen">
+          <button type="button" class="pildora-periodo activa" data-periodo="hoy" onclick="cambiarPeriodoInicio('hoy')">Hoy</button>
+          <button type="button" class="pildora-periodo" data-periodo="ayer" onclick="cambiarPeriodoInicio('ayer')">Ayer</button>
+          <button type="button" class="pildora-periodo" data-periodo="7dias" onclick="cambiarPeriodoInicio('7dias')">7 días</button>
+          <button type="button" class="pildora-periodo" data-periodo="mes" onclick="cambiarPeriodoInicio('mes')">Mes</button>
+        </div>
+        <div id="progreso-cobro-principal" class="progreso-cobro-principal"></div>
+        <h4 id="titulo-resumen-inicio">Resumen de hoy</h4>
         <div id="resumen-dia" class="resumen-dia"></div>
         <div id="resumen-cartera" class="resumen-dia"></div>
+        <div id="caja-diaria" class="caja-diaria"></div>
+
+        <h4>Acciones rápidas</h4>
+        <div class="acciones-rapidas acciones-rapidas-grid">
+          <button type="button" onclick="abrirPrestamoParaNuevoCliente()" class="accion-rapida accion-cliente"><span>👤</span><b>Crear cliente</b><small>Con su primer préstamo</small></button>
+          <button type="button" onclick="mostrarSeccion('prestamos')" class="accion-rapida accion-prestamo"><span>💸</span><b>Crear préstamo</b><small>Nuevo crédito</small></button>
+          <button type="button" onclick="mostrarSeccion('cobrar')" class="accion-rapida accion-cobrar"><span>✓</span><b>Registrar cobro</b><small>Pago del día</small></button>
+          <button type="button" onclick="mostrarSeccion('rutas')" class="accion-rapida accion-ruta"><span>⌖</span><b>Ver rutas</b><small>Organiza visitas</small></button>
+        </div>
 
         <h4>Meta de recaudo <span class="link-editar-meta" onclick="editarMetas()">✏️ editar</span></h4>
         <div id="metas-progreso"></div>
 
         <h4>Recaudo últimos 7 días</h4>
         <div id="grafico-semana" class="grafico-semana"></div>
+        <div id="tendencia-cobro" class="tendencia-cobro"></div>
 
         <h4>Pendientes por cobrar hoy</h4>
+        <p class="texto-ayuda">Organizados por ruta y con prioridad para las cuotas vencidas.</p>
+        <div id="jornada-por-rutas"></div>
         <div id="lista-pendientes-hoy"></div>
+
+        <h4>Agenda de vencimientos</h4>
+        <p class="texto-ayuda">Próximas cuotas esperadas durante los siguientes 7 días.</p>
+        <div id="agenda-vencimientos"></div>
       </section>
 
       <section id="seccion-cobrar" class="seccion oculto">
         <h3>Cobrar</h3>
+        <p class="texto-ayuda">Busca por cliente o filtra la ruta que estás recorriendo.</p>
+        <div class="chips-cobrar" role="group" aria-label="Estado de cuenta">
+          <button type="button" class="chip-cobrar activo" data-estado-cobro="todos" onclick="cambiarFiltroCobrar('todos')">Todos</button>
+          <button type="button" class="chip-cobrar" data-estado-cobro="saldo" onclick="cambiarFiltroCobrar('saldo')">Con saldo</button>
+          <button type="button" class="chip-cobrar" data-estado-cobro="aldia" onclick="cambiarFiltroCobrar('aldia')">Al día</button>
+        </div>
         <div class="fila-filtros">
           <input type="text" id="buscar-cliente-cobrar" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesCobrar()">
           <select id="filtro-ruta-cobrar" onchange="filtrarClientesCobrar()">
@@ -72,37 +109,46 @@
       </section>
 
       <section id="seccion-clientes" class="seccion oculto">
-        <h3>Clientes</h3>
-        <form id="form-nuevo-cliente" onsubmit="crearCliente(event)" class="tarjeta-form">
-          <input type="text" id="cliente-nombre" placeholder="Nombre completo" required>
-          <input type="text" id="cliente-telefono" placeholder="Teléfono">
-          <input type="text" id="cliente-direccion" placeholder="Dirección">
-          <textarea id="cliente-notas" placeholder="Notas (ej: vive cerca del parque)" rows="2"></textarea>
-          <select id="cliente-ruta" required>
-            <option value="">Selecciona una ruta</option>
-          </select>
-          <button type="submit">+ Agregar cliente</button>
-        </form>
+        <div class="cabecera-lista-clientes"><div><h3>Clientes</h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirPrestamoParaNuevoCliente()">＋ Nuevo</button></div>
         <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesLista()">
         <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
         <div id="lista-clientes"></div>
       </section>
 
+      <section id="seccion-cuentas" class="seccion oculto">
+        <h3>Cuentas por cobrar</h3>
+        <p class="texto-ayuda">Créditos activos ordenados para tu jornada de cobro.</p>
+        <div id="lista-cuentas-activas"></div>
+        <h4>Clientes que ya terminaron de pagar</h4>
+        <div id="lista-clientes-pagados"></div>
+      </section>
+
       <section id="seccion-prestamos" class="seccion oculto">
         <h3>Nuevo préstamo</h3>
+        <p class="texto-ayuda">Elige un cliente existente o registra uno nuevo antes de crear el préstamo.</p>
         <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
-          <select id="prestamo-cliente" required>
-            <option value="">Selecciona un cliente</option>
-          </select>
+          <div class="selector-tipo-cliente" role="group" aria-label="Tipo de cliente">
+            <button type="button" class="tipo-cliente activo" data-tipo-cliente="existente" onclick="seleccionarClientePrestamo('existente')">Cliente existente</button>
+            <button type="button" class="tipo-cliente" data-tipo-cliente="nuevo" onclick="seleccionarClientePrestamo('nuevo')">Crear cliente</button>
+          </div>
+          <div id="bloque-cliente-existente"><select id="prestamo-cliente"><option value="">Selecciona un cliente</option></select></div>
+          <div id="bloque-cliente-nuevo" class="oculto campos-anidados">
+            <input type="text" id="prestamo-nuevo-nombre" placeholder="Nombre completo del cliente">
+            <input type="text" id="prestamo-nuevo-telefono" placeholder="Teléfono">
+            <input type="text" id="prestamo-nuevo-direccion" placeholder="Dirección">
+            <textarea id="prestamo-nuevo-notas" placeholder="Notas (opcional)" rows="2"></textarea>
+            <select id="prestamo-nuevo-ruta"><option value="">Sin ruta por ahora</option></select>
+          </div>
           <input type="text" id="prestamo-monto" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
-          <input type="number" id="prestamo-interes" placeholder="Interés % (opcional, ej: 20)">
-          <input type="number" id="prestamo-cuotas" placeholder="Número de cuotas (ej: 20)" required>
+          <input type="number" id="prestamo-interes" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
+          <input type="number" id="prestamo-cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
           <select id="prestamo-frecuencia" required>
             <option value="">Frecuencia de pago</option>
             <option value="diario">Diario</option>
             <option value="semanal">Semanal</option>
           </select>
           <input type="date" id="prestamo-fecha" required>
+          <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
           <label class="check-label">
             <input type="checkbox" id="prestamo-mora-check" onchange="toggleCampoMora()">
@@ -137,9 +183,30 @@
         <input type="number" id="reporte-anio" class="oculto" placeholder="Ej: 2026" min="2020" max="2100">
         <div id="resumen-mes" class="resumen-dia"></div>
         <div id="comparacion-mes" class="comparacion-mes oculto"></div>
+        <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
+
+        <div class="encabezado-tendencia-cartera">
+          <h4>Cartera activa por semana</h4>
+          <span id="delta-cartera" class="tendencia-sube"></span>
+        </div>
+        <div id="grafico-cartera" class="grafico-cartera"></div>
 
         <div id="respaldo-recordatorio" class="oculto"></div>
-        <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar respaldo (CSV)</button>
+
+        <h4>Exportar para ver o compartir</h4>
+        <p class="texto-ayuda-export">Estos archivos se abren directo en Excel, Google Sheets o WhatsApp.</p>
+        <button type="button" onclick="exportarExcel(event)" class="btn-excel">📊 Exportar todo a Excel (.xlsx)</button>
+        <div class="exportaciones-csv">
+          <button type="button" onclick="exportarCsv('pagos')">Pagos (CSV)</button>
+          <button type="button" onclick="exportarCsv('cartera')">Cartera (CSV)</button>
+          <button type="button" onclick="exportarCsv('gastos')">Gastos (CSV)</button>
+        </div>
+
+        <div class="bloque-respaldo-tecnico">
+          <p class="titulo-respaldo-tecnico">🔒 Copia de seguridad técnica</p>
+          <p class="texto-ayuda-export">Archivo <strong>.json</strong> para restaurar tu información si algo sale mal. No está pensado para abrirlo ni leerlo — solo guárdalo.</p>
+          <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar copia de seguridad (.json)</button>
+        </div>
 
         <h4>Gastos operativos</h4>
         <form onsubmit="crearGasto(event)" class="tarjeta-form">
@@ -151,15 +218,30 @@
         <div id="lista-gastos"></div>
       </section>
 
+      <section id="seccion-configuracion" class="seccion oculto">
+        <div class="encabezado-config"><span class="icono-config">⚙</span><div><h3>Configuración</h3><p class="texto-ayuda">Personaliza tu espacio de trabajo y administra la app.</p></div></div>
+        <div class="grupo-config">
+          <p class="titulo-grupo-config">Preferencias</p>
+          <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono">◐</span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="editarMetas()"><span class="config-icono">◎</span><span><b>Metas de recaudo</b><small>Define tu objetivo diario y mensual</small></span><span class="config-chevron">›</span></button>
+        </div>
+        <div class="grupo-config">
+          <p class="titulo-grupo-config">Gestión</p>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('cuentas')"><span class="config-icono">▤</span><span><b>Cuentas por cobrar</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('rutas')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
+        </div>
+        <button type="button" class="btn-cerrar-sesion-config" onclick="cerrarSesion()">Cerrar sesión</button>
+      </section>
+
     </main>
 
-    <nav class="menu-inferior">
-      <button onclick="mostrarSeccion('inicio')" class="nav-btn" data-nav="inicio">🏠<br>Inicio</button>
-      <button onclick="mostrarSeccion('cobrar')" class="nav-btn" data-nav="cobrar">💰<br>Cobrar</button>
-      <button onclick="mostrarSeccion('clientes')" class="nav-btn" data-nav="clientes">👤<br>Clientes</button>
-      <button onclick="mostrarSeccion('prestamos')" class="nav-btn" data-nav="prestamos">💵<br>Préstamos</button>
-      <button onclick="mostrarSeccion('rutas')" class="nav-btn" data-nav="rutas">📍<br>Rutas</button>
-      <button onclick="mostrarSeccion('reportes')" class="nav-btn" data-nav="reportes">📊<br>Reportes</button>
+    <nav class="menu-inferior" id="menu-inferior" aria-label="Navegación principal">
+      <button onclick="mostrarSeccion('inicio')" class="barra-nav-btn" data-nav="inicio"><span>⌂</span><small>Inicio</small></button>
+      <button onclick="mostrarSeccion('clientes')" class="barra-nav-btn" data-nav="clientes"><span>♙</span><small>Clientes</small></button>
+      <button onclick="mostrarSeccion('prestamos')" class="barra-nav-btn" data-nav="prestamos"><span>¤</span><small>Préstamos</small></button>
+      <button onclick="mostrarSeccion('cobrar')" class="barra-nav-btn" data-nav="cobrar"><span>✓</span><small>Cobrar</small></button>
+      <button onclick="mostrarSeccion('configuracion')" class="barra-nav-btn" data-nav="configuracion"><span>⚙</span><small>Config.</small></button>
     </nav>
 
   </div>
@@ -200,8 +282,21 @@
     </div>
   </div>
 
+  <div id="modal-crear-cuenta" class="modal-overlay oculto">
+    <div class="modal-caja">
+      <div class="detalle-header"><h3>Crear cuenta</h3><button class="btn-cerrar-detalle" onclick="cerrarModalCrearCuenta()">✕</button></div>
+      <p class="texto-ayuda">Usa una contraseña de mínimo 8 caracteres.</p>
+      <input type="email" id="crear-email" placeholder="Correo electrónico">
+      <input type="password" id="crear-password" placeholder="Contraseña">
+      <input type="password" id="crear-password-confirmar" placeholder="Confirma tu contraseña">
+      <button onclick="registrarUsuario()">Crear mi cuenta</button>
+      <p id="mensaje-crear-cuenta" class="mensaje-modal"></p>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/offline.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/main.js"></script>

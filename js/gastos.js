@@ -2,13 +2,14 @@ formatearMoneda(document.getElementById("gasto-monto"));
 
 async function crearGasto(event) {
   event.preventDefault();
-  const concepto = document.getElementById("gasto-concepto").value;
+  const concepto = document.getElementById("gasto-concepto").value.trim();
   const monto = obtenerValorNumerico(document.getElementById("gasto-monto"));
   const fecha = document.getElementById("gasto-fecha").value;
-  const { data: userData } = await supabaseClient.auth.getUser();
+  if (!concepto || !fecha || !validarMontoPositivo(monto, "El gasto")) return;
+  const user = await obtenerUsuarioActual();
 
   const { error } = await supabaseClient.from("gastos").insert({
-    concepto, monto, fecha, user_id: userData.user.id
+    concepto, monto, fecha, user_id: user.id
   });
 
   if (error) { mostrarAlerta("Error al registrar gasto: " + error.message); return; }
@@ -24,14 +25,14 @@ async function cargarGastosDelPeriodo(inicio, fin) {
   if (inicio && fin) query = query.gte("fecha", inicio).lt("fecha", fin);
 
   const { data: gastos, error } = await query;
-  if (error) { console.error(error); return 0; }
+  if (error) { mostrarAlerta("No fue posible cargar los gastos."); return 0; }
 
   const contenedor = document.getElementById("lista-gastos");
   contenedor.innerHTML = gastos.length === 0
     ? `<div class="estado-vacio">Sin gastos registrados en este período.</div>`
     : gastos.map(g => `
         <div class="fila-historial">
-          <span>${g.fecha}</span><span>${g.concepto}</span>
+          <span>${g.fecha}</span><span>${escaparHtml(g.concepto)}</span>
           <span>${formatoPesos(g.monto)}</span>
           <span class="btn-borrar-gasto" onclick="eliminarGasto(${g.id})">🗑️</span>
         </div>`).join("");
@@ -42,6 +43,7 @@ async function cargarGastosDelPeriodo(inicio, fin) {
 async function eliminarGasto(gastoId) {
   const confirmado = await mostrarConfirmacion("¿Eliminar este gasto?");
   if (!confirmado) return;
-  await supabaseClient.from("gastos").delete().eq("id", gastoId);
+  const { error } = await supabaseClient.from("gastos").delete().eq("id", gastoId);
+  if (error) { mostrarAlerta("No fue posible eliminar el gasto."); return; }
   cargarGastosDelPeriodo();
 }
