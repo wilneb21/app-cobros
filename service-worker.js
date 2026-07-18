@@ -1,6 +1,6 @@
 // Nombre de la "versión" de caché. Súbelo (v2, v3...) cada vez que cambies archivos
 // para forzar que los celulares descarguen la versión nueva.
-const CACHE_NOMBRE = "app-cobros-v9";
+const CACHE_NOMBRE = "app-cobros-v12";
 
 // Archivos que se guardan para que la app cargue rápido y funcione con mala señal.
 // (Los datos reales de clientes/pagos siempre vienen de Supabase, no de aquí.)
@@ -18,6 +18,7 @@ const ARCHIVOS_CACHE = [
   "./js/prestamos.js",
   "./js/pagos.js",
   "./js/reportes.js",
+  "./js/ganancia.js",
   "./js/gastos.js",
   "./manifest.json",
   "./iconos/icon-192.png",

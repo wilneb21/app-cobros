@@ -221,12 +221,13 @@ button.secundario {
 /* --- RESUMEN / CAJAS --- */
 .resumen-dia {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 10px;
 }
 
 .resumen-caja {
-  flex: 1;
+  flex: 1 1 140px;
   background: var(--card);
   border-radius: 14px;
   padding: 14px 8px;
@@ -750,6 +751,18 @@ button.secundario {
 .tarjeta-cuenta { display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); }.cuenta-saldo { text-align: right; }.cuenta-saldo small, .cuenta-saldo span { display: block; font-size: 10px; color: var(--text-muted); }.cuenta-saldo b { display: block; color: var(--primary-dark); font-size: 15px; }
 .fila-finalizada { display: flex; align-items: center; gap: 10px; background: var(--card); margin-bottom: 8px; padding: 11px; border-radius: 12px; cursor: pointer; }.fila-finalizada > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #dcfce7; color: var(--success); font-weight: 800; }.fila-finalizada div { flex: 1; }.fila-finalizada strong, .fila-finalizada small { display: block; font-size: 12px; }.fila-finalizada small { color: var(--text-muted); }.fila-finalizada b { color: var(--primary); font-size: 11px; }
 .tendencia-cobro { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 8px 2px 2px; font-size: 12px; }.tendencia-cobro small { color: var(--text-muted); text-align: right; }.tendencia-sube { color: var(--success); font-weight: 700; }.tendencia-baja { color: var(--danger); font-weight: 700; }
+
+/* --- GANANCIA POR INTERESES (tarjeta destacada de Inicio) --- */
+.tarjeta-ganancia { background: var(--card); border-radius: 18px; padding: 14px; margin-bottom: 14px; box-shadow: 0 8px 22px rgba(32,42,92,.08); border: 1px solid rgba(64,86,214,.08); }
+.ganancia-cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ganancia-cabecera h4 { margin: 0; font-size: 14px; }
+.filtros-ganancia { padding: 0; overflow: visible; }
+.ganancia-acumulada { font-size: 12px; color: var(--text-muted); margin: 8px 2px 6px; }
+.ganancia-acumulada strong { color: var(--primary-dark); font-size: 13px; }
+.cartera-tendencia-periodo { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; margin: 4px 2px 0; }
+.cartera-tendencia-periodo small { color: var(--text-muted); text-align: right; }
+body.modo-oscuro .tarjeta-ganancia { background: #1e302e; border-color: #35514d; }
+body.modo-oscuro .ganancia-acumulada strong { color: #9ce5d8; }
 .mensaje-modal { min-height: 18px; color: var(--danger); font-size: 12px; }
 
 body.modo-oscuro .top-bar, body.modo-oscuro .inicio-hero { background: linear-gradient(135deg, #161b35, #33246e); }
@@ -1090,6 +1103,12 @@ body.modo-oscuro .jornada-ruta { background: #1e302e; border-color: #35514d; }.m
 /* --- Modo offline: banner de conexión e indicador de pagos pendientes --- */
 .banner-sin-conexion { margin: 0 16px 10px; padding: 9px 14px; color: #7a4a00; background: #fff3d6; border: 1px solid #f5dd9a; border-radius: 13px; font-size: 11px; font-weight: 600; text-align: center; }
 .indicador-offline { width: auto !important; padding: 0 10px !important; color: #7a4a00 !important; background: #fff3d6 !important; font-size: 10px !important; font-weight: 700; }
+.indicador-offline-error { color: #7a1a1a !important; background: #ffdede !important; cursor: pointer; }
+.btn-aplicar-mora { display: block; margin-top: 4px; font-size: 11px; padding: 4px 8px; }
+.recargo-mora-aplicado { display: block; font-size: 12px; color: #7a1a1a; font-weight: 600; }
+.ranking-fila { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #eee; }
+.ranking-puesto { font-weight: 700; margin-right: 6px; }
+.btn-exportar-csv { margin-left: 8px; }
 .badge-pendiente-sync { display: block; margin-bottom: 8px; padding: 6px 9px; color: #7a4a00; background: #fff3d6; border-radius: 9px; font-size: 10px; font-weight: 700; text-align: center; }
 body.modo-oscuro .banner-sin-conexion, body.modo-oscuro .badge-pendiente-sync { color: #ffd98a; background: #3a2e10; border-color: #5a4718; }
 
@@ -1105,3 +1124,44 @@ body.modo-oscuro .banner-sin-conexion, body.modo-oscuro .badge-pendiente-sync { 
 .botones-orden button:disabled { opacity: .35; }
 body.modo-oscuro .btn-ordenar-ruta, body.modo-oscuro .btn-mapa-ruta, body.modo-oscuro .btn-mapa-jornada, body.modo-oscuro .botones-orden button { color: #9ce5d8; background: #1c403b; }
 body.modo-oscuro .fila-orden-cliente { border-color: #35514d; }
+
+/* --- Bloqueo con PIN / huella --- */
+.pantalla-bloqueo { position: fixed; inset: 0; z-index: 999; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); display: flex; align-items: center; justify-content: center; }
+.bloqueo-caja { background: var(--card); padding: 36px 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.25); width: 90%; max-width: 360px; text-align: center; }
+.bloqueo-logo { font-size: 40px; margin-bottom: 6px; }
+.bloqueo-caja h2 { margin: 4px 0 2px; }
+#bloqueo-pin-input { width: 100%; margin: 16px 0 6px; padding: 14px; font-size: 26px; text-align: center; letter-spacing: 10px; border: 2px solid #e2e5f5; border-radius: 12px; }
+.bloqueo-error { color: var(--danger); font-size: 12px; min-height: 16px; margin: 0 0 8px; }
+.btn-bloqueo-entrar { width: 100%; padding: 13px; border: none; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 700; font-size: 15px; margin-top: 4px; }
+.btn-bloqueo-huella { width: 100%; padding: 12px; border: none; border-radius: 12px; background: #eef2ff; color: var(--primary-dark); font-weight: 600; font-size: 14px; margin-top: 10px; }
+body.modo-oscuro .bloqueo-caja { background: #1e2230; color: var(--text); }
+body.modo-oscuro #bloqueo-pin-input { background: #161b28; border-color: #3a4152; color: #fff; }
+body.modo-oscuro .btn-bloqueo-huella { background: #252044; color: #ddd6fe; }
+
+/* --- Cierre de caja: descuadre (conteo fisico vs esperado) --- */
+.caja-descuadre { margin-top: 6px; padding: 8px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; text-align: center; }
+.caja-descuadre.cuadrada { background: #ecfdf3; color: #067647; }
+.caja-descuadre.sobrante { background: #eff6ff; color: #1d4ed8; }
+.caja-descuadre.faltante { background: #fef2f2; color: #b42318; }
+body.modo-oscuro .caja-descuadre.cuadrada { background: #123024; }
+body.modo-oscuro .caja-descuadre.sobrante { background: #17233f; }
+body.modo-oscuro .caja-descuadre.faltante { background: #3a1414; }
+
+/* --- Recordatorio WhatsApp en agenda de vencimientos --- */
+.fila-agenda { flex-wrap: wrap; gap: 4px 8px; }
+.btn-recordar-whatsapp { margin-left: auto; padding: 4px 9px; font-size: 10px; font-weight: 700; color: #067647; background: #ecfdf3; border-radius: 8px; box-shadow: none; width: auto; }
+body.modo-oscuro .btn-recordar-whatsapp { background: #123024; color: #6ee7b7; }
+
+/* --- Sugerencia de cupo --- */
+.sugerencia-cupo { margin: 10px 0; padding: 12px 14px; border-radius: 12px; background: #eef2ff; border-left: 4px solid var(--accent); font-size: 12px; }
+.sugerencia-cupo b { display: block; font-size: 15px; color: var(--primary-dark); margin-bottom: 2px; }
+body.modo-oscuro .sugerencia-cupo { background: #252044; }
+body.modo-oscuro .sugerencia-cupo b { color: #ddd6fe; }
+
+/* --- Comparar rendimiento entre rutas --- */
+.comparar-rutas-fila { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; font-size: 12px; gap: 8px; }
+.comparar-rutas-fila:last-child { border-bottom: 0; }
+.comparar-rutas-fila .nombre-ruta { font-weight: 700; }
+.comparar-rutas-fila .mora-alta { color: var(--danger); font-weight: 700; }
+.comparar-rutas-fila .mora-baja { color: var(--success); font-weight: 700; }
+body.modo-oscuro .comparar-rutas-fila { border-color: #35514d; }

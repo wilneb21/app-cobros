@@ -20,9 +20,11 @@ function guardarColaOffline(cola) {
   actualizarIndicadorOffline();
 }
 
+const MAX_INTENTOS_SYNC = 5;
+
 function agregarPagoACola(item) {
   const cola = obtenerColaOffline();
-  cola.push(item);
+  cola.push({ ...item, intentos: 0 });
   guardarColaOffline(cola);
 }
 
@@ -34,8 +36,13 @@ function actualizarIndicadorOffline() {
     el.classList.add("oculto");
     return;
   }
+  const atascados = cola.filter(item => (item.intentos || 0) >= MAX_INTENTOS_SYNC).length;
   el.classList.remove("oculto");
-  el.textContent = `⏳ ${cola.length} por sincronizar`;
+  el.classList.toggle("indicador-offline-error", atascados > 0);
+  el.textContent = atascados > 0
+    ? `⚠️ ${atascados} pago${atascados > 1 ? "s" : ""} no se pudo enviar — toca para reintentar`
+    : `⏳ ${cola.length} por sincronizar`;
+  el.onclick = atascados > 0 ? () => sincronizarColaOffline(false, true) : null;
 }
 
 function marcarSubtarjetaPendienteSync(prestamoId) {
@@ -50,14 +57,18 @@ function marcarSubtarjetaPendienteSync(prestamoId) {
   }
 }
 
-async function sincronizarColaOffline(silencioso) {
+async function sincronizarColaOffline(silencioso, forzarAtascados) {
   if (!navigator.onLine) return;
   const cola = obtenerColaOffline();
   if (cola.length === 0) return;
 
   const restantes = [];
   let sincronizados = 0;
+  let nuevosAtascados = 0;
   for (const item of cola) {
+    const intentosPrevios = item.intentos || 0;
+    // Ya agotó los reintentos automáticos: solo se reintenta si el cobrador lo pide a mano.
+    if (intentosPrevios >= MAX_INTENTOS_SYNC && !forzarAtascados) { restantes.push(item); continue; }
     try {
       const { error } = await supabaseClient.rpc("registrar_pago", {
         p_prestamo_id: item.prestamoId,
@@ -65,10 +76,15 @@ async function sincronizarColaOffline(silencioso) {
         p_estado: item.estado,
         p_fecha_pago: item.fecha
       });
-      if (error) restantes.push(item);
-      else sincronizados++;
+      if (error) {
+        const intentos = intentosPrevios + 1;
+        if (intentos >= MAX_INTENTOS_SYNC) nuevosAtascados++;
+        restantes.push({ ...item, intentos });
+      } else sincronizados++;
     } catch {
-      restantes.push(item);
+      const intentos = intentosPrevios + 1;
+      if (intentos >= MAX_INTENTOS_SYNC) nuevosAtascados++;
+      restantes.push({ ...item, intentos });
     }
   }
 
@@ -77,6 +93,9 @@ async function sincronizarColaOffline(silencioso) {
   if (sincronizados > 0 && !silencioso) {
     mostrarAlerta(`✅ Se sincronizaron ${sincronizados} pago${sincronizados > 1 ? "s" : ""} que estaban pendientes de conexión.`);
     if (typeof cargarResumenDia === "function") cargarResumenDia();
+  }
+  if (nuevosAtascados > 0) {
+    mostrarAlerta(`⚠️ ${nuevosAtascados} pago${nuevosAtascados > 1 ? "s" : ""} no se pudo enviar tras varios intentos. Revisa el indicador de "sin sincronizar" para reintentar a mano — puede ser un dato inválido, no solo falta de señal.`);
   }
 }
 

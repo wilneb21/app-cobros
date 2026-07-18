@@ -28,6 +28,10 @@ async function cargarClientesEnSelector() {
 
 async function crearPrestamo(event) {
   event.preventDefault();
+  if (!navigator.onLine) {
+    mostrarAlerta("📴 Sin conexión. Crear un préstamo nuevo necesita señal — el modo offline solo guarda cobros de préstamos que ya existen. Intenta de nuevo cuando vuelva la señal.");
+    return;
+  }
   let clienteId = document.getElementById("prestamo-cliente").value;
   const monto = obtenerValorNumerico(document.getElementById("prestamo-monto"));
   const interes = parseFloat(document.getElementById("prestamo-interes").value) || 0;
@@ -180,16 +184,24 @@ async function cargarPrestamosDeCliente(clienteId) {
   if (error) { contenedor.innerHTML = "Error al cargar."; return; }
   if (prestamos.length === 0) { contenedor.innerHTML = "<span>Sin préstamos activos</span>"; return; }
 
-  contenedor.innerHTML = "";
-  for (const p of prestamos) {
-    const { data: pagos, error: errorPagos } = await supabaseClient
-      .from("pagos").select("monto_pagado, fecha_pago, estado")
-      .eq("prestamo_id", p.id).order("fecha_pago", { ascending: false });
-    if (errorPagos) { contenedor.textContent = "No fue posible cargar los pagos."; return; }
+  // Antes se pedían los pagos de cada préstamo UNO POR UNO en fila (await dentro
+  // de un for): con varios créditos activos y señal de celular lenta, la espera
+  // se sumaba por cada uno y la pestaña se podía quedar "Cargando..." mucho
+  // tiempo. Ahora se piden todos al mismo tiempo con Promise.all.
+  const resultados = await Promise.all(prestamos.map(p =>
+    supabaseClient.from("pagos").select("monto_pagado, fecha_pago, estado")
+      .eq("prestamo_id", p.id).order("fecha_pago", { ascending: false })
+  ));
+
+  if (resultados.some(r => r.error)) { contenedor.textContent = "No fue posible cargar los pagos."; return; }
+
+  const tarjetas = prestamos.map((p, indice) => {
+    const pagos = resultados[indice].data;
 
     const totalPagado = pagos ? pagos.reduce((s, pg) => s + Number(pg.monto_pagado), 0) : 0;
     const totalConInteres = Number(p.monto_prestado) + (Number(p.monto_prestado) * Number(p.interes_porcentaje) / 100);
-    const saldoPendiente = totalConInteres - totalPagado;
+    const moraAcumulada = Number(p.mora_acumulada) || 0;
+    const saldoPendiente = totalConInteres - totalPagado + moraAcumulada;
 
     const ultimoPago = pagos && pagos.length > 0 ? pagos[0] : null;
     const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
@@ -218,15 +230,19 @@ async function cargarPrestamosDeCliente(clienteId) {
       textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)}`;
 
       if (p.interes_mora_habilitado && p.interes_mora_porcentaje > 0) {
-        const recargo = montoDebe * (p.interes_mora_porcentaje / 100);
-        recargoTexto = `<span class="recargo-mora">+ Recargo por mora estimado: ${formatoPesos(recargo)}</span>`;
+        const recargo = Math.round(montoDebe * (p.interes_mora_porcentaje / 100));
+        recargoTexto = `<span class="recargo-mora">+ Recargo por mora estimado: ${formatoPesos(recargo)}
+          <button type="button" class="btn-aplicar-mora" onclick="aplicarRecargoMora(${p.id}, ${recargo}, ${clienteId})">Aplicar recargo al saldo</button></span>`;
       }
     }
+    const moraTexto = moraAcumulada > 0
+      ? `<span class="recargo-mora-aplicado">Mora ya aplicada a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
 
-    contenedor.innerHTML += `
+    return `
       <div class="subtarjeta ${claseMora}" id="subtarjeta-${p.id}">
         <span class="badge-estado">${textoMora}</span>
         ${recargoTexto}
+        ${moraTexto}
         <span>Cuota ${p.frecuencia}: ${formatoPesos(p.cuota)}</span><br>
         <span><strong>Saldo pendiente: ${formatoPesos(saldoPendiente)}</strong></span><br>
         <span class="ultimo-registro">${textoUltimo}</span>
@@ -240,7 +256,32 @@ async function cargarPrestamosDeCliente(clienteId) {
         <div id="historial-${p.id}" class="historial oculto"></div>
         <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>
       </div>`;
+  });
+
+  contenedor.innerHTML = tarjetas.join("");
+}
+
+// Convierte el recargo por mora, hasta ahora solo un estimado en pantalla,
+// en un cargo real: lo suma al saldo pendiente del préstamo (mora_acumulada)
+// y queda registrado (auditable) en Supabase. Requiere conexión: es un
+// cargo de dinero real, no se guarda en cola offline para evitar aplicarlo
+// dos veces por accidente si el celular reintenta el envío.
+async function aplicarRecargoMora(prestamoId, montoEstimado, clienteId) {
+  if (!navigator.onLine) {
+    mostrarAlerta("📴 Necesitas conexión para aplicar un recargo de mora, ya que es un cargo real al saldo del cliente.");
+    return;
   }
+  const confirmado = await mostrarConfirmacion(
+    `¿Aplicar un recargo de mora de ${formatoPesos(montoEstimado)} al saldo de este préstamo?<br>Se sumará al saldo pendiente y quedará registrado.`
+  );
+  if (!confirmado) return;
+
+  const { error } = await supabaseClient.rpc("aplicar_recargo_mora", {
+    p_prestamo_id: prestamoId, p_monto: montoEstimado
+  });
+  if (error) { mostrarAlerta("No fue posible aplicar el recargo: " + error.message); return; }
+  mostrarAlerta("✅ Recargo de mora aplicado al saldo.");
+  cargarPrestamosDeCliente(clienteId);
 }
 
 async function verificarSiQuedoPagado(prestamoId) {

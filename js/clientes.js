@@ -12,6 +12,88 @@ async function cargarClientes() {
   pintarClientesLista(data);
 }
 
+// --- RANKING DE CLIENTES POR CUMPLIMIENTO ---
+// % de cumplimiento = pagos completos registrados / total de registros de pago
+// (pagos completos + parciales + "no pagó") de todos los préstamos del cliente,
+// histórico. Sirve para decidir a quién es más fácil volver a prestarle.
+let rankingClientesVisible = false;
+
+function toggleRankingClientes() {
+  rankingClientesVisible = !rankingClientesVisible;
+  const cont = document.getElementById("ranking-clientes");
+  document.getElementById("link-ver-ranking").textContent = rankingClientesVisible
+    ? "← Ocultar ranking" : "🏆 Ver ranking de cumplimiento";
+  cont.classList.toggle("oculto", !rankingClientesVisible);
+  if (rankingClientesVisible) cargarRankingClientes();
+}
+
+async function cargarRankingClientes() {
+  const cont = document.getElementById("ranking-clientes");
+  cont.innerHTML = '<div class="cargando">Calculando ranking...</div>';
+
+  const { data: pagos, error } = await supabaseClient
+    .from("pagos").select("estado, prestamos(cliente_id, clientes(nombre))");
+  if (error) { cont.innerHTML = '<p class="texto-ayuda">No fue posible calcular el ranking.</p>'; return; }
+
+  const porCliente = {};
+  (pagos || []).forEach(p => {
+    const clienteId = p.prestamos?.cliente_id;
+    const nombre = p.prestamos?.clientes?.nombre;
+    if (!clienteId) return;
+    if (!porCliente[clienteId]) porCliente[clienteId] = { nombre, total: 0, pagados: 0 };
+    porCliente[clienteId].total++;
+    if (p.estado === "pago") porCliente[clienteId].pagados++;
+  });
+
+  const ranking = Object.values(porCliente)
+    .filter(c => c.total >= 3) // evita rankear con muy poca historia
+    .map(c => ({ ...c, pct: (c.pagados / c.total) * 100 }))
+    .sort((a, b) => b.pct - a.pct);
+
+  cont.innerHTML = ranking.length === 0
+    ? '<p class="texto-ayuda">Necesitas al menos 3 pagos registrados por cliente para calcular el ranking.</p>'
+    : ranking.map((c, i) => `
+        <div class="ranking-fila">
+          <span><span class="ranking-puesto">#${i + 1}</span>${escaparHtml(c.nombre || "Cliente")}</span>
+          <span>${c.pct.toFixed(0)}% cumplimiento (${c.pagados}/${c.total})</span>
+        </div>`).join("");
+}
+
+// --- SUGERENCIA DE CUPO ---
+// Con base en el préstamo más grande que el cliente ya terminó de pagar (estado
+// "pagado") y su % de cumplimiento histórico, sugiere cuánto sería razonable
+// volver a prestarle. Es solo una guía — la decisión final siempre es tuya.
+async function calcularSugerenciaCupo(clienteId, riesgo) {
+  const { data: prestamos, error } = await supabaseClient
+    .from("prestamos").select("id, monto_prestado, estado").eq("cliente_id", clienteId);
+  if (error || !prestamos) return null;
+
+  const finalizados = prestamos.filter(p => p.estado === "pagado");
+  if (finalizados.length === 0) return null; // sin historial cerrado, no hay base confiable para sugerir
+
+  const montoMaximoPagado = Math.max(...finalizados.map(p => Number(p.monto_prestado)));
+
+  const idsTodos = prestamos.map(p => p.id);
+  const { data: pagos } = await supabaseClient.from("pagos").select("estado").in("prestamo_id", idsTodos);
+  const total = (pagos || []).length;
+  const pagados = (pagos || []).filter(p => p.estado === "pago").length;
+  const pctCumplimiento = total >= 3 ? (pagados / total) * 100 : null;
+
+  let factor = 1.0; // por defecto, mantener el mismo monto
+  let motivo = " · monto similar al último crédito ya cancelado";
+
+  if (pctCumplimiento !== null) {
+    if (pctCumplimiento >= 90) { factor = 1.3; motivo = ` · ${pctCumplimiento.toFixed(0)}% de cumplimiento, puedes subirle el cupo`; }
+    else if (pctCumplimiento >= 75) { factor = 1.15; motivo = ` · ${pctCumplimiento.toFixed(0)}% de cumplimiento, aumento moderado`; }
+    else if (pctCumplimiento >= 50) { factor = 1.0; motivo = ` · ${pctCumplimiento.toFixed(0)}% de cumplimiento, mejor mantener el mismo monto`; }
+    else { factor = 0.7; motivo = ` · ${pctCumplimiento.toFixed(0)}% de cumplimiento, conviene bajarle el cupo`; }
+  }
+
+  if (riesgo === "riesgoso") factor = Math.min(factor, 0.8);
+
+  return { monto: Math.round((montoMaximoPagado * factor) / 10000) * 10000, razon: motivo };
+}
+
 function toggleVerArchivados() {
   mostrandoArchivados = !mostrandoArchivados;
   document.getElementById("link-ver-archivados").innerText = mostrandoArchivados
@@ -109,6 +191,10 @@ function cerrarModalNuevoCliente() {
 
 async function crearClienteNuevo(event) {
   event.preventDefault();
+  if (!navigator.onLine) {
+    mostrarAlerta("📴 Sin conexión. Crear un cliente nuevo necesita señal — el modo offline solo guarda cobros de clientes que ya existen. Intenta de nuevo cuando vuelva la señal.");
+    return;
+  }
   const nombre = document.getElementById("nuevo-cliente-nombre").value.trim();
   const telefono = document.getElementById("nuevo-cliente-telefono").value.trim();
   const direccion = document.getElementById("nuevo-cliente-direccion").value.trim();
@@ -190,9 +276,11 @@ async function pintarTabInfo(cliente) {
   (pagosActivos || []).forEach(pago => pagadoPorPrestamo[pago.prestamo_id] = (pagadoPorPrestamo[pago.prestamo_id] || 0) + Number(pago.monto_pagado));
   const saldoActivo = (activos || []).reduce((total, prestamo) => total + Math.max(Number(prestamo.monto_prestado) * (1 + Number(prestamo.interes_porcentaje) / 100) - (pagadoPorPrestamo[prestamo.id] || 0), 0), 0);
   const proximaCuota = (activos || []).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
+  const sugerenciaCupo = await calcularSugerenciaCupo(cliente.id, riesgo);
 
   document.getElementById("tab-info").innerHTML = `
     ${activos?.length ? `<div class="resumen-cliente-operativo"><div><small>Saldo activo</small><b>${formatoPesos(saldoActivo)}</b></div><div><small>Créditos activos</small><b>${activos.length}</b></div><div><small>Cuota siguiente</small><b>${formatoPesos(proximaCuota.cuota)}</b></div></div>` : `<div class="resumen-cliente-operativo sin-credito"><span>Sin créditos activos</span><button type="button" onclick="abrirPrestamoParaCliente(${cliente.id})">Crear préstamo</button></div>`}
+    ${sugerenciaCupo ? `<div class="sugerencia-cupo">💡 <b>Cupo sugerido: ${formatoPesos(sugerenciaCupo.monto)}</b>${escaparHtml(sugerenciaCupo.razon)}</div>` : ""}
     <form onsubmit="guardarEdicionCliente(event, ${cliente.id})" class="tarjeta-form">
       <input type="text" id="editar-nombre" value="${escaparHtml(cliente.nombre)}" required>
       <input type="text" id="editar-telefono" value="${escaparHtml(cliente.telefono || "")}" placeholder="Teléfono">

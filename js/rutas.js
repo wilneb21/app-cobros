@@ -45,6 +45,8 @@ async function cargarRutas() {
 // Permite organizar los clientes en el orden real en que el cobrador los visita
 // (no alfabético), usando botones ▲▼ pensados para pantalla táctil.
 let listaOrdenRutaActual = [];
+let rutaIdOrdenActual = null;
+let ordenRutaCambiado = false;
 
 async function abrirOrdenRuta(rutaId, nombreRuta) {
   const { data: clientes, error } = await supabaseClient
@@ -54,6 +56,8 @@ async function abrirOrdenRuta(rutaId, nombreRuta) {
   if (error) { mostrarAlerta("No fue posible cargar los clientes de la ruta."); return; }
   if (clientes.length === 0) { mostrarAlerta("Esta ruta todavía no tiene clientes asignados."); return; }
 
+  rutaIdOrdenActual = rutaId;
+  ordenRutaCambiado = false;
   listaOrdenRutaActual = clientes.map((c, i) => ({ ...c, orden: c.orden ?? (i + 1) }));
   pintarOrdenRuta(nombreRuta);
   document.getElementById("modal-generico").classList.remove("oculto");
@@ -74,9 +78,39 @@ function pintarOrdenRuta(nombreRuta) {
           </span>
         </div>`).join("")}
     </div>
+    <div id="historial-orden-ruta"></div>
     <div class="modal-botones">
-      <button class="btn-modal-confirmar" onclick="cerrarModalGenerico()">Listo</button>
+      <button class="btn-modal-cancelar" onclick="verHistorialOrdenRuta()">🕓 Ver últimos cambios</button>
+      <button class="btn-modal-confirmar" onclick="cerrarOrdenRutaYGuardarHistorial()">Listo</button>
     </div>`;
+}
+
+// Deja un registro de cómo quedó el orden cada vez que se cierra el editor
+// (si hubo algún cambio), para poder revisar o deshacer un ajuste accidental.
+async function cerrarOrdenRutaYGuardarHistorial() {
+  if (ordenRutaCambiado && rutaIdOrdenActual && navigator.onLine) {
+    const user = await obtenerUsuarioActual();
+    await supabaseClient.from("historial_orden_ruta").insert({
+      ruta_id: rutaIdOrdenActual, user_id: user.id,
+      orden: listaOrdenRutaActual.map(c => ({ id: c.id, nombre: c.nombre, orden: c.orden }))
+    });
+  }
+  cerrarModalGenerico();
+}
+
+async function verHistorialOrdenRuta() {
+  const cont = document.getElementById("historial-orden-ruta");
+  if (!cont) return;
+  cont.innerHTML = '<div class="cargando">Cargando historial...</div>';
+  const { data, error } = await supabaseClient
+    .from("historial_orden_ruta").select("creado_en, orden")
+    .eq("ruta_id", rutaIdOrdenActual).order("creado_en", { ascending: false }).limit(5);
+  if (error) { cont.innerHTML = '<p class="texto-ayuda">No fue posible cargar el historial (¿ejecutaste la migración 20260720?).</p>'; return; }
+  cont.innerHTML = !data.length
+    ? '<p class="texto-ayuda">Todavía no hay cambios de orden guardados para esta ruta.</p>'
+    : `<p class="texto-ayuda">Últimos ${data.length} cambio(s):</p>` + data.map(h =>
+        `<div class="fila-historial"><span>${new Date(h.creado_en).toLocaleString()}</span><span>${h.orden.map(c => escaparHtml(c.nombre)).join(" → ")}</span></div>`
+      ).join("");
 }
 
 async function moverClienteOrden(indice, direccion) {
@@ -86,6 +120,7 @@ async function moverClienteOrden(indice, direccion) {
 
   [listaOrdenRutaActual[indice], listaOrdenRutaActual[nuevoIndice]] = [listaOrdenRutaActual[nuevoIndice], listaOrdenRutaActual[indice]];
   listaOrdenRutaActual.forEach((c, i) => c.orden = i + 1);
+  ordenRutaCambiado = true;
   pintarOrdenRuta(tituloModal);
 
   await Promise.all(listaOrdenRutaActual.map(c =>
