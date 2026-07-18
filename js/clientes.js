@@ -75,6 +75,7 @@ async function abrirModalNuevoCliente() {
 
   document.getElementById("modal-nuevo-cliente").classList.remove("oculto");
   document.getElementById("nuevo-cliente-nombre").focus();
+  empujarEstadoModal("modal-nuevo-cliente");
 }
 
 async function cargarRutasEnSelectorNuevoCliente(rutaSeleccionadaId = "") {
@@ -103,7 +104,7 @@ async function manejarSeleccionRutaNuevoCliente() {
 }
 
 function cerrarModalNuevoCliente() {
-  document.getElementById("modal-nuevo-cliente").classList.add("oculto");
+  cerrarModalConHistorial("modal-nuevo-cliente");
 }
 
 async function crearClienteNuevo(event) {
@@ -154,10 +155,11 @@ async function abrirDetalleCliente(clienteId) {
   pintarTabInfo(cliente);
 
   document.getElementById("modal-detalle").classList.remove("oculto");
+  empujarEstadoModal("modal-detalle");
 }
 
 function cerrarDetalleCliente() {
-  document.getElementById("modal-detalle").classList.add("oculto");
+  cerrarModalConHistorial("modal-detalle");
 }
 
 function cambiarTabDetalle(tab) {

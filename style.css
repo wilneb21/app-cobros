@@ -668,8 +668,65 @@ button.secundario {
   display: block;
   margin-top: 4px;
 }
-.app-entrada { animation: entrada-app .38s cubic-bezier(.2,.8,.2,1); }
-@keyframes entrada-app { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+.app-entrada { animation: entrada-app .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes entrada-app { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* Entrada suave de la pantalla de login */
+.pantalla { animation: pantalla-entrada .5s cubic-bezier(.2,.8,.2,1); }
+@keyframes pantalla-entrada { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* --- PANTALLA DE BIENVENIDA (splash de entrada a la app) --- */
+.pantalla-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+}
+.splash-logo {
+  font-size: 64px;
+  animation: splash-logo-entrada .6s cubic-bezier(.34,1.56,.64,1) both;
+}
+.splash-nombre {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  opacity: 0;
+  animation: splash-texto-entrada .5s ease-out .25s both;
+}
+.splash-spinner {
+  width: 24px;
+  height: 24px;
+  margin-top: 16px;
+  border: 3px solid rgba(255,255,255,.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: splash-texto-entrada .3s ease-out .4s both, splash-girar .8s linear .4s infinite;
+}
+.pantalla-splash.splash-salida {
+  animation: splash-salida .45s ease forwards;
+  pointer-events: none;
+}
+@keyframes splash-logo-entrada {
+  0% { opacity: 0; transform: scale(.4) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes splash-texto-entrada {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes splash-girar { to { transform: rotate(360deg); } }
+@keyframes splash-salida {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.05); }
+}
 
 /* Navegación compacta: el menú se despliega sólo cuando el usuario lo necesita. */
 .menu-inferior { position: relative; min-height: 58px; padding: 7px 12px; gap: 8px; align-items: center; }

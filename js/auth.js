@@ -19,10 +19,11 @@ async function registrarUsuario() {
 function abrirModalCrearCuenta() {
   document.getElementById("modal-crear-cuenta").classList.remove("oculto");
   document.getElementById("crear-email").focus();
+  empujarEstadoModal("modal-crear-cuenta");
 }
 
 function cerrarModalCrearCuenta() {
-  document.getElementById("modal-crear-cuenta").classList.add("oculto");
+  cerrarModalConHistorial("modal-crear-cuenta");
   document.getElementById("mensaje-crear-cuenta").textContent = "";
 }
 
@@ -55,6 +56,8 @@ async function cerrarSesion() {
   document.getElementById("app-principal").classList.add("oculto");
   document.getElementById("login-screen").classList.remove("oculto");
   detenerControlInactividad();
+  navegacionMovilPreparada = false;
+  salidaConfirmada = false;
 }
 
 function mostrarAppPrincipal() {
@@ -78,7 +81,21 @@ function mostrarAppPrincipal() {
 
 supabaseClient.auth.getSession().then(({ data: { session } }) => {
   if (session) mostrarAppPrincipal();
+  ocultarSplash();
 });
+
+// --- PANTALLA DE BIENVENIDA (animación de entrada) ---
+const horaInicioSplash = Date.now();
+function ocultarSplash() {
+  const splash = document.getElementById("pantalla-splash");
+  if (!splash) return;
+  const transcurrido = Date.now() - horaInicioSplash;
+  const espera = Math.max(0, 550 - transcurrido); // muestra el splash mínimo 550ms para que no "parpadee"
+  setTimeout(() => {
+    splash.classList.add("splash-salida");
+    setTimeout(() => splash.remove(), 500);
+  }, espera);
+}
 
 // --- Cierre de sesión automático por inactividad (30 minutos) ---
 let temporizadorInactividad;
@@ -107,21 +124,63 @@ function detenerControlInactividad() {
   }
 }
 
+// --- NAVEGACIÓN CON EL BOTÓN "ATRÁS" (Android / navegador móvil) ---
+// El botón atrás ya no cierra la app de una: primero cierra la ventana/modal
+// que esté abierta, luego regresa a la sección anterior dentro de la app,
+// y solo al llegar al inicio sin nada abierto pregunta si se quiere salir.
 let salidaConfirmada = false;
 let navegacionMovilPreparada = false;
+let estadoNavActual = { seccion: "inicio", modal: null };
+
 function prepararNavegacionMovil() {
   if (navegacionMovilPreparada) return;
-  window.history.pushState({ appCobros: true }, "");
-  window.addEventListener("popstate", async () => {
-    if (!document.getElementById("app-principal").classList.contains("oculto") && !salidaConfirmada) {
+  estadoNavActual = { seccion: "inicio", modal: null };
+  window.history.replaceState(estadoNavActual, "");
+  navegacionMovilPreparada = true;
+
+  window.addEventListener("popstate", async (evento) => {
+    const estado = evento.state;
+
+    if (!estado) {
+      // Ya no queda ningún paso de la app en el historial: confirmar salida real
+      if (salidaConfirmada) return;
       const salir = await mostrarConfirmacion("¿Quieres salir de la aplicación?");
       if (salir) {
         salidaConfirmada = true;
         window.history.back();
       } else {
-        window.history.pushState({ appCobros: true }, "");
+        window.history.pushState(estadoNavActual, "");
       }
+      return;
     }
+
+    // Si veníamos con un modal abierto y el estado al que volvimos no lo trae, se cierra
+    if (estadoNavActual.modal && estadoNavActual.modal !== estado.modal) {
+      document.getElementById(estadoNavActual.modal)?.classList.add("oculto");
+    }
+    // Si el estado al que volvimos corresponde a otra sección, se muestra esa sección
+    if (estado.seccion && estado.seccion !== estadoNavActual.seccion) {
+      mostrarSeccion(estado.seccion, true);
+    }
+    estadoNavActual = estado;
   });
-  navegacionMovilPreparada = true;
+}
+
+// Registra en el historial la apertura de un modal de pantalla completa
+// (detalle de cliente, nuevo cliente, búsqueda, recibo, crear cuenta) para
+// que el botón atrás lo cierre en vez de salir de la app.
+function empujarEstadoModal(idModal) {
+  if (!navegacionMovilPreparada) return;
+  estadoNavActual = { seccion: estadoNavActual.seccion, modal: idModal };
+  window.history.pushState(estadoNavActual, "");
+}
+
+// Cierra un modal registrado con empujarEstadoModal, manteniendo el
+// historial sincronizado (sin dejar "pasos fantasma" para el botón atrás).
+function cerrarModalConHistorial(idModal) {
+  document.getElementById(idModal)?.classList.add("oculto");
+  if (navegacionMovilPreparada && estadoNavActual.modal === idModal) {
+    estadoNavActual = { seccion: estadoNavActual.seccion, modal: null };
+    window.history.replaceState(estadoNavActual, "");
+  }
 }

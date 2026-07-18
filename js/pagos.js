@@ -83,6 +83,7 @@ async function mostrarRecibo(clienteId, monto, fecha, estado) {
     <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>
     <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}')">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
   document.getElementById("modal-recibo").classList.remove("oculto");
+  empujarEstadoModal("modal-recibo");
 }
 
 async function compartirRecibo(clienteId, monto, fecha, estado) {
@@ -97,5 +98,5 @@ async function compartirRecibo(clienteId, monto, fecha, estado) {
 }
 
 function cerrarRecibo() {
-  document.getElementById("modal-recibo").classList.add("oculto");
+  cerrarModalConHistorial("modal-recibo");
 }

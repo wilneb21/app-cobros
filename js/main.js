@@ -1,6 +1,6 @@
 let periodoInicioActivo = "hoy";
 
-function mostrarSeccion(nombre) {
+function mostrarSeccion(nombre, desdeHistorial = false) {
   document.querySelectorAll(".seccion").forEach(sec => sec.classList.add("oculto"));
   document.getElementById("seccion-" + nombre).classList.remove("oculto");
   marcarNavActivo(nombre);
@@ -16,6 +16,16 @@ function mostrarSeccion(nombre) {
     if (!document.getElementById("gasto-fecha").value) document.getElementById("gasto-fecha").value = obtenerFechaLocal();
   }
   cerrarMenuPrincipal();
+
+  // Deja registrado el cambio de sección en el historial para que el botón
+  // atrás del celular navegue dentro de la app en vez de salir directamente.
+  if (typeof navegacionMovilPreparada !== "undefined" && navegacionMovilPreparada && !desdeHistorial) {
+    if (estadoNavActual.modal) document.getElementById(estadoNavActual.modal)?.classList.add("oculto");
+    if (nombre !== estadoNavActual.seccion || estadoNavActual.modal) {
+      estadoNavActual = { seccion: nombre, modal: null };
+      window.history.pushState(estadoNavActual, "");
+    }
+  }
 }
 
 function cambiarPeriodoInicio(periodo) {
@@ -305,10 +315,11 @@ function abrirBusquedaGlobal() {
   document.getElementById("input-busqueda-global").value = "";
   document.getElementById("resultados-busqueda-global").innerHTML = "";
   document.getElementById("input-busqueda-global").focus();
+  empujarEstadoModal("modal-busqueda");
 }
 
 function cerrarBusquedaGlobal() {
-  document.getElementById("modal-busqueda").classList.add("oculto");
+  cerrarModalConHistorial("modal-busqueda");
 }
 
 function ejecutarBusquedaGlobal() {
