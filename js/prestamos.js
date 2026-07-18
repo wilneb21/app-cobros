@@ -17,34 +17,12 @@ function actualizarVistaPreviaPrestamo() {
   vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
 }
 
-let tipoClientePrestamo = "existente";
-
-function seleccionarClientePrestamo(tipo) {
-  tipoClientePrestamo = tipo;
-  document.querySelectorAll(".tipo-cliente").forEach(boton => boton.classList.toggle("activo", boton.dataset.tipoCliente === tipo));
-  document.getElementById("bloque-cliente-existente").classList.toggle("oculto", tipo !== "existente");
-  document.getElementById("bloque-cliente-nuevo").classList.toggle("oculto", tipo !== "nuevo");
-  document.getElementById("prestamo-cliente").required = tipo === "existente";
-  document.getElementById("prestamo-nuevo-nombre").required = tipo === "nuevo";
-}
-
-function abrirPrestamoParaNuevoCliente() {
-  mostrarSeccion("prestamos");
-  seleccionarClientePrestamo("nuevo");
-  document.getElementById("prestamo-nuevo-nombre").focus();
-}
-
 async function cargarClientesEnSelector() {
   const { data, error } = await supabaseClient.from("clientes").select("id, nombre").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
   const selector = document.getElementById("prestamo-cliente");
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
   data.forEach(c => selector.innerHTML += `<option value="${c.id}">${escaparHtml(c.nombre)}</option>`);
-
-  const { data: rutas } = await supabaseClient.from("rutas").select("id, nombre").order("nombre");
-  const selectorRuta = document.getElementById("prestamo-nuevo-ruta");
-  selectorRuta.innerHTML = '<option value="">Sin ruta por ahora</option>';
-  (rutas || []).forEach(ruta => selectorRuta.innerHTML += `<option value="${ruta.id}">${escaparHtml(ruta.nombre)}</option>`);
   if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = obtenerFechaLocal();
 }
 
@@ -67,36 +45,7 @@ async function crearPrestamo(event) {
   const cuota = Math.round((totalConInteres / numeroCuotas) * 100) / 100;
   const user = await obtenerUsuarioActual();
 
-  if (tipoClientePrestamo === "nuevo") {
-    const nombre = document.getElementById("prestamo-nuevo-nombre").value.trim();
-    const telefono = document.getElementById("prestamo-nuevo-telefono").value.trim();
-    const direccion = document.getElementById("prestamo-nuevo-direccion").value.trim();
-    const notas = document.getElementById("prestamo-nuevo-notas").value.trim();
-    const rutaId = document.getElementById("prestamo-nuevo-ruta").value;
-    if (!nombre) { mostrarAlerta("Indica el nombre del nuevo cliente."); return; }
-
-    if (telefono) {
-      const { data: posiblesDuplicados } = await supabaseClient
-        .from("clientes").select("nombre, archivado").eq("telefono", telefono);
-      if (posiblesDuplicados && posiblesDuplicados.length > 0) {
-        const nombresExistentes = posiblesDuplicados
-          .map(c => escaparHtml(c.nombre) + (c.archivado ? " (archivado)" : ""))
-          .join(", ");
-        const continuar = await mostrarConfirmacion(
-          `Ya existe un cliente registrado con este teléfono: <strong>${nombresExistentes}</strong>.<br><br>¿Seguro que quieres crear <strong>${escaparHtml(nombre)}</strong> como un cliente nuevo de todas formas?`
-        );
-        if (!continuar) return;
-      }
-    }
-
-    const { data: clienteNuevo, error: errorCliente } = await supabaseClient.from("clientes").insert({
-      nombre, telefono, direccion, notas, ruta_id: rutaId || null, user_id: user.id
-    }).select("id").single();
-    if (errorCliente) { mostrarAlerta("No fue posible crear el cliente: " + errorCliente.message); return; }
-    clienteId = clienteNuevo.id;
-  }
-
-  if (!clienteId) { mostrarAlerta("Selecciona un cliente o crea uno nuevo."); return; }
+  if (!clienteId) { mostrarAlerta("Selecciona un cliente. Si aún no existe, créalo primero desde la pestaña Clientes."); return; }
 
   const { error } = await supabaseClient.from("prestamos").insert({
     cliente_id: clienteId, monto_prestado: monto, interes_porcentaje: interes,
@@ -106,9 +55,7 @@ async function crearPrestamo(event) {
   });
 
   if (error) {
-    mostrarAlerta(tipoClientePrestamo === "nuevo"
-      ? "El cliente fue creado, pero no se pudo registrar el préstamo: " + error.message
-      : "Error al crear préstamo: " + error.message);
+    mostrarAlerta("Error al crear préstamo: " + error.message);
     return;
   }
 
@@ -119,9 +66,7 @@ async function crearPrestamo(event) {
   document.getElementById("prestamo-mora-check").checked = false;
   document.getElementById("prestamo-mora-porcentaje").value = "";
   document.getElementById("prestamo-mora-porcentaje").classList.add("oculto");
-  ["prestamo-nuevo-nombre", "prestamo-nuevo-telefono", "prestamo-nuevo-direccion", "prestamo-nuevo-notas"].forEach(id => document.getElementById(id).value = "");
-  document.getElementById("prestamo-nuevo-ruta").value = "";
-  seleccionarClientePrestamo("existente");
+  document.getElementById("prestamo-cliente").value = "";
   cargarClientesEnSelector();
   cargarClientes();
   mostrarAlerta("✅ Préstamo registrado con éxito");

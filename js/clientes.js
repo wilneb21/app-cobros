@@ -26,7 +26,7 @@ function pintarClientesLista(data) {
   if (data.length === 0) {
     contenedor.innerHTML = mostrandoArchivados
       ? `<div class="estado-vacio">📦 No tienes clientes archivados.</div>`
-      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Toca <strong>Nuevo</strong> para crearlo junto con su primer préstamo.</div>`;
+      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Toca <strong>Nuevo</strong> para crear el primero.</div>`;
     return;
   }
 
@@ -61,6 +61,84 @@ function armarNumeroWhatsapp(telefono) {
   const soloDigitos = telefono.replace(/\D/g, "");
   if (soloDigitos.length > 10) return soloDigitos; // ya trae indicativo de país
   return "57" + soloDigitos; // número local colombiano de 10 dígitos
+}
+
+// --- CREAR CLIENTE DIRECTO (modal desde la pestaña Clientes) ---
+async function abrirModalNuevoCliente() {
+  document.getElementById("nuevo-cliente-nombre").value = "";
+  document.getElementById("nuevo-cliente-telefono").value = "";
+  document.getElementById("nuevo-cliente-direccion").value = "";
+  document.getElementById("nuevo-cliente-notas").value = "";
+  document.getElementById("nuevo-cliente-riesgo").value = "bueno";
+
+  await cargarRutasEnSelectorNuevoCliente();
+
+  document.getElementById("modal-nuevo-cliente").classList.remove("oculto");
+  document.getElementById("nuevo-cliente-nombre").focus();
+}
+
+async function cargarRutasEnSelectorNuevoCliente(rutaSeleccionadaId = "") {
+  const { data: rutas } = await supabaseClient.from("rutas").select("id, nombre").order("nombre");
+  const selectorRuta = document.getElementById("nuevo-cliente-ruta");
+  selectorRuta.innerHTML = '<option value="">Sin ruta por ahora</option>';
+  (rutas || []).forEach(ruta => selectorRuta.innerHTML += `<option value="${ruta.id}">${escaparHtml(ruta.nombre)}</option>`);
+  selectorRuta.innerHTML += '<option value="__nueva__">➕ Crear nueva ruta...</option>';
+  selectorRuta.value = rutaSeleccionadaId;
+}
+
+async function manejarSeleccionRutaNuevoCliente() {
+  const selectorRuta = document.getElementById("nuevo-cliente-ruta");
+  if (selectorRuta.value !== "__nueva__") return;
+
+  const nombreRuta = await mostrarPrompt("Nombre de la nueva ruta:");
+  if (!nombreRuta || !nombreRuta.trim()) { selectorRuta.value = ""; return; }
+
+  const user = await obtenerUsuarioActual();
+  const { data: rutaCreada, error } = await supabaseClient.from("rutas")
+    .insert({ nombre: nombreRuta.trim(), descripcion: "", user_id: user.id })
+    .select("id").single();
+  if (error) { mostrarAlerta("No fue posible crear la ruta: " + error.message); selectorRuta.value = ""; return; }
+
+  await cargarRutasEnSelectorNuevoCliente(String(rutaCreada.id));
+}
+
+function cerrarModalNuevoCliente() {
+  document.getElementById("modal-nuevo-cliente").classList.add("oculto");
+}
+
+async function crearClienteNuevo(event) {
+  event.preventDefault();
+  const nombre = document.getElementById("nuevo-cliente-nombre").value.trim();
+  const telefono = document.getElementById("nuevo-cliente-telefono").value.trim();
+  const direccion = document.getElementById("nuevo-cliente-direccion").value.trim();
+  const notas = document.getElementById("nuevo-cliente-notas").value.trim();
+  const riesgo = document.getElementById("nuevo-cliente-riesgo").value;
+  const rutaId = document.getElementById("nuevo-cliente-ruta").value;
+  if (!nombre) { mostrarAlerta("El nombre del cliente es obligatorio."); return; }
+
+  if (telefono) {
+    const { data: posiblesDuplicados } = await supabaseClient
+      .from("clientes").select("nombre, archivado").eq("telefono", telefono);
+    if (posiblesDuplicados && posiblesDuplicados.length > 0) {
+      const nombresExistentes = posiblesDuplicados
+        .map(c => escaparHtml(c.nombre) + (c.archivado ? " (archivado)" : ""))
+        .join(", ");
+      const continuar = await mostrarConfirmacion(
+        `Ya existe un cliente registrado con este teléfono: <strong>${nombresExistentes}</strong>.<br><br>¿Seguro que quieres crear <strong>${escaparHtml(nombre)}</strong> como un cliente nuevo de todas formas?`
+      );
+      if (!continuar) return;
+    }
+  }
+
+  const user = await obtenerUsuarioActual();
+  const { error } = await supabaseClient.from("clientes").insert({
+    nombre, telefono, direccion, notas, riesgo, ruta_id: rutaId || null, user_id: user.id, archivado: false
+  });
+  if (error) { mostrarAlerta("No fue posible crear el cliente: " + error.message); return; }
+
+  cerrarModalNuevoCliente();
+  mostrarAlerta("✅ Cliente creado");
+  cargarClientes();
 }
 
 // --- DETALLE DE CLIENTE (modal con pestañas) ---
@@ -152,7 +230,6 @@ function abrirPrestamoParaCliente(clienteId) {
   const seleccionar = () => {
     const selector = document.getElementById("prestamo-cliente");
     if (!selector.querySelector(`option[value="${clienteId}"]`)) return setTimeout(seleccionar, 100);
-    seleccionarClientePrestamo("existente");
     selector.value = String(clienteId);
   };
   seleccionar();

@@ -359,9 +359,9 @@ async function obtenerMetas() {
 async function editarMetas() {
   const metas = await obtenerMetas();
 
-  const diaria = await mostrarPrompt("¿Cuál es tu meta de recaudo DIARIO?", metas.meta_diaria || "0");
+  const diaria = await mostrarPrompt("¿Cuál es tu meta de recaudo DIARIO?", metas.meta_diaria || "0", true);
   if (diaria === null) return;
-  const mensual = await mostrarPrompt("¿Cuál es tu meta de recaudo MENSUAL?", metas.meta_mensual || "0");
+  const mensual = await mostrarPrompt("¿Cuál es tu meta de recaudo MENSUAL?", metas.meta_mensual || "0", true);
   if (mensual === null) return;
 
   const user = await obtenerUsuarioActual();
@@ -442,10 +442,10 @@ async function gestionarCajaDiaria(yaAbierta) {
   const hoy = obtenerFechaLocal();
   const user = await obtenerUsuarioActual();
   const etiqueta = yaAbierta ? "¿Con cuánto efectivo terminaste hoy?" : "¿Con cuánto efectivo empiezas hoy?";
-  const texto = await mostrarPrompt(etiqueta, "0");
+  const texto = await mostrarPrompt(etiqueta, "0", true);
   if (texto === null) return;
-  const valor = Number(String(texto).replace(/[^0-9,.-]/g, "").replace(/\./g, "").replace(",", "."));
-  if (!Number.isFinite(valor) || valor < 0) { mostrarAlerta("Ingresa un valor válido."); return; }
+  const valor = Number(String(texto).replace(/\D/g, "")) || 0;
+  if (valor < 0) { mostrarAlerta("Ingresa un valor válido."); return; }
   const datos = yaAbierta ? { user_id: user.id, fecha: hoy, efectivo_final: valor } : { user_id: user.id, fecha: hoy, base_inicial: valor, efectivo_final: null };
   const { error } = await supabaseClient.from("caja_diaria").upsert(datos, { onConflict: "user_id,fecha" });
   if (error) { mostrarAlerta("No fue posible guardar la caja: " + error.message); return; }

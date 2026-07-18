@@ -49,7 +49,7 @@ async function registrarPago(prestamoId, monto, estado, clienteId) {
 }
 
 async function abrirPagoParcial(prestamoId, clienteId) {
-  const monto = await mostrarPrompt("¿Cuánto pagó el cliente hoy?");
+  const monto = await mostrarPrompt("¿Cuánto pagó el cliente hoy?", "0", true);
   if (monto === null) return;
   const montoLimpio = parseFloat(monto.replace(/\D/g, ""));
   if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }

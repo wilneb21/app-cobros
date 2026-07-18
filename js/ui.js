@@ -16,16 +16,26 @@ function mostrarConfirmacion(mensaje) {
   });
 }
 
-function mostrarPrompt(mensaje, valorDefault = "") {
+function mostrarPrompt(mensaje, valorDefault = "", formatoDinero = false) {
   return new Promise(resolve => {
     const cont = document.getElementById("modal-generico-contenido");
     cont.innerHTML = '<p class="modal-mensaje"></p><input type="text" id="modal-input-valor"><div class="modal-botones"><button class="btn-modal-cancelar" id="modal-btn-cancelar">Cancelar</button><button class="btn-modal-confirmar" id="modal-btn-aceptar">Aceptar</button></div>';
     cont.querySelector(".modal-mensaje").textContent = mensaje;
-    document.getElementById("modal-input-valor").value = valorDefault;
+    const input = document.getElementById("modal-input-valor");
+
+    if (formatoDinero) {
+      input.setAttribute("inputmode", "numeric");
+      formatearMoneda(input);
+      const valorNumerico = Number(String(valorDefault).replace(/\D/g, "")) || 0;
+      input.value = "$" + valorNumerico.toLocaleString("es-CO");
+    } else {
+      input.value = valorDefault;
+    }
+
     document.getElementById("modal-generico").classList.remove("oculto");
-    document.getElementById("modal-input-valor").focus();
+    input.focus();
     document.getElementById("modal-btn-aceptar").onclick = () => {
-      const valor = document.getElementById("modal-input-valor").value;
+      const valor = input.value;
       cerrarModalGenerico();
       resolve(valor);
     };

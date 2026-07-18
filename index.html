@@ -68,7 +68,7 @@
 
         <h4>Acciones rápidas</h4>
         <div class="acciones-rapidas acciones-rapidas-grid">
-          <button type="button" onclick="abrirPrestamoParaNuevoCliente()" class="accion-rapida accion-cliente"><span>👤</span><b>Crear cliente</b><small>Con su primer préstamo</small></button>
+          <button type="button" onclick="mostrarSeccion('clientes'); abrirModalNuevoCliente()" class="accion-rapida accion-cliente"><span>👤</span><b>Crear cliente</b><small>Nuevo registro</small></button>
           <button type="button" onclick="mostrarSeccion('prestamos')" class="accion-rapida accion-prestamo"><span>💸</span><b>Crear préstamo</b><small>Nuevo crédito</small></button>
           <button type="button" onclick="mostrarSeccion('cobrar')" class="accion-rapida accion-cobrar"><span>✓</span><b>Registrar cobro</b><small>Pago del día</small></button>
           <button type="button" onclick="mostrarSeccion('rutas')" class="accion-rapida accion-ruta"><span>⌖</span><b>Ver rutas</b><small>Organiza visitas</small></button>
@@ -109,7 +109,7 @@
       </section>
 
       <section id="seccion-clientes" class="seccion oculto">
-        <div class="cabecera-lista-clientes"><div><h3>Clientes</h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirPrestamoParaNuevoCliente()">＋ Nuevo</button></div>
+        <div class="cabecera-lista-clientes"><div><h3>Clientes</h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirModalNuevoCliente()">＋ Nuevo</button></div>
         <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesLista()">
         <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
         <div id="lista-clientes"></div>
@@ -125,20 +125,9 @@
 
       <section id="seccion-prestamos" class="seccion oculto">
         <h3>Nuevo préstamo</h3>
-        <p class="texto-ayuda">Elige un cliente existente o registra uno nuevo antes de crear el préstamo.</p>
+        <p class="texto-ayuda">Elige el cliente para crear su préstamo. Si aún no existe, créalo primero desde la pestaña Clientes.</p>
         <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
-          <div class="selector-tipo-cliente" role="group" aria-label="Tipo de cliente">
-            <button type="button" class="tipo-cliente activo" data-tipo-cliente="existente" onclick="seleccionarClientePrestamo('existente')">Cliente existente</button>
-            <button type="button" class="tipo-cliente" data-tipo-cliente="nuevo" onclick="seleccionarClientePrestamo('nuevo')">Crear cliente</button>
-          </div>
-          <div id="bloque-cliente-existente"><select id="prestamo-cliente"><option value="">Selecciona un cliente</option></select></div>
-          <div id="bloque-cliente-nuevo" class="oculto campos-anidados">
-            <input type="text" id="prestamo-nuevo-nombre" placeholder="Nombre completo del cliente">
-            <input type="text" id="prestamo-nuevo-telefono" placeholder="Teléfono">
-            <input type="text" id="prestamo-nuevo-direccion" placeholder="Dirección">
-            <textarea id="prestamo-nuevo-notas" placeholder="Notas (opcional)" rows="2"></textarea>
-            <select id="prestamo-nuevo-ruta"><option value="">Sin ruta por ahora</option></select>
-          </div>
+          <select id="prestamo-cliente" required><option value="">Selecciona un cliente</option></select>
           <input type="text" id="prestamo-monto" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
           <input type="number" id="prestamo-interes" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
           <input type="number" id="prestamo-cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
@@ -268,6 +257,33 @@
       <div id="tab-info" class="tab-contenido"></div>
       <div id="tab-prestamos" class="tab-contenido oculto"></div>
       <div id="tab-historial" class="tab-contenido oculto"></div>
+    </div>
+  </div>
+
+  <div id="modal-nuevo-cliente" class="modal-overlay oculto">
+    <div class="modal-caja">
+      <div class="detalle-header">
+        <h3>Nuevo cliente</h3>
+        <button class="btn-cerrar-detalle" onclick="cerrarModalNuevoCliente()">✕</button>
+      </div>
+      <form onsubmit="crearClienteNuevo(event)" class="tarjeta-form">
+        <input type="text" id="nuevo-cliente-nombre" placeholder="Nombre completo" required>
+        <input type="text" id="nuevo-cliente-telefono" placeholder="Teléfono">
+        <input type="text" id="nuevo-cliente-direccion" placeholder="Dirección">
+        <textarea id="nuevo-cliente-notas" placeholder="Notas (opcional)" rows="2"></textarea>
+        <label class="etiqueta-select">Nivel de riesgo</label>
+        <select id="nuevo-cliente-riesgo">
+          <option value="bueno" selected>🟢 Bueno</option>
+          <option value="regular">🟡 Regular</option>
+          <option value="riesgoso">🔴 Riesgoso</option>
+        </select>
+        <label class="etiqueta-select">Ruta</label>
+        <select id="nuevo-cliente-ruta" onchange="manejarSeleccionRutaNuevoCliente()">
+          <option value="">Sin ruta por ahora</option>
+          <option value="__nueva__">➕ Crear nueva ruta...</option>
+        </select>
+        <button type="submit">+ Crear cliente</button>
+      </form>
     </div>
   </div>
 
