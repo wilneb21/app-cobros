@@ -8,6 +8,7 @@ async function cargarClientes() {
     .eq("archivado", mostrandoArchivados)
     .order("nombre");
   if (error) { mostrarAlerta("No fue posible cargar los clientes."); return; }
+  data.sort(compararClientesPorRutaYOrden);
   clientesCache = data;
   pintarClientesLista(data);
 }
@@ -113,14 +114,20 @@ function pintarClientesLista(data) {
   }
 
   contenedor.innerHTML = "";
+  let rutaAnterior = undefined;
   data.forEach(cliente => {
+    const nombreRuta = cliente.rutas ? cliente.rutas.nombre : null;
+    if (nombreRuta !== rutaAnterior) {
+      contenedor.innerHTML += `<div class="grupo-ruta-titulo">📍 ${nombreRuta ? escaparHtml(nombreRuta) : "Sin ruta asignada"}</div>`;
+      rutaAnterior = nombreRuta;
+    }
     const riesgo = cliente.riesgo || "bueno";
     const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
     contenedor.innerHTML += `
       <div class="tarjeta cliente-clickable" onclick="abrirDetalleCliente(${cliente.id})">
         <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
-        <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span><br>
-        <span>📍 ${escaparHtml(cliente.rutas ? cliente.rutas.nombre : "sin ruta")}</span>
+        ${cliente.cedula ? `<span>🪪 C.C. ${escaparHtml(cliente.cedula)}</span><br>` : ""}
+        <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
         ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
       </div>`;
   });
@@ -128,7 +135,7 @@ function pintarClientesLista(data) {
 
 function filtrarClientesLista() {
   const texto = document.getElementById("buscar-cliente-lista").value.toLowerCase();
-  const filtrados = clientesCache.filter(c => c.nombre.toLowerCase().includes(texto));
+  const filtrados = clientesCache.filter(c => c.nombre.toLowerCase().includes(texto) || (c.cedula || "").includes(texto));
 
   if (filtrados.length === 0 && texto) {
     document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">🔍 Ningún cliente coincide con "${escaparHtml(texto)}".</div>`;
@@ -148,6 +155,7 @@ function armarNumeroWhatsapp(telefono) {
 // --- CREAR CLIENTE DIRECTO (modal desde la pestaña Clientes) ---
 async function abrirModalNuevoCliente() {
   document.getElementById("nuevo-cliente-nombre").value = "";
+  document.getElementById("nuevo-cliente-cedula").value = "";
   document.getElementById("nuevo-cliente-telefono").value = "";
   document.getElementById("nuevo-cliente-direccion").value = "";
   document.getElementById("nuevo-cliente-notas").value = "";
@@ -196,12 +204,27 @@ async function crearClienteNuevo(event) {
     return;
   }
   const nombre = document.getElementById("nuevo-cliente-nombre").value.trim();
+  const cedula = document.getElementById("nuevo-cliente-cedula").value.trim();
   const telefono = document.getElementById("nuevo-cliente-telefono").value.trim();
   const direccion = document.getElementById("nuevo-cliente-direccion").value.trim();
   const notas = document.getElementById("nuevo-cliente-notas").value.trim();
   const riesgo = document.getElementById("nuevo-cliente-riesgo").value;
   const rutaId = document.getElementById("nuevo-cliente-ruta").value;
   if (!nombre) { mostrarAlerta("El nombre del cliente es obligatorio."); return; }
+
+  if (cedula) {
+    const { data: cedulaDuplicada } = await supabaseClient
+      .from("clientes").select("nombre, archivado").eq("cedula", cedula);
+    if (cedulaDuplicada && cedulaDuplicada.length > 0) {
+      const nombresExistentes = cedulaDuplicada
+        .map(c => escaparHtml(c.nombre) + (c.archivado ? " (archivado)" : ""))
+        .join(", ");
+      const continuar = await mostrarConfirmacion(
+        `Ya existe un cliente registrado con esta cédula: <strong>${nombresExistentes}</strong>.<br><br>¿Seguro que quieres crear <strong>${escaparHtml(nombre)}</strong> como un cliente nuevo de todas formas?`
+      );
+      if (!continuar) return;
+    }
+  }
 
   if (telefono) {
     const { data: posiblesDuplicados } = await supabaseClient
@@ -219,7 +242,7 @@ async function crearClienteNuevo(event) {
 
   const user = await obtenerUsuarioActual();
   const { error } = await supabaseClient.from("clientes").insert({
-    nombre, telefono, direccion, notas, riesgo, ruta_id: rutaId || null, user_id: user.id, archivado: false
+    nombre, cedula, telefono, direccion, notas, riesgo, ruta_id: rutaId || null, user_id: user.id, archivado: false
   });
   if (error) { mostrarAlerta("No fue posible crear el cliente: " + error.message); return; }
 
@@ -283,6 +306,7 @@ async function pintarTabInfo(cliente) {
     ${sugerenciaCupo ? `<div class="sugerencia-cupo">💡 <b>Cupo sugerido: ${formatoPesos(sugerenciaCupo.monto)}</b>${escaparHtml(sugerenciaCupo.razon)}</div>` : ""}
     <form onsubmit="guardarEdicionCliente(event, ${cliente.id})" class="tarjeta-form">
       <input type="text" id="editar-nombre" value="${escaparHtml(cliente.nombre)}" required>
+      <input type="text" id="editar-cedula" value="${escaparHtml(cliente.cedula || "")}" placeholder="Número de cédula" inputmode="numeric">
       <input type="text" id="editar-telefono" value="${escaparHtml(cliente.telefono || "")}" placeholder="Teléfono">
       <input type="text" id="editar-direccion" value="${escaparHtml(cliente.direccion || "")}" placeholder="Dirección">
       <textarea id="editar-notas" rows="2" placeholder="Notas">${escaparHtml(cliente.notas || "")}</textarea>
@@ -328,13 +352,14 @@ function abrirPrestamoParaCliente(clienteId) {
 async function guardarEdicionCliente(event, clienteId) {
   event.preventDefault();
   const nombre = document.getElementById("editar-nombre").value.trim();
+  const cedula = document.getElementById("editar-cedula").value.trim();
   const telefono = document.getElementById("editar-telefono").value.trim();
   const direccion = document.getElementById("editar-direccion").value.trim();
   const notas = document.getElementById("editar-notas").value.trim();
   const riesgo = document.getElementById("editar-riesgo").value;
   if (!nombre) return mostrarAlerta("El nombre del cliente es obligatorio.");
 
-  const { error } = await supabaseClient.from("clientes").update({ nombre, telefono, direccion, notas, riesgo }).eq("id", clienteId);
+  const { error } = await supabaseClient.from("clientes").update({ nombre, cedula, telefono, direccion, notas, riesgo }).eq("id", clienteId);
   if (error) { mostrarAlerta("Error al guardar: " + error.message); return; }
 
   mostrarAlerta("✅ Cambios guardados");
@@ -370,7 +395,7 @@ async function exportarEstadoCuentaPDF(clienteId) {
     <body style="font-family:Arial,sans-serif;padding:24px;">
       <h1>Estado de cuenta</h1>
       <h2>${escaparHtml(cliente.nombre)}</h2>
-      <p>Teléfono: ${escaparHtml(cliente.telefono || "N/A")} | Dirección: ${escaparHtml(cliente.direccion || "N/A")}</p>
+      <p>${cliente.cedula ? `C.C. ${escaparHtml(cliente.cedula)} | ` : ""}Teléfono: ${escaparHtml(cliente.telefono || "N/A")} | Dirección: ${escaparHtml(cliente.direccion || "N/A")}</p>
       <hr>
       ${filasPrestamos || "<p>Sin préstamos registrados.</p>"}
     </body></html>

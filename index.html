@@ -144,7 +144,7 @@
 
       <section id="seccion-clientes" class="seccion oculto">
         <div class="cabecera-lista-clientes"><div><h3>Clientes</h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirModalNuevoCliente()">＋ Nuevo</button></div>
-        <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesLista()">
+        <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar por nombre o cédula..." oninput="filtrarClientesLista()">
         <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
         <p id="link-ver-ranking" class="link-olvide" onclick="toggleRankingClientes()">🏆 Ver ranking de cumplimiento</p>
         <div id="ranking-clientes" class="oculto"></div>
@@ -310,6 +310,7 @@
       </div>
       <form onsubmit="crearClienteNuevo(event)" class="tarjeta-form">
         <input type="text" id="nuevo-cliente-nombre" placeholder="Nombre completo" required>
+        <input type="text" id="nuevo-cliente-cedula" placeholder="Número de cédula" inputmode="numeric">
         <input type="text" id="nuevo-cliente-telefono" placeholder="Teléfono">
         <input type="text" id="nuevo-cliente-direccion" placeholder="Dirección">
         <textarea id="nuevo-cliente-notas" placeholder="Notas (opcional)" rows="2"></textarea>

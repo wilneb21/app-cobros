@@ -85,6 +85,7 @@ async function cargarClientesParaCobrar() {
   mostrarCargando("lista-clientes-cobrar");
   const { data: clientes, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("archivado", false).order("nombre");
   if (error) { mostrarAlerta("No fue posible cargar los clientes para cobrar."); return; }
+  clientes.sort(compararClientesPorRutaYOrden);
   clientesCobrarCache = clientes;
   const ids = (clientes || []).map(cliente => cliente.id);
   const { data: prestamosActivos } = ids.length
@@ -145,11 +146,16 @@ function pintarClientesCobrar(clientes) {
   }
 
   contenedor.innerHTML = "";
+  let rutaAnterior = undefined;
   for (const cliente of clientes) {
+    const nombreRuta = cliente.rutas ? cliente.rutas.nombre : null;
+    if (nombreRuta !== rutaAnterior) {
+      contenedor.innerHTML += `<div class="grupo-ruta-titulo">📍 ${nombreRuta ? escaparHtml(nombreRuta) : "Sin ruta asignada"}</div>`;
+      rutaAnterior = nombreRuta;
+    }
     contenedor.innerHTML += `
       <div class="tarjeta">
         <strong>${escaparHtml(cliente.nombre)}</strong>
-        <span>📍 ${escaparHtml(cliente.rutas ? cliente.rutas.nombre : "sin ruta")}</span>
         ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
         <div id="prestamos-cliente-${cliente.id}" class="prestamos-cliente">Cargando préstamos...</div>
       </div>`;
@@ -161,7 +167,7 @@ function filtrarClientesCobrar() {
   const texto = document.getElementById("buscar-cliente-cobrar").value.toLowerCase();
   const rutaId = document.getElementById("filtro-ruta-cobrar").value;
 
-  let filtrados = clientesCobrarCache.filter(c => c.nombre.toLowerCase().includes(texto));
+  let filtrados = clientesCobrarCache.filter(c => c.nombre.toLowerCase().includes(texto) || (c.cedula || "").includes(texto));
   if (rutaId) filtrados = filtrados.filter(c => String(c.ruta_id) === rutaId);
   if (filtroEstadoCobrar === "saldo") filtrados = filtrados.filter(c => clientesConSaldoIds.has(c.id));
   if (filtroEstadoCobrar === "aldia") filtrados = filtrados.filter(c => !clientesConSaldoIds.has(c.id));

@@ -454,6 +454,17 @@ button.secundario {
 }
 body.modo-oscuro .mas-opciones { border-color: #3a4152; }
 
+.grupo-ruta-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #e2e5f5;
+}
+.grupo-ruta-titulo:first-child { margin-top: 2px; }
+body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
+
 .nota-cliente {
   background: #fff9e6;
   border-left: 3px solid var(--warning);

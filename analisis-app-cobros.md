@@ -2,6 +2,16 @@
 
 Este documento explica cómo funciona la app hoy, qué implementé en esta ronda, una corrección a mi análisis anterior, y qué queda pendiente y por qué.
 
+## -1. Ronda nueva (2026-07-19): cédula del cliente y orden compartido
+
+| Idea | Dónde quedó |
+|---|---|
+| 🪪 Cédula del cliente | Nuevo campo en "Nuevo cliente" y en la pestaña Info del detalle. Se guarda en `clientes.cedula` (columna nueva, migración `20260721_cedula_cliente.sql`). Se muestra en la tarjeta de la lista, se puede usar para buscar clientes, se avisa si ya existe otro cliente con la misma cédula, y aparece en el estado de cuenta exportado. |
+| 🔀 Orden compartido entre Rutas, Clientes y Cobrar | Antes, el orden manual que definías en "Rutas → Ordenar clientes" solo se veía reflejado al abrir el mapa de la ruta. Ahora la lista de **Clientes** y la de **Cobrar** también respetan ese mismo orden: se agrupan por ruta (con un encabezado 📍) y, dentro de cada ruta, los clientes salen en el orden exacto que definiste — no alfabético. |
+
+**Importante:** necesitas correr la migración nueva `supabase/migrations/20260721_cedula_cliente.sql` en el SQL Editor de Supabase para que el campo de cédula funcione (si no la corres, la app fallará al crear/editar clientes porque la columna no existirá).
+
+
 ## 0. Ronda nueva (2026-07-18): candado, caja, WhatsApp, cupo y rutas
 
 De la lista de ideas que hablamos, ya existían implementadas (no hizo falta tocarlas): **modo oscuro**, **copia de seguridad exportable (.json)** y el botón manual de WhatsApp en el perfil del cliente. Lo que sí agregué en esta ronda:

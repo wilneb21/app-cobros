@@ -21,6 +21,25 @@ function obtenerValorNumerico(input) {
   return parseFloat(input.value.replace(/\D/g, "")) || 0;
 }
 
+// --- ORDEN COMPARTIDO: RUTAS → CLIENTES Y COBRAR ---
+// El orden manual que el cobrador define en "Rutas → Ordenar clientes" (columna
+// clientes.orden) es la fuente única de verdad. Esta función se usa tanto en
+// la lista de Clientes como en Cobrar, para que ambas respeten ese mismo orden
+// en vez de mostrar todo alfabético.
+function compararClientesPorRutaYOrden(a, b) {
+  const rutaA = a.rutas?.nombre || null;
+  const rutaB = b.rutas?.nombre || null;
+  if (rutaA !== rutaB) {
+    if (rutaA === null) return 1; // "Sin ruta" siempre al final
+    if (rutaB === null) return -1;
+    return rutaA.localeCompare(rutaB);
+  }
+  const ordenA = a.orden ?? 9999;
+  const ordenB = b.orden ?? 9999;
+  if (ordenA !== ordenB) return ordenA - ordenB;
+  return a.nombre.localeCompare(b.nombre);
+}
+
 function formatoPesos(numero) {
   return "$" + Number(numero).toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
