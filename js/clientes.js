@@ -128,7 +128,6 @@ function pintarClientesLista(data) {
         <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
         ${cliente.cedula ? `<span>🪪 C.C. ${escaparHtml(cliente.cedula)}</span><br>` : ""}
         <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
-        ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
       </div>`;
   });
 }

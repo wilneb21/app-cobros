@@ -243,6 +243,9 @@
           <input type="text" id="gasto-concepto" placeholder="Concepto (ej: gasolina)" required>
           <input type="text" id="gasto-monto" inputmode="numeric" placeholder="Monto (ej: 20.000)" required>
           <input type="date" id="gasto-fecha" required>
+          <select id="gasto-ruta">
+            <option value="">General (no aplica a una ruta)</option>
+          </select>
           <button type="submit">+ Registrar gasto</button>
         </form>
         <div id="lista-gastos"></div>
@@ -254,6 +257,7 @@
           <p class="titulo-grupo-config">Preferencias</p>
           <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono">◐</span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-pin" class="fila-config" onclick="configurarPin()"><span class="config-icono">🔒</span><span><b>Bloqueo con PIN</b><small>Pide un PIN cada vez que abras la app</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-push" class="fila-config" onclick="configurarNotificacionesPush()"><span class="config-icono">🔔</span><span><b>Notificaciones push</b><small>Avisa cuando una cuota vence mañana</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="editarMetas()"><span class="config-icono">◎</span><span><b>Metas de recaudo</b><small>Define tu objetivo diario y mensual</small></span><span class="config-chevron">›</span></button>
         </div>
         <div class="grupo-config">
@@ -358,6 +362,7 @@
   <script src="js/offline.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/bloqueo.js"></script>
+  <script src="js/push.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/main.js"></script>
   <script src="js/rutas.js"></script>

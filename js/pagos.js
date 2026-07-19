@@ -48,31 +48,30 @@ async function registrarPago(prestamoId, monto, estado, clienteId) {
   if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
 }
 
-async function abrirPagoParcial(prestamoId, clienteId) {
-  const monto = await mostrarPrompt("¿Cuánto pagó el cliente hoy?", "0", true);
-  if (monto === null) return;
-  const montoLimpio = parseFloat(monto.replace(/\D/g, ""));
-  if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
-  await registrarPago(prestamoId, montoLimpio, "parcial", clienteId);
-}
-
-// --- PONERSE AL DÍA (cliente atrasado en varias cuotas) ---
-// El botón "Pagó ✅" solo registra el valor de UNA cuota. Cuando el cliente
-// debe más de una (por ejemplo, se atrasó 3 semanas y hoy quiere pagar todo
-// junto), este flujo precarga el monto TOTAL que debe y lo deja editable —
-// el cobrador escribe cuánto recibió realmente. Si paga el total, queda
-// registrado como "Pagó ✅" (al día); si paga menos, como "Parcial ⚠️".
-// Importante: sigue existiendo un solo registro de pago por día — el monto
-// que se escriba aquí reemplaza (no se suma a) cualquier pago ya registrado
-// hoy para este mismo préstamo.
-async function abrirPonerseAlDia(prestamoId, clienteId, montoDebe) {
-  const monto = await mostrarPrompt(`Este cliente debe ${formatoPesos(montoDebe)} de cuotas atrasadas. ¿Cuánto te pagó hoy para ponerse al día?`, montoDebe, true);
+// --- REGISTRAR PAGO (flujo único para parcial / ponerse al día) ---
+// Antes existían dos caminos separados para lo mismo: "Parcial" (monto libre,
+// sin contexto de cuánto se debe) y "Ponerse al día" (precargaba el total
+// atrasado). Se unificaron en uno solo: si el cliente está al día, se abre
+// pidiendo el monto libremente (para un abono parcial de la cuota de hoy); si
+// está atrasado, se precarga el total que debe para que sea un solo toque
+// ponerlo al día, pero se puede editar para dejarlo como abono parcial.
+// Si paga el total (o más), queda como "Pagó ✅"; si paga menos, "Parcial ⚠️".
+// Recuerda: sigue existiendo un solo registro de pago por día — el monto que
+// se escriba aquí reemplaza (no se suma a) cualquier pago ya registrado hoy.
+async function abrirRegistrarPago(prestamoId, clienteId, montoDebe) {
+  const mensaje = montoDebe > 0
+    ? `Este cliente debe ${formatoPesos(montoDebe)} de cuotas atrasadas. ¿Cuánto te pagó hoy?`
+    : "¿Cuánto pagó el cliente hoy?";
+  const monto = await mostrarPrompt(mensaje, montoDebe > 0 ? montoDebe : "0", true);
   if (monto === null) return;
   const montoLimpio = parseFloat(String(monto).replace(/\D/g, ""));
   if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
-  const estado = montoLimpio >= montoDebe ? "pago" : "parcial";
+  const estado = montoDebe > 0 && montoLimpio >= montoDebe ? "pago" : "parcial";
   await registrarPago(prestamoId, montoLimpio, estado, clienteId);
 }
+
+let historialPagosCache = {};
+const LIMITE_HISTORIAL_INICIAL = 20;
 
 async function verHistorial(prestamoId) {
   const contenedor = document.getElementById("historial-" + prestamoId);
@@ -82,11 +81,26 @@ async function verHistorial(prestamoId) {
     .from("pagos").select("*").eq("prestamo_id", prestamoId).order("fecha_pago", { ascending: false });
   if (error) { contenedor.innerHTML = "Error al cargar historial."; return; }
 
-  const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
-  contenedor.innerHTML = pagos.length === 0
-    ? "<p>Sin pagos registrados todavía.</p>"
-    : pagos.map(p => `<div class="fila-historial"><span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span></div>`).join("");
+  historialPagosCache[prestamoId] = pagos;
+  pintarHistorial(prestamoId, LIMITE_HISTORIAL_INICIAL);
   contenedor.classList.remove("oculto");
+}
+
+// Pinta el historial ya cargado en memoria. Empieza mostrando solo los últimos
+// registros (los más relevantes para el día a día) para no cargar la pantalla
+// con meses de historial en clientes viejos; "Ver más" despliega el resto sin
+// volver a consultar el servidor.
+function pintarHistorial(prestamoId, limite) {
+  const contenedor = document.getElementById("historial-" + prestamoId);
+  const pagos = historialPagosCache[prestamoId] || [];
+  const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
+
+  if (pagos.length === 0) { contenedor.innerHTML = "<p>Sin pagos registrados todavía.</p>"; return; }
+
+  const visibles = limite ? pagos.slice(0, limite) : pagos;
+  const restantes = limite ? pagos.length - visibles.length : 0;
+  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span></div>`).join("")
+    + (restantes > 0 ? `<p class="link-ver-mas-historial" onclick="pintarHistorial(${prestamoId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
 }
 
 async function mostrarRecibo(clienteId, monto, fecha, estado) {

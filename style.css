@@ -501,17 +501,6 @@ body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
   border-radius: 8px;
 }
 
-.btn-al-dia {
-  width: 100%;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 9px;
-  margin-top: 8px;
-  border-radius: 8px;
-  background: #1d4ed8;
-}
-body.modo-oscuro .btn-al-dia { background: #2b4fc4; }
-
 .btn-historial { background: #1565c0; }
 .btn-refinanciar { background: #6a1b9a; }
 
@@ -531,6 +520,15 @@ body.modo-oscuro .btn-al-dia { background: #2b4fc4; }
 }
 
 .fila-historial:last-child { border-bottom: none; }
+
+.link-ver-mas-historial {
+  text-align: center;
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  padding: 8px 0 2px;
+  cursor: pointer;
+}
 
 .btn-respaldo {
   background: #1565c0;

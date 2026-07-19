@@ -87,6 +87,7 @@ function mostrarAppPrincipal() {
   marcarNavActivo("inicio");
   iniciarControlInactividad();
   mostrarPantallaBloqueo();
+  if (!pinEstaActivo()) verificarRecordatorioPin();
 }
 
 // --- PANTALLA DE BIENVENIDA (animación de entrada) ---

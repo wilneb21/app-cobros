@@ -11,10 +11,11 @@ function mostrarSeccion(nombre, desdeHistorial = false) {
   if (nombre === "cobrar") cargarClientesParaCobrar();
   if (nombre === "cuentas") cargarCuentasPorCobrar();
   if (nombre === "rutas") cargarRutas();
-  if (nombre === "configuracion") actualizarFilaConfigBloqueo();
+  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); }
   if (nombre === "reportes") {
     cargarReporteMes();
     if (!document.getElementById("gasto-fecha").value) document.getElementById("gasto-fecha").value = obtenerFechaLocal();
+    cargarRutasEnSelectorGasto();
   }
   cerrarMenuPrincipal();
 

@@ -56,6 +56,12 @@ async function configurarPin() {
   actualizarFilaConfigBloqueo();
   mostrarAlerta("🔒 Listo. Desde ahora la app pedirá este PIN cada vez que la abras en este celular.");
 
+  try {
+    const user = await obtenerUsuarioActual();
+    await supabaseClient.from("preferencias_usuario")
+      .upsert({ user_id: user.id, pin_activado_alguna_vez: true }, { onConflict: "user_id" });
+  } catch (e) { /* no bloquea el flujo si falla el guardado remoto */ }
+
   if (await biometriaDisponibleEnDispositivo()) {
     const quiereHuella = await mostrarConfirmacion("Este celular tiene huella o Face ID disponible. ¿Quieres poder usarla también para desbloquear más rápido (en vez de escribir el PIN cada vez)?");
     if (quiereHuella) await activarBiometria();
@@ -88,6 +94,26 @@ function actualizarFilaConfigBloqueo() {
   fila.querySelector("small").textContent = pinEstaActivo()
     ? "Activado en este celular · toca para desactivar"
     : "Pide un PIN cada vez que abras la app";
+}
+
+// Si el usuario activó el PIN alguna vez (en cualquier celular) pero en ESTE
+// celular no está activo (por ejemplo, reinstaló la app o entró desde uno
+// nuevo), se lo recuerda una sola vez por día — sin ser insistente.
+async function verificarRecordatorioPin() {
+  if (pinEstaActivo()) return;
+  const hoy = obtenerFechaLocal();
+  if (localStorage.getItem("avisoPinVistoFecha") === hoy) return;
+
+  try {
+    const user = await obtenerUsuarioActual();
+    const { data } = await supabaseClient.from("preferencias_usuario")
+      .select("pin_activado_alguna_vez").eq("user_id", user.id).maybeSingle();
+    if (!data?.pin_activado_alguna_vez) return;
+
+    localStorage.setItem("avisoPinVistoFecha", hoy);
+    const activar = await mostrarConfirmacion("🔒 En otro celular tenías activado el bloqueo con PIN, pero en este todavía no. ¿Quieres activarlo ahora para proteger los datos de tus clientes?");
+    if (activar) await configurarPin();
+  } catch (e) { /* si falla la consulta, simplemente no se muestra el aviso hoy */ }
 }
 
 // --- PANTALLA DE BLOQUEO ---

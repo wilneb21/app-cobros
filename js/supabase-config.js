@@ -3,6 +3,11 @@ const SUPABASE_URL = "https://sgaispueisunccflbahk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Tr-FIcJTBAt9ebTKrf1HXw_-PVzSvjn";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Clave pública VAPID para notificaciones push (ver js/push.js). La privada
+// NUNCA va en el frontend — vive solo como secreto en la Edge Function.
+// ⚠️ Genera tu propio par de llaves para producción (ver SUPABASE_SETUP.md).
+const VAPID_PUBLIC_KEY = "BNnJdT6j_rHGlHZTJV1e3kPfEQ9LfxN-ccUfqdN1jFeqhXZwIj2vAkzONBCBsHPw1eaAwz79VXq0RXpjJrg7KNk";
+
 function obtenerFechaLocal() {
   const formateador = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit"

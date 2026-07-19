@@ -2,6 +2,27 @@
 
 Este documento explica cómo funciona la app hoy, qué implementé en esta ronda, una corrección a mi análisis anterior, y qué queda pendiente y por qué.
 
+## -2. Ronda nueva (2026-07-19, tarde): simplificar, push real, y seguridad/consistencia
+
+**Simplificado / quitado:**
+- El historial completo de pagos ahora muestra los últimos 20 registros con un link "Ver los N pagos anteriores" — antes cargaba todo de una vez, y con clientes viejos se volvía una lista eterna.
+- Se fusionaron los botones "Parcial" y "📅 Ponerse al día" en uno solo: cuando el cliente está atrasado, el botón central de la tarjeta cambia a "Registrar pago 💰" y ya viene precargado con el total que debe (editable). Cuando está al día, sigue siendo "Parcial ⚠️" como antes. Menos botones, mismo resultado.
+- Las notas del cliente ya no se muestran en las tarjetas de las listas (Clientes y Cobrar) — solo quedan visibles/editables dentro del detalle del cliente, para no ensuciar la vista general.
+
+**🔔 Notificaciones push reales:**
+- Antes solo existía el recordatorio local (notificación programada por el navegador, que solo funciona con la app abierta o recién cerrada). Ahora hay un sistema real de push: se activa en Configuración → "Notificaciones push", y una Edge Function de Supabase (`recordatorios-push`) corre una vez al día y le avisa a cada cobrador, en su celular, cuántas cuotas le vencen mañana — **aunque la app esté completamente cerrada**.
+- Requiere pasos de configuración únicos en Supabase (llaves VAPID, secretos, desplegar la función y programarla con `pg_cron`). Todo está documentado paso a paso en `SUPABASE_SETUP.md`, sección "Activar notificaciones push reales". **Sin esos pasos, el botón de Configuración se activa pero nadie recibirá push real** (solo quedará la suscripción guardada, esperando a que actives la función).
+
+**🔒 Seguridad y consistencia:**
+- Si activaste el PIN en un celular y luego abres la app en otro (o reinstalaste), ahora te lo recuerda una vez al día: "en otro celular tenías el PIN activado, ¿lo activas aquí también?". El indicador (`pin_activado_alguna_vez`) se guarda en Supabase — nunca el PIN en sí.
+- Los gastos ahora se pueden etiquetar opcionalmente con una ruta (selector "General" por defecto). Antes todos los gastos quedaban sueltos, sin poder saber si la gasolina de tal día fue de una ruta en particular.
+- **Decisión consciente:** la caja diaria (`caja_diaria`) se queda global, sin ruta — representa el efectivo físico real que el cobrador trae en el bolsillo, que normalmente es uno solo aunque cubra varias rutas en el día. Separarla por ruta habría sido forzar una separación de dinero que, en la práctica, no suele existir así.
+
+**Nuevas migraciones que debes correr en Supabase (en este orden, después de las anteriores):**
+1. `supabase/migrations/20260722_push_y_preferencias.sql` — crea `push_subscriptions`, `preferencias_usuario`, y agrega `gastos.ruta_id`.
+2. Sigue la guía de `SUPABASE_SETUP.md` para dejar funcionando la Edge Function de push (si no la configuras, todo lo demás de la app sigue funcionando igual, simplemente no llegarán notificaciones push reales).
+
+
 ## -1. Ronda nueva (2026-07-19): cédula del cliente y orden compartido
 
 | Idea | Dónde quedó |

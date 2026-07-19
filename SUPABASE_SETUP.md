@@ -30,3 +30,66 @@ Cuando alguien crea una cuenta o pide recuperar su contraseña, Supabase manda u
 4. Guarda los cambios.
 
 Si tu app vive en varias URLs (por ejemplo local para pruebas y la publicada), agrega todas las que uses en la lista de **Redirect URLs**.
+
+## Activar notificaciones push reales (cuotas que vencen mañana, con la app cerrada)
+
+Esto tiene 3 partes: la base de datos, la Edge Function que manda los push, y programarla para que corra sola todos los días.
+
+### 1. Base de datos
+Ejecuta `supabase/migrations/20260722_push_y_preferencias.sql` en el SQL Editor (crea `push_subscriptions` y `preferencias_usuario`, ambas con RLS).
+
+### 2. Llaves VAPID (para que el navegador confíe en tus notificaciones)
+Ya dejé un par de llaves de ejemplo funcionando en `js/supabase-config.js` (`VAPID_PUBLIC_KEY`) para que puedas probar de una vez. **Para producción, genera tu propio par** con:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Si generas unas nuevas, reemplaza `VAPID_PUBLIC_KEY` en `js/supabase-config.js` por la que te dé ese comando.
+
+### 3. Configura los secretos de la Edge Function
+En el Dashboard de Supabase → **Edge Functions → Secrets** (o con la CLI):
+
+```bash
+supabase secrets set VAPID_PUBLIC_KEY="tu_clave_publica"
+supabase secrets set VAPID_PRIVATE_KEY="tu_clave_privada"
+supabase secrets set VAPID_SUBJECT="mailto:tucorreo@dominio.com"
+supabase secrets set CRON_SECRET="inventa-una-clave-larga-y-secreta"
+```
+
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya existen automáticamente en toda Edge Function, no hace falta configurarlos.
+
+### 4. Despliega la función
+```bash
+supabase functions deploy recordatorios-push --no-verify-jwt
+```
+(`--no-verify-jwt` porque quien la llama es un cron interno, no un usuario logueado; la función igual está protegida por el `CRON_SECRET` del paso anterior.)
+
+### 5. Prográmala para que corra sola cada día
+En el SQL Editor (reemplaza `TU_PROJECT_REF` y el secreto por los tuyos reales):
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+select cron.schedule(
+  'recordatorios-push-diario',
+  '0 22 * * *', -- 5:00 p.m. hora de Bogotá (UTC-5) — ajusta la hora a tu gusto
+  $$
+  select net.http_post(
+    url := 'https://TU_PROJECT_REF.supabase.co/functions/v1/recordatorios-push',
+    headers := jsonb_build_object('x-cron-secret', 'inventa-una-clave-larga-y-secreta'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Con eso, todos los días a la hora que elijas, la función revisa qué cuotas vencen mañana y les manda el push a los celulares que hayan activado "Notificaciones push" en Configuración dentro de la app.
+
+**Para probar sin esperar al cron:** puedes invocar la función manualmente desde la terminal:
+```bash
+curl -X POST 'https://TU_PROJECT_REF.supabase.co/functions/v1/recordatorios-push' \
+  -H "x-cron-secret: inventa-una-clave-larga-y-secreta"
+```
+

@@ -156,7 +156,6 @@ function pintarClientesCobrar(clientes) {
     contenedor.innerHTML += `
       <div class="tarjeta">
         <strong>${escaparHtml(cliente.nombre)}</strong>
-        ${cliente.notas ? `<div class="nota-cliente">📝 ${escaparHtml(cliente.notas)}</div>` : ""}
         <div id="prestamos-cliente-${cliente.id}" class="prestamos-cliente">Cargando préstamos...</div>
       </div>`;
   }
@@ -226,20 +225,14 @@ async function cargarPrestamosDeCliente(clienteId) {
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const diferencia = totalPagado - montoEsperado;
 
-    let claseMora, textoMora, recargoTexto = "", botonAlDia = "";
+    let claseMora, textoMora, recargoTexto = "", montoDebe = 0;
     if (diferencia >= 0) {
       claseMora = "estado-al-dia";
       textoMora = diferencia > 0 ? `🟢 Al día (adelantado ${formatoPesos(diferencia)})` : "🟢 Al día";
     } else {
-      const montoDebe = Math.abs(diferencia);
+      montoDebe = Math.round(Math.abs(diferencia));
       claseMora = montoDebe < Number(p.cuota) * 2 ? "estado-atencion" : "estado-mora";
       textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)}`;
-
-      // Si debe más de 1 cuota, "Pagó ✅" solo registraría el valor de UNA cuota
-      // y el cliente seguiría atrasado. Este botón precarga el total que debe
-      // (todas las cuotas atrasadas juntas) para ponerlo al día de un solo pago.
-      const montoDebeRedondeado = Math.round(montoDebe);
-      botonAlDia = `<button type="button" class="btn-al-dia" onclick="abrirPonerseAlDia(${p.id}, ${clienteId}, ${montoDebeRedondeado})">📅 Ponerse al día (${formatoPesos(montoDebeRedondeado)})</button>`;
 
       if (p.interes_mora_habilitado && p.interes_mora_porcentaje > 0) {
         const recargo = Math.round(montoDebe * (p.interes_mora_porcentaje / 100));
@@ -261,10 +254,9 @@ async function cargarPrestamosDeCliente(clienteId) {
           <span class="ultimo-registro">${textoUltimo}</span>
           ${textoRacha}
         </div>
-        ${botonAlDia}
         <div class="botones-pago">
           <button class="btn-pago pago-si" onclick="registrarPago(${p.id}, ${p.cuota}, 'pago', ${clienteId})">Pagó ✅</button>
-          <button class="btn-pago pago-parcial" onclick="abrirPagoParcial(${p.id}, ${clienteId})">Parcial ⚠️</button>
+          <button class="btn-pago pago-parcial" onclick="abrirRegistrarPago(${p.id}, ${clienteId}, ${montoDebe})">${montoDebe > 0 ? "Registrar pago 💰" : "Parcial ⚠️"}</button>
           <button class="btn-pago pago-no" onclick="registrarPago(${p.id}, 0, 'no_pago', ${clienteId})">No pagó ❌</button>
         </div>
         <p class="link-mas-opciones" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
