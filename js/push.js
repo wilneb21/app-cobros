@@ -45,6 +45,7 @@ async function actualizarFilaConfigPush() {
 }
 
 async function configurarNotificacionesPush() {
+  if (!requiereConexion()) return;
   if (!pushDisponibleEnDispositivo()) {
     mostrarAlerta("Este navegador o celular no soporta notificaciones push.");
     return;

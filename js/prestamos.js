@@ -59,7 +59,7 @@ async function crearPrestamo(event) {
   });
 
   if (error) {
-    mostrarAlerta("Error al crear préstamo: " + error.message);
+    mostrarAlerta("Error al crear préstamo: " + traducirErrorSupabase(error));
     return;
   }
 
@@ -299,7 +299,7 @@ async function aplicarRecargoMora(prestamoId, montoEstimado, clienteId) {
   const { error } = await supabaseClient.rpc("aplicar_recargo_mora", {
     p_prestamo_id: prestamoId, p_monto: montoEstimado
   });
-  if (error) { mostrarAlerta("No fue posible aplicar el recargo: " + error.message); return; }
+  if (error) { mostrarAlerta("No fue posible aplicar el recargo: " + traducirErrorSupabase(error)); return; }
   mostrarAlerta("✅ Recargo de mora aplicado al saldo.");
   cargarPrestamosDeCliente(clienteId);
 }
@@ -316,6 +316,7 @@ async function verificarSiQuedoPagado(prestamoId) {
 }
 
 async function refinanciarPrestamo(prestamoIdViejo, clienteId, saldoPendiente, interesActual, frecuenciaActual) {
+  if (!requiereConexion()) return;
   const cont = document.getElementById("modal-generico-contenido");
   cont.innerHTML = `
     <p class="modal-mensaje">Saldo pendiente actual: <strong>${formatoPesos(saldoPendiente)}</strong></p>
@@ -352,7 +353,7 @@ async function refinanciarPrestamo(prestamoIdViejo, clienteId, saldoPendiente, i
       p_fecha_inicio: obtenerFechaLocal()
     });
 
-    if (error) { mostrarAlerta("Error al crear nuevo préstamo: " + error.message); return; }
+    if (error) { mostrarAlerta("Error al crear nuevo préstamo: " + traducirErrorSupabase(error)); return; }
 
     mostrarAlerta(`✅ Crédito refinanciado.<br>Nuevo monto: ${formatoPesos(nuevoMontoPrestado)}<br>Nueva cuota: ${formatoPesos(nuevaCuota)}`);
     cargarPrestamosDeCliente(clienteId);

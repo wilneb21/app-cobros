@@ -8,6 +8,45 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ⚠️ Genera tu propio par de llaves para producción (ver SUPABASE_SETUP.md).
 const VAPID_PUBLIC_KEY = "BNnJdT6j_rHGlHZTJV1e3kPfEQ9LfxN-ccUfqdN1jFeqhXZwIj2vAkzONBCBsHPw1eaAwz79VXq0RXpjJrg7KNk";
 
+// --- TRADUCTOR DE ERRORES ---
+// Supabase/Postgres siempre devuelven sus mensajes de error en inglés. Esta
+// función los traduce a algo que un cobrador (sin conocimientos técnicos)
+// entienda, en español. El mensaje original queda en la consola por si
+// soporte técnico lo necesita, pero nunca se le muestra al usuario en inglés.
+function requiereConexion() {
+  if (!navigator.onLine) {
+    mostrarAlerta("📴 Necesitas conexión a internet para hacer esto. Los pagos sí se guardan sin señal, pero crear o editar clientes, préstamos, rutas y gastos necesita estar conectado.");
+    return false;
+  }
+  return true;
+}
+
+function traducirErrorSupabase(error) {
+  console.error("Error original:", error);
+  const mensaje = (error?.message || String(error || "")).toLowerCase();
+
+  if (!navigator.onLine || mensaje.includes("failed to fetch") || mensaje.includes("network") || mensaje.includes("load failed")) {
+    return "No hay conexión a internet. Verifica tu señal e intenta de nuevo.";
+  }
+  if (mensaje.includes("invalid login credentials")) return "Correo o contraseña incorrectos.";
+  if (mensaje.includes("user already registered")) return "Ya existe una cuenta con ese correo.";
+  if (mensaje.includes("email not confirmed")) return "Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.";
+  if (mensaje.includes("unable to validate email") || mensaje.includes("invalid format")) return "El correo no tiene un formato válido.";
+  if (mensaje.includes("for security purposes")) return "Por seguridad, espera un momento antes de volver a intentarlo.";
+  if (mensaje.includes("password") && (mensaje.includes("character") || mensaje.includes("short"))) return "La contraseña debe tener al menos 8 caracteres.";
+  if (mensaje.includes("duplicate key") || mensaje.includes("already exists")) return "Ya existe un registro con ese mismo dato.";
+  if (mensaje.includes("violates foreign key")) return "No se puede completar porque hay información relacionada (por ejemplo, préstamos o pagos) que depende de esto.";
+  if (mensaje.includes("null value in column") || mensaje.includes("violates not-null")) return "Falta completar un dato obligatorio.";
+  if (mensaje.includes("row-level security") || mensaje.includes("permission denied")) return "No tienes permiso para hacer esta acción.";
+  if (mensaje.includes("does not exist") && (mensaje.includes("relation") || mensaje.includes("column") || mensaje.includes("function"))) {
+    return "Falta ejecutar una actualización de la base de datos (migración de Supabase) antes de poder usar esta función.";
+  }
+  if (mensaje.includes("jwt") || mensaje.includes("token")) return "Tu sesión expiró. Cierra sesión y vuelve a entrar.";
+  if (mensaje.includes("timeout")) return "El servidor tardó demasiado en responder. Intenta de nuevo.";
+
+  return "Ocurrió un error inesperado. Intenta de nuevo. Si el problema sigue, avísale a soporte técnico.";
+}
+
 function obtenerFechaLocal() {
   const formateador = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit"

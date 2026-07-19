@@ -16,7 +16,7 @@ async function registrarUsuario() {
     options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` }
   });
   document.getElementById("mensaje-crear-cuenta").innerText = error
-    ? "Error: " + error.message
+    ? "Error: " + traducirErrorSupabase(error)
     : "Cuenta creada. Revisa tu correo si pide confirmación, o inicia sesión.";
 }
 
@@ -36,7 +36,7 @@ async function iniciarSesion() {
   const password = document.getElementById("password").value;
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) {
-    document.getElementById("mensaje-error").innerText = "Error: " + error.message;
+    document.getElementById("mensaje-error").innerText = "Error: " + traducirErrorSupabase(error);
   } else {
     mostrarAppPrincipal();
   }
@@ -49,7 +49,7 @@ async function recuperarContrasena() {
     redirectTo: `${window.location.origin}${window.location.pathname}`
   });
   if (error) {
-    mostrarAlerta("Error: " + error.message);
+    mostrarAlerta("Error: " + traducirErrorSupabase(error));
   } else {
     mostrarAlerta("Te enviamos un correo con instrucciones para recuperar tu contraseña.");
   }
@@ -148,7 +148,7 @@ function mostrarPantallaNuevaContrasena() {
     if (clave1 !== clave2) { elError.textContent = "Las contraseñas no coinciden."; return; }
 
     const { error } = await supabaseClient.auth.updateUser({ password: clave1 });
-    if (error) { elError.textContent = "Error: " + error.message; return; }
+    if (error) { elError.textContent = "Error: " + traducirErrorSupabase(error); return; }
 
     cerrarModalGenerico();
     // Por seguridad (el enlace pudo abrirse en un celular compartido), cerramos

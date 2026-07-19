@@ -416,6 +416,7 @@ async function obtenerMetas() {
 }
 
 async function editarMetas() {
+  if (!requiereConexion()) return;
   const metas = await obtenerMetas();
 
   const diaria = await mostrarPrompt("¿Cuál es tu meta de recaudo DIARIO?", metas.meta_diaria || "0", true);
@@ -504,6 +505,7 @@ async function cargarCajaDiaria() {
 }
 
 async function gestionarCajaDiaria(yaAbierta) {
+  if (!requiereConexion()) return;
   const hoy = obtenerFechaLocal();
   const user = await obtenerUsuarioActual();
   const etiqueta = yaAbierta ? "¿Con cuánto efectivo terminaste hoy?" : "¿Con cuánto efectivo empiezas hoy?";
@@ -513,6 +515,6 @@ async function gestionarCajaDiaria(yaAbierta) {
   if (valor < 0) { mostrarAlerta("Ingresa un valor válido."); return; }
   const datos = yaAbierta ? { user_id: user.id, fecha: hoy, efectivo_final: valor } : { user_id: user.id, fecha: hoy, base_inicial: valor, efectivo_final: null };
   const { error } = await supabaseClient.from("caja_diaria").upsert(datos, { onConflict: "user_id,fecha" });
-  if (error) { mostrarAlerta("No fue posible guardar la caja: " + error.message); return; }
+  if (error) { mostrarAlerta("No fue posible guardar la caja: " + traducirErrorSupabase(error)); return; }
   cargarCajaDiaria();
 }

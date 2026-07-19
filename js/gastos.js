@@ -12,6 +12,7 @@ async function cargarRutasEnSelectorGasto() {
 
 async function crearGasto(event) {
   event.preventDefault();
+  if (!requiereConexion()) return;
   const concepto = document.getElementById("gasto-concepto").value.trim();
   const monto = obtenerValorNumerico(document.getElementById("gasto-monto"));
   const fecha = document.getElementById("gasto-fecha").value;
@@ -23,7 +24,7 @@ async function crearGasto(event) {
     concepto, monto, fecha, ruta_id: rutaId || null, user_id: user.id
   });
 
-  if (error) { mostrarAlerta("Error al registrar gasto: " + error.message); return; }
+  if (error) { mostrarAlerta("Error al registrar gasto: " + traducirErrorSupabase(error)); return; }
 
   document.getElementById("gasto-concepto").value = "";
   document.getElementById("gasto-monto").value = "";
@@ -53,6 +54,7 @@ async function cargarGastosDelPeriodo(inicio, fin) {
 }
 
 async function eliminarGasto(gastoId) {
+  if (!requiereConexion()) return;
   const confirmado = await mostrarConfirmacion("¿Eliminar este gasto?");
   if (!confirmado) return;
   const { error } = await supabaseClient.from("gastos").delete().eq("id", gastoId);

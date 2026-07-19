@@ -187,7 +187,7 @@ async function manejarSeleccionRutaNuevoCliente() {
   const { data: rutaCreada, error } = await supabaseClient.from("rutas")
     .insert({ nombre: nombreRuta.trim(), descripcion: "", user_id: user.id })
     .select("id").single();
-  if (error) { mostrarAlerta("No fue posible crear la ruta: " + error.message); selectorRuta.value = ""; return; }
+  if (error) { mostrarAlerta("No fue posible crear la ruta: " + traducirErrorSupabase(error)); selectorRuta.value = ""; return; }
 
   await cargarRutasEnSelectorNuevoCliente(String(rutaCreada.id));
 }
@@ -243,7 +243,7 @@ async function crearClienteNuevo(event) {
   const { error } = await supabaseClient.from("clientes").insert({
     nombre, cedula, telefono, direccion, notas, riesgo, ruta_id: rutaId || null, user_id: user.id, archivado: false
   });
-  if (error) { mostrarAlerta("No fue posible crear el cliente: " + error.message); return; }
+  if (error) { mostrarAlerta("No fue posible crear el cliente: " + traducirErrorSupabase(error)); return; }
 
   cerrarModalNuevoCliente();
   mostrarAlerta("✅ Cliente creado");
@@ -256,7 +256,7 @@ let clienteDetalleActualId = null;
 async function abrirDetalleCliente(clienteId) {
   clienteDetalleActualId = clienteId;
   const { data: cliente, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("id", clienteId).single();
-  if (error) { mostrarAlerta("Error al cargar cliente: " + error.message); return; }
+  if (error) { mostrarAlerta("Error al cargar cliente: " + traducirErrorSupabase(error)); return; }
 
   document.getElementById("detalle-nombre-cliente").innerText = cliente.nombre;
   cambiarTabDetalle("info");
@@ -350,6 +350,7 @@ function abrirPrestamoParaCliente(clienteId) {
 
 async function guardarEdicionCliente(event, clienteId) {
   event.preventDefault();
+  if (!requiereConexion()) return;
   const nombre = document.getElementById("editar-nombre").value.trim();
   const cedula = document.getElementById("editar-cedula").value.trim();
   const telefono = document.getElementById("editar-telefono").value.trim();
@@ -359,7 +360,7 @@ async function guardarEdicionCliente(event, clienteId) {
   if (!nombre) return mostrarAlerta("El nombre del cliente es obligatorio.");
 
   const { error } = await supabaseClient.from("clientes").update({ nombre, cedula, telefono, direccion, notas, riesgo }).eq("id", clienteId);
-  if (error) { mostrarAlerta("Error al guardar: " + error.message); return; }
+  if (error) { mostrarAlerta("Error al guardar: " + traducirErrorSupabase(error)); return; }
 
   mostrarAlerta("✅ Cambios guardados");
   document.getElementById("detalle-nombre-cliente").innerText = nombre;
@@ -404,23 +405,25 @@ async function exportarEstadoCuentaPDF(clienteId) {
 }
 
 async function eliminarCliente(clienteId) {
+  if (!requiereConexion()) return;
   // Solo se llega aquí cuando el cliente NO tiene ningún préstamo en su historial
   const confirmado = await mostrarConfirmacion("¿Seguro que quieres eliminar este cliente? Esto no se puede deshacer.");
   if (!confirmado) return;
 
   const { error } = await supabaseClient.from("clientes").delete().eq("id", clienteId);
-  if (error) { mostrarAlerta("Error: " + error.message); return; }
+  if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
 
   cerrarDetalleCliente();
   cargarClientes();
 }
 
 async function archivarCliente(clienteId) {
+  if (!requiereConexion()) return;
   const confirmado = await mostrarConfirmacion("Este cliente se ocultará de tu lista de clientes activos, pero todo su historial de préstamos y pagos se conserva intacto.<br><br>¿Deseas archivarlo?");
   if (!confirmado) return;
 
   const { error } = await supabaseClient.from("clientes").update({ archivado: true }).eq("id", clienteId);
-  if (error) { mostrarAlerta("Error: " + error.message); return; }
+  if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
 
   mostrarAlerta("📦 Cliente archivado");
   cerrarDetalleCliente();
@@ -428,8 +431,9 @@ async function archivarCliente(clienteId) {
 }
 
 async function desarchivarCliente(clienteId) {
+  if (!requiereConexion()) return;
   const { error } = await supabaseClient.from("clientes").update({ archivado: false }).eq("id", clienteId);
-  if (error) { mostrarAlerta("Error: " + error.message); return; }
+  if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
 
   mostrarAlerta("✅ Cliente desarchivado, ya aparece de nuevo en tu lista activa.");
   cerrarDetalleCliente();

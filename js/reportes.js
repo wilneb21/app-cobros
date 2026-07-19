@@ -364,7 +364,7 @@ async function exportarExcel(evento) {
       supabaseClient.from("gastos").select("fecha, concepto, monto").order("fecha", { ascending: false })
     ]);
     const conError = [clientes, prestamos, pagos, gastos].find(r => r.error);
-    if (conError) { mostrarAlerta("No fue posible exportar a Excel: " + conError.error.message); return; }
+    if (conError) { mostrarAlerta("No fue posible exportar a Excel: " + traducirErrorSupabase(conError.error)); return; }
 
     const etiquetasEstado = { pago: "Pagó", parcial: "Parcial", no_pago: "No pagó" };
     const etiquetasRiesgo = { bueno: "Bueno", regular: "Regular", riesgoso: "Riesgoso" };
@@ -475,7 +475,7 @@ async function exportarExcel(evento) {
 
     XLSX.writeFile(libro, `cobros-excel-${obtenerFechaLocal()}.xlsx`);
   } catch (error) {
-    mostrarAlerta(error.message || "No fue posible generar el Excel.");
+    mostrarAlerta(error ? traducirErrorSupabase(error) : "No fue posible generar el Excel.");
   } finally {
     if (boton) { boton.disabled = false; boton.innerHTML = textoOriginal; }
   }
@@ -491,7 +491,7 @@ async function descargarRespaldo() {
     supabaseClient.from("metas").select("*")
   ]);
   const resultadoConError = [rutas, clientes, prestamos, pagos, gastos, metas].find(resultado => resultado.error);
-  if (resultadoConError) { mostrarAlerta("No fue posible generar el respaldo: " + resultadoConError.error.message); return; }
+  if (resultadoConError) { mostrarAlerta("No fue posible generar el respaldo: " + traducirErrorSupabase(resultadoConError.error)); return; }
 
   const respaldo = {
     version: 1,

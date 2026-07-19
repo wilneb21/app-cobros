@@ -1,12 +1,13 @@
 async function crearRuta(event) {
   event.preventDefault();
+  if (!requiereConexion()) return;
   const nombre = document.getElementById("ruta-nombre").value.trim();
   const descripcion = document.getElementById("ruta-descripcion").value.trim();
   if (!nombre) return mostrarAlerta("El nombre de la ruta es obligatorio.");
   const user = await obtenerUsuarioActual();
 
   const { error } = await supabaseClient.from("rutas").insert({ nombre, descripcion, user_id: user.id });
-  if (error) { mostrarAlerta("Error al crear ruta: " + error.message); return; }
+  if (error) { mostrarAlerta("Error al crear ruta: " + traducirErrorSupabase(error)); return; }
 
   document.getElementById("ruta-nombre").value = "";
   document.getElementById("ruta-descripcion").value = "";
@@ -114,6 +115,7 @@ async function verHistorialOrdenRuta() {
 }
 
 async function moverClienteOrden(indice, direccion) {
+  if (!navigator.onLine) { mostrarAlerta("📴 Necesitas conexión para reordenar la ruta — el nuevo orden no se pudo guardar."); return; }
   const nuevoIndice = indice + direccion;
   if (nuevoIndice < 0 || nuevoIndice >= listaOrdenRutaActual.length) return;
   const tituloModal = document.querySelector("#modal-generico-contenido h3").textContent.replace("Orden de visita — ", "");
@@ -145,6 +147,7 @@ async function abrirMapaRutaCompleta(rutaId, nombreRuta) {
 }
 
 async function eliminarRuta(rutaId) {
+  if (!requiereConexion()) return;
   const { count } = await supabaseClient
     .from("clientes").select("*", { count: "exact", head: true }).eq("ruta_id", rutaId);
 
@@ -157,6 +160,6 @@ async function eliminarRuta(rutaId) {
   if (!confirmado) return;
 
   const { error } = await supabaseClient.from("rutas").delete().eq("id", rutaId);
-  if (error) { mostrarAlerta("Error: " + error.message); return; }
+  if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
   cargarRutas();
 }
