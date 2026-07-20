@@ -73,53 +73,51 @@
           <h3>Tu jornada de cobro</h3>
           <p id="fecha-inicio"></p>
         </div>
-        <div class="tarjeta-ganancia">
-          <div class="ganancia-cabecera">
-            <h4>💰 Ganancia por intereses</h4>
-            <div class="filtros-periodo filtros-ganancia" role="group" aria-label="Periodo de la ganancia">
-              <button type="button" class="pildora-periodo activa" data-periodo-ganancia="diaria" onclick="cambiarPeriodoGanancia('diaria')">Diaria</button>
-              <button type="button" class="pildora-periodo" data-periodo-ganancia="semanal" onclick="cambiarPeriodoGanancia('semanal')">Semanal</button>
-              <button type="button" class="pildora-periodo" data-periodo-ganancia="mensual" onclick="cambiarPeriodoGanancia('mensual')">Mensual</button>
-            </div>
-          </div>
-          <div id="ganancia-periodo-caja"></div>
-          <div id="ganancia-acumulada" class="ganancia-acumulada"></div>
-          <div id="cartera-tendencia-periodo" class="cartera-tendencia-periodo"></div>
-        </div>
 
-        <div class="filtros-periodo" role="group" aria-label="Periodo del resumen">
-          <button type="button" class="pildora-periodo activa" data-periodo="hoy" onclick="cambiarPeriodoInicio('hoy')">Hoy</button>
-          <button type="button" class="pildora-periodo" data-periodo="ayer" onclick="cambiarPeriodoInicio('ayer')">Ayer</button>
-          <button type="button" class="pildora-periodo" data-periodo="7dias" onclick="cambiarPeriodoInicio('7dias')">7 días</button>
-          <button type="button" class="pildora-periodo" data-periodo="mes" onclick="cambiarPeriodoInicio('mes')">Mes</button>
-        </div>
         <div id="progreso-cobro-principal" class="progreso-cobro-principal"></div>
-        <h4 id="titulo-resumen-inicio">Resumen de hoy</h4>
         <div id="resumen-dia" class="resumen-dia"></div>
         <div id="resumen-cartera" class="resumen-dia"></div>
         <div id="caja-diaria" class="caja-diaria"></div>
-
-        <h4>Acciones rápidas</h4>
-        <div class="acciones-rapidas acciones-rapidas-grid">
-          <button type="button" onclick="mostrarSeccion('clientes'); abrirModalNuevoCliente()" class="accion-rapida accion-cliente"><span>👤</span><b>Crear cliente</b><small>Nuevo registro</small></button>
-          <button type="button" onclick="mostrarSeccion('prestamos')" class="accion-rapida accion-prestamo"><span>💸</span><b>Crear préstamo</b><small>Nuevo crédito</small></button>
-          <button type="button" onclick="mostrarSeccion('cobrar')" class="accion-rapida accion-cobrar"><span>✓</span><b>Registrar cobro</b><small>Pago del día</small></button>
-          <button type="button" onclick="mostrarSeccion('rutas')" class="accion-rapida accion-ruta"><span>⌖</span><b>Ver rutas</b><small>Organiza visitas</small></button>
-        </div>
-
-        <h4>Recaudo últimos 7 días</h4>
-        <div id="grafico-semana" class="grafico-semana"></div>
-        <div id="tendencia-cobro" class="tendencia-cobro"></div>
 
         <h4>Pendientes por cobrar hoy</h4>
         <p class="texto-ayuda">Organizados por ruta y con prioridad para las cuotas vencidas.</p>
         <div id="jornada-por-rutas"></div>
         <div id="lista-pendientes-hoy"></div>
 
-        <h4>Agenda de vencimientos</h4>
-        <p class="texto-ayuda">Próximas cuotas esperadas durante los siguientes 7 días.</p>
-        <p id="link-activar-recordatorios" class="link-olvide oculto" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
-        <div id="agenda-vencimientos"></div>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver ganancia, gráficos y agenda de vencimientos</button>
+
+        <div id="inicio-mas-estadisticas" class="oculto">
+          <div class="tarjeta-ganancia">
+            <div class="ganancia-cabecera">
+              <h4>💰 Ganancia por intereses</h4>
+              <div class="filtros-periodo filtros-ganancia" role="group" aria-label="Periodo de la ganancia">
+                <button type="button" class="pildora-periodo activa" data-periodo-ganancia="diaria" onclick="cambiarPeriodoGanancia('diaria')">Diaria</button>
+                <button type="button" class="pildora-periodo" data-periodo-ganancia="semanal" onclick="cambiarPeriodoGanancia('semanal')">Semanal</button>
+                <button type="button" class="pildora-periodo" data-periodo-ganancia="mensual" onclick="cambiarPeriodoGanancia('mensual')">Mensual</button>
+              </div>
+            </div>
+            <div id="ganancia-periodo-caja"></div>
+            <div id="ganancia-acumulada" class="ganancia-acumulada"></div>
+            <div id="cartera-tendencia-periodo" class="cartera-tendencia-periodo"></div>
+          </div>
+
+          <div class="filtros-periodo" role="group" aria-label="Periodo del resumen">
+            <button type="button" class="pildora-periodo activa" data-periodo="hoy" onclick="cambiarPeriodoInicio('hoy')">Hoy</button>
+            <button type="button" class="pildora-periodo" data-periodo="ayer" onclick="cambiarPeriodoInicio('ayer')">Ayer</button>
+            <button type="button" class="pildora-periodo" data-periodo="7dias" onclick="cambiarPeriodoInicio('7dias')">7 días</button>
+            <button type="button" class="pildora-periodo" data-periodo="mes" onclick="cambiarPeriodoInicio('mes')">Mes</button>
+          </div>
+          <h4 id="titulo-resumen-inicio">Resumen de hoy</h4>
+
+          <h4>Recaudo últimos 7 días</h4>
+          <div id="grafico-semana" class="grafico-semana"></div>
+          <div id="tendencia-cobro" class="tendencia-cobro"></div>
+
+          <h4>Agenda de vencimientos</h4>
+          <p class="texto-ayuda">Próximas cuotas esperadas durante los siguientes 7 días.</p>
+          <p id="link-activar-recordatorios" class="link-olvide oculto" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
+          <div id="agenda-vencimientos"></div>
+        </div>
       </section>
 
       <section id="seccion-cobrar" class="seccion oculto">
@@ -143,7 +141,7 @@
         <div class="cabecera-lista-clientes"><div><h3>Clientes</h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirModalNuevoCliente()">＋ Nuevo</button></div>
         <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar por nombre o cédula..." oninput="filtrarClientesLista()">
         <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
-        <p id="link-ver-ranking" class="link-olvide" onclick="toggleRankingClientes()">🏆 Ver ranking de cumplimiento</p>
+        <p id="link-ver-ranking" class="link-olvide funcion-avanzada oculto" onclick="toggleRankingClientes()">🏆 Ver ranking de cumplimiento</p>
         <div id="ranking-clientes" class="oculto"></div>
         <div id="lista-clientes"></div>
       </section>
@@ -172,7 +170,7 @@
           <input type="date" id="prestamo-fecha" required>
           <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
-          <label class="check-label">
+          <label class="check-label funcion-avanzada oculto">
             <input type="checkbox" id="prestamo-mora-check" onchange="toggleCampoMora()">
             Aplicar interés por mora (opcional)
           </label>
@@ -206,33 +204,39 @@
         <div id="resumen-mes" class="resumen-dia"></div>
         <button type="button" class="btn-exportar-csv" onclick="exportarReporteCSV()">⬇️ Exportar este reporte a CSV</button>
         <div id="comparacion-mes" class="comparacion-mes oculto"></div>
-        <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
-
-        <div class="encabezado-tendencia-cartera">
-          <h4>Cartera activa por semana</h4>
-          <span id="delta-cartera" class="tendencia-sube"></span>
-        </div>
-        <div id="grafico-cartera" class="grafico-cartera"></div>
-
-        <h4>Rendimiento por ruta</h4>
-        <p class="texto-ayuda">Recaudo y cumplimiento del período que estás viendo arriba, para comparar cuál ruta paga mejor.</p>
-        <div id="comparativo-rutas"></div>
-
         <div id="respaldo-recordatorio" class="oculto"></div>
 
-        <h4>Exportar para ver o compartir</h4>
-        <p class="texto-ayuda-export">Estos archivos se abren directo en Excel, Google Sheets o WhatsApp.</p>
-        <button type="button" onclick="exportarExcel(event)" class="btn-excel">📊 Exportar todo a Excel (.xlsx)</button>
-        <div class="exportaciones-csv">
-          <button type="button" onclick="exportarCsv('pagos')">Pagos (CSV)</button>
-          <button type="button" onclick="exportarCsv('cartera')">Cartera (CSV)</button>
-          <button type="button" onclick="exportarCsv('gastos')">Gastos (CSV)</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('reportes-cartera-rutas', this, '📈 Ver cartera por semana y rendimiento por ruta', '📈 Ocultar cartera y rendimiento por ruta')">📈 Ver cartera por semana y rendimiento por ruta</button>
+        <div id="reportes-cartera-rutas" class="oculto">
+          <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
+
+          <div class="encabezado-tendencia-cartera">
+            <h4>Cartera activa por semana</h4>
+            <span id="delta-cartera" class="tendencia-sube"></span>
+          </div>
+          <div id="grafico-cartera" class="grafico-cartera"></div>
+
+          <h4>Rendimiento por ruta</h4>
+          <p class="texto-ayuda">Recaudo y cumplimiento del período que estás viendo arriba, para comparar cuál ruta paga mejor.</p>
+          <div id="comparativo-rutas"></div>
         </div>
 
-        <div class="bloque-respaldo-tecnico">
-          <p class="titulo-respaldo-tecnico">🔒 Copia de seguridad técnica</p>
-          <p class="texto-ayuda-export">Archivo <strong>.json</strong> para restaurar tu información si algo sale mal. No está pensado para abrirlo ni leerlo — solo guárdalo.</p>
-          <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar copia de seguridad (.json)</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('reportes-exportar', this, '⬇️ Ver exportaciones y respaldo', '⬇️ Ocultar exportaciones y respaldo')">⬇️ Ver exportaciones y respaldo</button>
+        <div id="reportes-exportar" class="oculto">
+          <h4>Exportar para ver o compartir</h4>
+          <p class="texto-ayuda-export">Estos archivos se abren directo en Excel, Google Sheets o WhatsApp.</p>
+          <button type="button" onclick="exportarExcel(event)" class="btn-excel">📊 Exportar todo a Excel (.xlsx)</button>
+          <div class="exportaciones-csv">
+            <button type="button" onclick="exportarCsv('pagos')">Pagos (CSV)</button>
+            <button type="button" onclick="exportarCsv('cartera')">Cartera (CSV)</button>
+            <button type="button" onclick="exportarCsv('gastos')">Gastos (CSV)</button>
+          </div>
+
+          <div class="bloque-respaldo-tecnico">
+            <p class="titulo-respaldo-tecnico">🔒 Copia de seguridad técnica</p>
+            <p class="texto-ayuda-export">Archivo <strong>.json</strong> para restaurar tu información si algo sale mal. No está pensado para abrirlo ni leerlo — solo guárdalo.</p>
+            <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar copia de seguridad (.json)</button>
+          </div>
         </div>
 
         <h4>Gastos operativos</h4>
@@ -251,11 +255,10 @@
       <section id="seccion-configuracion" class="seccion oculto">
         <div class="encabezado-config"><span class="icono-config">⚙</span><div><h3>Configuración</h3><p class="texto-ayuda">Personaliza tu espacio de trabajo y administra la app.</p></div></div>
         <div class="grupo-config">
-          <p class="titulo-grupo-config">Preferencias</p>
+          <p class="titulo-grupo-config">Uso diario</p>
           <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono">◐</span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-pin" class="fila-config" onclick="configurarPin()"><span class="config-icono">🔒</span><span><b>Bloqueo con PIN</b><small>Pide un PIN cada vez que abras la app</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-push" class="fila-config" onclick="configurarNotificacionesPush()"><span class="config-icono">🔔</span><span><b>Notificaciones push</b><small>Avisa cuando una cuota vence mañana</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-caja-auto" class="fila-config" onclick="toggleCajaAutomatica()"><span class="config-icono">🧮</span><span><b>Cuadre automático de caja</b><small>La base de cada día se calcula sola, sin contar efectivo</small></span><span class="config-chevron">›</span></button>
         </div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Gestión</p>
@@ -361,7 +364,11 @@
   <script src="js/bloqueo.js"></script>
   <script src="js/push.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/navegacion.js"></script>
+  <script src="js/inicio.js"></script>
+  <script src="js/busqueda.js"></script>
+  <script src="js/preferencias.js"></script>
+  <script src="js/caja.js"></script>
   <script src="js/rutas.js"></script>
   <script src="js/clientes.js"></script>
   <script src="js/prestamos.js"></script>

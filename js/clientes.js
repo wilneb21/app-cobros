@@ -288,7 +288,7 @@ async function pintarTabInfo(cliente) {
     .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", cliente.id);
   const tieneHistorial = count > 0;
   const { data: activos } = await supabaseClient.from("prestamos")
-    .select("id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, numero_cuotas")
+    .select("id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, frecuencia, fecha_inicio, numero_cuotas")
     .eq("cliente_id", cliente.id).eq("estado", "activo");
   const idsActivos = (activos || []).map(prestamo => prestamo.id);
   const { data: pagosActivos } = idsActivos.length
@@ -296,9 +296,13 @@ async function pintarTabInfo(cliente) {
     : { data: [] };
   const pagadoPorPrestamo = {};
   (pagosActivos || []).forEach(pago => pagadoPorPrestamo[pago.prestamo_id] = (pagadoPorPrestamo[pago.prestamo_id] || 0) + Number(pago.monto_pagado));
-  const saldoActivo = (activos || []).reduce((total, prestamo) => total + Math.max(Number(prestamo.monto_prestado) * (1 + Number(prestamo.interes_porcentaje) / 100) - (pagadoPorPrestamo[prestamo.id] || 0), 0), 0);
+  const saldoActivo = (activos || []).reduce((total, prestamo) => total + calcularSaldoPendiente(prestamo, pagadoPorPrestamo[prestamo.id] || 0), 0);
   const proximaCuota = (activos || []).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
-  const sugerenciaCupo = await calcularSugerenciaCupo(cliente.id, riesgo);
+  // Antes esta sugerencia se calculaba y mostraba siempre, aunque el cliente
+  // ya tuviera un crédito activo y el cobrador no estuviera pensando en
+  // prestarle de nuevo. Ahora solo aparece cuando de verdad podría servir:
+  // justo cuando no tiene crédito activo y está a punto de crear uno.
+  const sugerenciaCupo = (!activos || activos.length === 0) ? await calcularSugerenciaCupo(cliente.id, riesgo) : null;
 
   document.getElementById("tab-info").innerHTML = `
     ${activos?.length ? `<div class="resumen-cliente-operativo"><div><small>Saldo activo</small><b>${formatoPesos(saldoActivo)}</b></div><div><small>Créditos activos</small><b>${activos.length}</b></div><div><small>Cuota siguiente</small><b>${formatoPesos(proximaCuota.cuota)}</b></div></div>` : `<div class="resumen-cliente-operativo sin-credito"><span>Sin créditos activos</span><button type="button" onclick="abrirPrestamoParaCliente(${cliente.id})">Crear préstamo</button></div>`}
@@ -378,12 +382,14 @@ async function exportarEstadoCuentaPDF(clienteId) {
   for (const p of prestamos) {
     const { data: pagos } = await supabaseClient.from("pagos").select("*").eq("prestamo_id", p.id).order("fecha_pago");
     const totalPagado = (pagos || []).reduce((s, pg) => s + Number(pg.monto_pagado), 0);
-    const totalConInteres = Number(p.monto_prestado) + (Number(p.monto_prestado) * Number(p.interes_porcentaje) / 100);
+    const totalConInteres = calcularTotalConInteres(p.monto_prestado, p.interes_porcentaje);
+    const saldoConMora = calcularSaldoPendiente(p, totalPagado);
+    const moraTexto = Number(p.mora_acumulada) > 0 ? ` (incluye ${formatoPesos(p.mora_acumulada)} de mora aplicada)` : "";
 
     filasPrestamos += `
       <h3>Préstamo del ${p.fecha_inicio} — ${escaparHtml(p.estado)}</h3>
       <p>Monto: ${formatoPesos(p.monto_prestado)} | Interés: ${p.interes_porcentaje}% | Total a pagar: ${formatoPesos(totalConInteres)}</p>
-      <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(totalConInteres - totalPagado)}</p>
+      <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(saldoConMora)}${moraTexto}</p>
       <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px;">
         <tr><th>Fecha</th><th>Estado</th><th>Monto</th></tr>
         ${(pagos || []).map(pg => `<tr><td>${pg.fecha_pago}</td><td>${escaparHtml(pg.estado)}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}

@@ -1,3 +1,13 @@
+// Reportes mostraba de una vez: totales, comparación, gráfico de cartera,
+// rendimiento por ruta, refinanciamientos y 5 botones de exportación. Ahora
+// solo quedan visibles los totales del período; el resto se abre a pedido.
+function toggleBloqueReportes(idBloque, boton, textoCerrado, textoAbierto) {
+  const bloque = document.getElementById(idBloque);
+  if (!bloque) return;
+  const abierto = bloque.classList.toggle("oculto") === false;
+  boton.textContent = abierto ? textoAbierto : textoCerrado;
+}
+
 function cambiarTipoReporte() {
   const tipo = document.getElementById("reporte-tipo").value;
   document.getElementById("reporte-fecha-dia").classList.add("oculto");
@@ -117,7 +127,7 @@ async function cargarReporteMes() {
   await cargarRefinanciamientosPeriodo(refinanciados, inicio, fin);
   await cargarTendenciaCartera();
   await cargarComparativoRutas(inicio, fin);
-  verificarRecordatorioRespaldo();
+  await verificarRecordatorioRespaldo();
 }
 
 // --- COMPARAR RENDIMIENTO ENTRE RUTAS ---
@@ -239,11 +249,11 @@ async function cargarRefinanciamientosPeriodo(refinanciados, inicio, fin) {
   let totalRenovado = 0;
   const detalle = [];
   for (const nuevo of filas) {
-    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").eq("id", nuevo.prestamo_anterior_id).single();
+    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, mora_acumulada").eq("id", nuevo.prestamo_anterior_id).single();
     if (!viejo) continue;
     const { data: pagosViejo } = await supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", nuevo.prestamo_anterior_id).lte("fecha_pago", nuevo.fecha_inicio);
     const pagadoViejo = (pagosViejo || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
-    const saldoViejo = Math.max(Number(viejo.monto_prestado) * (1 + Number(viejo.interes_porcentaje) / 100) - pagadoViejo, 0);
+    const saldoViejo = calcularSaldoPendiente(viejo, pagadoViejo);
     totalRenovado += saldoViejo;
     detalle.push({ nombre: nuevo.clientes?.nombre || "Cliente", saldoViejo, montoNuevo: Number(nuevo.monto_prestado) });
   }
@@ -508,7 +518,11 @@ async function descargarRespaldo() {
   enlace.click();
   URL.revokeObjectURL(url);
 
-  localStorage.setItem("ultimoRespaldo", obtenerFechaLocal());
+  // Antes esto se guardaba en localStorage (por celular). Ahora se guarda en
+  // Supabase para que no se pierda si el cobrador cambia de dispositivo.
+  const user = await obtenerUsuarioActual();
+  await supabaseClient.from("preferencias_usuario")
+    .upsert({ user_id: user.id, ultimo_respaldo: obtenerFechaLocal() }, { onConflict: "user_id" });
   document.getElementById("respaldo-recordatorio").classList.add("oculto");
 }
 
@@ -535,21 +549,27 @@ async function exportarCsv(tipo) {
     if (error) return mostrarAlerta("No fue posible exportar los gastos.");
     descargarArchivoCsv("gastos", ["Fecha", "Concepto", "Monto"], (data || []).map(g => [g.fecha, g.concepto, g.monto]));
   } else {
-    const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, cuota, prestamo_anterior_id, clientes(nombre)").eq("estado", "activo");
+    const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, prestamo_anterior_id, clientes(nombre)").eq("estado", "activo");
     if (error) return mostrarAlerta("No fue posible exportar la cartera.");
     const ids = (prestamos || []).map(p => p.id);
     const { data: pagos } = ids.length ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids) : { data: [] };
     const abonado = {}; (pagos || []).forEach(p => abonado[p.prestamo_id] = (abonado[p.prestamo_id] || 0) + Number(p.monto_pagado));
-    descargarArchivoCsv("cartera", ["Cliente", "Monto inicial", "Interés %", "Cuota", "Abonado", "Saldo", "Es refinanciamiento"], (prestamos || []).map(p => {
-      const total = Number(p.monto_prestado) * (1 + Number(p.interes_porcentaje) / 100);
-      return [p.clientes?.nombre, p.monto_prestado, p.interes_porcentaje, p.cuota, abonado[p.id] || 0, Math.max(total - (abonado[p.id] || 0), 0), p.prestamo_anterior_id ? "Sí" : "No"];
+    // Antes este saldo no incluía la mora aplicada, así que un crédito con
+    // mora salía con un número distinto aquí que en la pantalla de Cobrar.
+    descargarArchivoCsv("cartera", ["Cliente", "Monto inicial", "Interés %", "Cuota", "Abonado", "Mora aplicada", "Saldo", "Es refinanciamiento"], (prestamos || []).map(p => {
+      return [p.clientes?.nombre, p.monto_prestado, p.interes_porcentaje, p.cuota, abonado[p.id] || 0, p.mora_acumulada || 0, calcularSaldoPendiente(p, abonado[p.id] || 0), p.prestamo_anterior_id ? "Sí" : "No"];
     }));
   }
 }
 
 // --- Recordatorio de respaldo si han pasado más de 7 días ---
-function verificarRecordatorioRespaldo() {
-  const ultimo = localStorage.getItem("ultimoRespaldo");
+// Antes vivía en localStorage (por celular); ahora vive en Supabase, junto
+// con el resto de las preferencias del negocio, para que no se pierda si
+// cambias de dispositivo.
+async function verificarRecordatorioRespaldo() {
+  const user = await obtenerUsuarioActual();
+  const { data } = await supabaseClient.from("preferencias_usuario").select("ultimo_respaldo").eq("user_id", user.id).maybeSingle();
+  const ultimo = data?.ultimo_respaldo;
   const contenedor = document.getElementById("respaldo-recordatorio");
   const hoy = obtenerFechaLocal();
 

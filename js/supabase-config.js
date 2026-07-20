@@ -94,6 +94,29 @@ function escaparHtml(valor) {
   })[caracter]);
 }
 
+// --- CÁLCULO CENTRAL DEL SALDO DE UN PRÉSTAMO ---
+// Antes esta cuenta estaba copiada (con pequeñas diferencias) en 7 lugares
+// distintos del código: algunas pantallas sumaban la mora aplicada al saldo
+// y otras no, así que un mismo crédito con mora podía mostrar dos saldos
+// distintos según en qué pantalla estuvieras. Ahora toda la app pasa por
+// estas dos funciones — es la única fuente de verdad.
+
+// Total que el cliente debe pagar por un préstamo: capital + interés (sin
+// mora). Interés simple, calculado una sola vez sobre el monto prestado.
+function calcularTotalConInteres(montoPrestado, interesPorcentaje) {
+  return Number(montoPrestado) * (1 + (Number(interesPorcentaje) || 0) / 100);
+}
+
+// Saldo pendiente real de un préstamo: total con interés + mora ya aplicada
+// (columna prestamos.mora_acumulada) menos lo que ya pagó. Nunca baja de $0.
+// "prestamo" puede venir de un select("*") o de un select parcial, siempre
+// que incluya monto_prestado, interes_porcentaje y (opcionalmente) mora_acumulada.
+function calcularSaldoPendiente(prestamo, totalPagado) {
+  const total = calcularTotalConInteres(prestamo.monto_prestado, prestamo.interes_porcentaje);
+  const mora = Number(prestamo.mora_acumulada) || 0;
+  return Math.max(total + mora - Number(totalPagado || 0), 0);
+}
+
 // Calcula cuánto efectivo REALMENTE salió de la caja para una lista de préstamos.
 // Si un préstamo es un refinanciamiento (trae prestamo_anterior_id), el saldo que
 // se traslada del crédito viejo no es billete nuevo — solo se entrega en efectivo
@@ -102,11 +125,11 @@ async function calcularDesembolsoReal(prestamos) {
   let total = 0;
   for (const p of prestamos || []) {
     if (!p.prestamo_anterior_id) { total += Number(p.monto_prestado); continue; }
-    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").eq("id", p.prestamo_anterior_id).single();
+    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, mora_acumulada").eq("id", p.prestamo_anterior_id).single();
     if (!viejo) { total += Number(p.monto_prestado); continue; }
     const { data: pagosViejo } = await supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", p.prestamo_anterior_id).lte("fecha_pago", p.fecha_inicio);
     const pagadoViejo = (pagosViejo || []).reduce((s, pg) => s + Number(pg.monto_pagado), 0);
-    const saldoViejo = Math.max(Number(viejo.monto_prestado) * (1 + Number(viejo.interes_porcentaje) / 100) - pagadoViejo, 0);
+    const saldoViejo = calcularSaldoPendiente(viejo, pagadoViejo);
     total += Math.max(Number(p.monto_prestado) - saldoViejo, 0);
   }
   return total;

@@ -504,6 +504,14 @@ body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
 .btn-historial { background: #1565c0; }
 .btn-refinanciar { background: #6a1b9a; }
 
+.btn-eliminar-prestamo {
+  font-size: 11px;
+  padding: 7px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: var(--danger);
+}
+
 .historial {
   margin-top: 8px;
   background: #f5f5f7;
@@ -1056,6 +1064,18 @@ button { border-radius: 13px; box-shadow: 0 5px 12px rgba(64,86,214,.16); }
   font-size: 12px;
   color: var(--text-muted);
   margin: 0 0 8px;
+}
+
+.btn-ver-mas-inicio {
+  width: 100%;
+  background: var(--card-bg, #f2f4f8);
+  border: 1px solid var(--border-color, #dde1e8);
+  color: var(--text-color, #333);
+  border-radius: 12px;
+  padding: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 16px 0;
 }
 
 .btn-excel {

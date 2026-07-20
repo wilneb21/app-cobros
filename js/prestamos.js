@@ -12,7 +12,7 @@ function actualizarVistaPreviaPrestamo() {
     vista.textContent = "Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.";
     return;
   }
-  const total = monto * (1 + interes / 100);
+  const total = calcularTotalConInteres(monto, interes);
   const cuota = total / cuotas;
   vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
 }
@@ -45,7 +45,7 @@ async function crearPrestamo(event) {
     return;
   }
 
-  const totalConInteres = monto + (monto * interes / 100);
+  const totalConInteres = calcularTotalConInteres(monto, interes);
   const cuota = Math.round((totalConInteres / numeroCuotas) * 100) / 100;
   const user = await obtenerUsuarioActual();
 
@@ -101,7 +101,7 @@ async function cargarCuentasPorCobrar() {
   const pagados = document.getElementById("lista-clientes-pagados");
   activas.innerHTML = '<div class="cargando">Cargando cuentas...</div>';
   const { data: prestamos, error } = await supabaseClient
-    .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
+    .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
     .eq("estado", "activo").order("fecha_inicio");
   if (error) { activas.textContent = "No fue posible cargar las cuentas por cobrar."; return; }
   const ids = (prestamos || []).map(p => p.id);
@@ -110,8 +110,7 @@ async function cargarCuentasPorCobrar() {
   (pagos || []).forEach(p => acumulados[p.prestamo_id] = (acumulados[p.prestamo_id] || 0) + Number(p.monto_pagado));
 
   activas.innerHTML = !prestamos?.length ? '<div class="estado-vacio">🎉 No tienes cuentas activas por cobrar.</div>' : prestamos.map(p => {
-    const total = Number(p.monto_prestado) * (1 + Number(p.interes_porcentaje) / 100);
-    const saldo = Math.max(total - (acumulados[p.id] || 0), 0);
+    const saldo = calcularSaldoPendiente(p, acumulados[p.id] || 0);
     return `<div class="tarjeta tarjeta-cuenta" onclick="abrirDetalleCliente(${p.cliente_id})"><div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div><div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div></div>`;
   }).join("");
 
@@ -204,9 +203,8 @@ async function cargarPrestamosDeCliente(clienteId) {
     const pagos = resultados[indice].data;
 
     const totalPagado = pagos ? pagos.reduce((s, pg) => s + Number(pg.monto_pagado), 0) : 0;
-    const totalConInteres = Number(p.monto_prestado) + (Number(p.monto_prestado) * Number(p.interes_porcentaje) / 100);
     const moraAcumulada = Number(p.mora_acumulada) || 0;
-    const saldoPendiente = totalConInteres - totalPagado + moraAcumulada;
+    const saldoPendiente = calcularSaldoPendiente(p, totalPagado);
 
     const ultimoPago = pagos && pagos.length > 0 ? pagos[0] : null;
     const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
@@ -243,16 +241,15 @@ async function cargarPrestamosDeCliente(clienteId) {
     const moraTexto = moraAcumulada > 0
       ? `<span class="recargo-mora-aplicado">Mora ya aplicada a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
 
+    // Antes esta tarjeta mostraba hasta 6 cifras de dinero a la vez (saldo,
+    // cuota, debe, recargo estimado, mora aplicada, adelantado). Ahora solo
+    // quedan visibles el estado y la cuota — lo mínimo para decidir qué
+    // botón tocar — y el resto vive detrás de "Más opciones".
     return `
       <div class="subtarjeta ${claseMora}" id="subtarjeta-${p.id}">
         <div class="fila-resumen-credito">
           <span class="badge-estado">${textoMora}</span>
-          <strong class="saldo-credito">${formatoPesos(saldoPendiente)}</strong>
-        </div>
-        <div class="subinfo-credito">
-          <span>Cuota ${p.frecuencia}: ${formatoPesos(p.cuota)}</span>
-          <span class="ultimo-registro">${textoUltimo}</span>
-          ${textoRacha}
+          <strong class="saldo-credito">Cuota ${formatoPesos(p.cuota)}</strong>
         </div>
         <div class="botones-pago">
           <button class="btn-pago pago-si" onclick="registrarPago(${p.id}, ${p.cuota}, 'pago', ${clienteId})">Pagó ✅</button>
@@ -261,11 +258,17 @@ async function cargarPrestamosDeCliente(clienteId) {
         </div>
         <p class="link-mas-opciones" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
         <div id="mas-opciones-${p.id}" class="mas-opciones oculto">
+          <div class="subinfo-credito">
+            <span>Saldo total: ${formatoPesos(saldoPendiente)}</span>
+            <span class="ultimo-registro">${textoUltimo}</span>
+            ${textoRacha}
+          </div>
           ${recargoTexto}
           ${moraTexto}
           <button class="btn-historial" onclick="verHistorial(${p.id}, ${clienteId})">Ver historial completo</button>
           <div id="historial-${p.id}" class="historial oculto"></div>
           <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>
+          <button class="btn-eliminar-prestamo" onclick="eliminarPrestamo(${p.id}, ${clienteId})">🗑️ Eliminar préstamo</button>
         </div>
       </div>`;
   });
@@ -304,13 +307,39 @@ async function aplicarRecargoMora(prestamoId, montoEstimado, clienteId) {
   cargarPrestamosDeCliente(clienteId);
 }
 
+// --- ELIMINAR UN PRÉSTAMO MAL REGISTRADO ---
+// Igual que eliminarPago pero para el crédito completo: por ejemplo si se
+// creó por error (cliente equivocado, monto equivocado, duplicado). Borra
+// primero los pagos y cargos de mora asociados (para no dejar historial
+// huérfano ni chocar con la relación en la base de datos) y al final el
+// préstamo. Esto no se puede deshacer.
+async function eliminarPrestamo(prestamoId, clienteId) {
+  if (!requiereConexion()) return;
+  const confirmado = await mostrarConfirmacion("⚠️ ¿Seguro que quieres eliminar este préstamo? Se borrará también todo su historial de pagos y recargos de mora. Esto no se puede deshacer.");
+  if (!confirmado) return;
+
+  const { error: errorPagos } = await supabaseClient.from("pagos").delete().eq("prestamo_id", prestamoId);
+  if (errorPagos) { mostrarAlerta("No fue posible borrar el historial de pagos del préstamo: " + traducirErrorSupabase(errorPagos)); return; }
+
+  await supabaseClient.from("cargos_mora").delete().eq("prestamo_id", prestamoId);
+
+  const { error } = await supabaseClient.from("prestamos").delete().eq("id", prestamoId);
+  if (error) { mostrarAlerta("No fue posible eliminar el préstamo: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("🗑️ Préstamo eliminado.");
+  delete historialPagosCache[prestamoId];
+  cargarPrestamosDeCliente(clienteId);
+  cargarClientes();
+}
+
 async function verificarSiQuedoPagado(prestamoId) {
   const { data: prestamo } = await supabaseClient.from("prestamos").select("*").eq("id", prestamoId).single();
   if (!prestamo) return;
   const { data: pagos } = await supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", prestamoId);
   const totalPagado = pagos ? pagos.reduce((s, p) => s + Number(p.monto_pagado), 0) : 0;
-  const totalConInteres = Number(prestamo.monto_prestado) + (Number(prestamo.monto_prestado) * Number(prestamo.interes_porcentaje) / 100);
-  if (totalPagado >= totalConInteres) {
+  // Antes esto no contaba la mora aplicada: un crédito con mora podía quedar
+  // marcado como "pagado" sin que el cliente hubiera cubierto ese recargo.
+  if (calcularSaldoPendiente(prestamo, totalPagado) <= 0) {
     await supabaseClient.from("prestamos").update({ estado: "pagado" }).eq("id", prestamoId);
   }
 }
