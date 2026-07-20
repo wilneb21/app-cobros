@@ -89,7 +89,8 @@ async function configurarNotificacionesPush() {
     actualizarFilaConfigPush();
     mostrarAlerta("🔔 Notificaciones push activadas. Te avisaré cuando una cuota venza mañana.");
   } catch (e) {
-    mostrarAlerta("No fue posible activar las notificaciones push en este celular.");
+    console.error("Error activando notificaciones push:", e);
+    mostrarAlerta("No fue posible activar las notificaciones push: " + (e?.message || e));
   }
 }
 

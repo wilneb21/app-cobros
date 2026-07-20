@@ -581,12 +581,12 @@ async function cargarCajaDiaria(fecha) {
     ${avisoRacha}
     <div class="caja-metricas"><span>Base <b>${formatoPesos(base)}</b>${editarBase}</span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
     ${listaAportesHtml}
-    <div class="caja-total">Efectivo esperado: <strong>${formatoPesos(esperado)}</strong>${hayConteo ? ` · Contado: <strong>${formatoPesos(cierre)}</strong>` : ""}</div>
+    <div class="caja-total">Efectivo esperado: <strong>${formatoPesos(esperado)}</strong>${hayConteo ? ` · Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}` : ""}</div>
     ${hayConteo ? `
       <div class="caja-descuadre ${descuadre === 0 ? "cuadrada" : descuadre > 0 ? "sobrante" : "faltante"}">
         ${descuadre === 0 ? "✅ Caja cuadrada — el conteo físico coincide con lo esperado" : descuadre > 0 ? `🔵 Sobrante de ${formatoPesos(descuadre)} — contaste más efectivo del esperado` : `🔴 Faltante de ${formatoPesos(Math.abs(descuadre))} — contaste menos efectivo del esperado`}
       </div>` : ""}
-    ${esHoy && caja.data && !hayConteo ? `<button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>` : ""}`;
+    ${esHoy && caja.data && (automatica || !hayConteo) ? `<button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>` : ""}`;
 }
 
 function verCajaDeOtroDia() {
