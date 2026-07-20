@@ -28,7 +28,7 @@ async function crearGasto(event) {
 
   document.getElementById("gasto-concepto").value = "";
   document.getElementById("gasto-monto").value = "";
-  document.getElementById("gasto-fecha").value = "";
+  document.getElementById("gasto-fecha").value = obtenerFechaLocal();
   document.getElementById("gasto-ruta").value = "";
   cargarGastosDelPeriodo();
 }

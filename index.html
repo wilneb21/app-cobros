@@ -107,9 +107,6 @@
           <button type="button" onclick="mostrarSeccion('rutas')" class="accion-rapida accion-ruta"><span>⌖</span><b>Ver rutas</b><small>Organiza visitas</small></button>
         </div>
 
-        <h4>Meta de recaudo <span class="link-editar-meta" onclick="editarMetas()">✏️ editar</span></h4>
-        <div id="metas-progreso"></div>
-
         <h4>Recaudo últimos 7 días</h4>
         <div id="grafico-semana" class="grafico-semana"></div>
         <div id="tendencia-cobro" class="tendencia-cobro"></div>
@@ -258,7 +255,7 @@
           <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono">◐</span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-pin" class="fila-config" onclick="configurarPin()"><span class="config-icono">🔒</span><span><b>Bloqueo con PIN</b><small>Pide un PIN cada vez que abras la app</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-push" class="fila-config" onclick="configurarNotificacionesPush()"><span class="config-icono">🔔</span><span><b>Notificaciones push</b><small>Avisa cuando una cuota vence mañana</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="editarMetas()"><span class="config-icono">◎</span><span><b>Metas de recaudo</b><small>Define tu objetivo diario y mensual</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-caja-auto" class="fila-config" onclick="toggleCajaAutomatica()"><span class="config-icono">🧮</span><span><b>Cuadre automático de caja</b><small>La base de cada día se calcula sola, sin contar efectivo</small></span><span class="config-chevron">›</span></button>
         </div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Gestión</p>

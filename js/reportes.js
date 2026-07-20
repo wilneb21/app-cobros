@@ -482,22 +482,23 @@ async function exportarExcel(evento) {
 }
 
 async function descargarRespaldo() {
-  const [rutas, clientes, prestamos, pagos, gastos, metas] = await Promise.all([
+  const [rutas, clientes, prestamos, pagos, gastos, cajaDiaria, aportes] = await Promise.all([
     supabaseClient.from("rutas").select("*").order("id"),
     supabaseClient.from("clientes").select("*").order("id"),
     supabaseClient.from("prestamos").select("*").order("id"),
     supabaseClient.from("pagos").select("*").order("fecha_pago", { ascending: false }),
     supabaseClient.from("gastos").select("*").order("fecha", { ascending: false }),
-    supabaseClient.from("metas").select("*")
+    supabaseClient.from("caja_diaria").select("*").order("fecha", { ascending: false }),
+    supabaseClient.from("aportes_capital").select("*").order("fecha", { ascending: false })
   ]);
-  const resultadoConError = [rutas, clientes, prestamos, pagos, gastos, metas].find(resultado => resultado.error);
+  const resultadoConError = [rutas, clientes, prestamos, pagos, gastos, cajaDiaria, aportes].find(resultado => resultado.error);
   if (resultadoConError) { mostrarAlerta("No fue posible generar el respaldo: " + traducirErrorSupabase(resultadoConError.error)); return; }
 
   const respaldo = {
     version: 1,
     generado_en: new Date().toISOString(),
     zona_horaria: "America/Bogota",
-    datos: { rutas: rutas.data || [], clientes: clientes.data || [], prestamos: prestamos.data || [], pagos: pagos.data || [], gastos: gastos.data || [], metas: metas.data || [] }
+    datos: { rutas: rutas.data || [], clientes: clientes.data || [], prestamos: prestamos.data || [], pagos: pagos.data || [], gastos: gastos.data || [], caja_diaria: cajaDiaria.data || [], aportes_capital: aportes.data || [] }
   };
   const blob = new Blob([JSON.stringify(respaldo, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);

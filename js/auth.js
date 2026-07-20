@@ -78,7 +78,7 @@ function mostrarAppPrincipal() {
   cargarClientes();
   cargarResumenDia();
   cargarGraficoSemana();
-  cargarProgresoMetas();
+  cargarCajaDiaria(obtenerFechaLocal());
   cargarTendenciaCobro();
   cargarAgendaVencimientos();
   cargarGananciaInicio();

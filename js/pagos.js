@@ -73,7 +73,7 @@ async function abrirRegistrarPago(prestamoId, clienteId, montoDebe) {
 let historialPagosCache = {};
 const LIMITE_HISTORIAL_INICIAL = 20;
 
-async function verHistorial(prestamoId) {
+async function verHistorial(prestamoId, clienteId) {
   const contenedor = document.getElementById("historial-" + prestamoId);
   if (!contenedor.classList.contains("oculto")) { contenedor.classList.add("oculto"); return; }
 
@@ -82,7 +82,7 @@ async function verHistorial(prestamoId) {
   if (error) { contenedor.innerHTML = "Error al cargar historial."; return; }
 
   historialPagosCache[prestamoId] = pagos;
-  pintarHistorial(prestamoId, LIMITE_HISTORIAL_INICIAL);
+  pintarHistorial(prestamoId, clienteId, LIMITE_HISTORIAL_INICIAL);
   contenedor.classList.remove("oculto");
 }
 
@@ -90,7 +90,7 @@ async function verHistorial(prestamoId) {
 // registros (los más relevantes para el día a día) para no cargar la pantalla
 // con meses de historial en clientes viejos; "Ver más" despliega el resto sin
 // volver a consultar el servidor.
-function pintarHistorial(prestamoId, limite) {
+function pintarHistorial(prestamoId, clienteId, limite) {
   const contenedor = document.getElementById("historial-" + prestamoId);
   const pagos = historialPagosCache[prestamoId] || [];
   const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
@@ -99,8 +99,27 @@ function pintarHistorial(prestamoId, limite) {
 
   const visibles = limite ? pagos.slice(0, limite) : pagos;
   const restantes = limite ? pagos.length - visibles.length : 0;
-  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span></div>`).join("")
-    + (restantes > 0 ? `<p class="link-ver-mas-historial" onclick="pintarHistorial(${prestamoId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
+  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span><span class="btn-borrar-pago" onclick="eliminarPago(${p.id}, ${prestamoId}, ${clienteId})">🗑️</span></div>`).join("")
+    + (restantes > 0 ? `<p class="link-ver-mas-historial" onclick="pintarHistorial(${prestamoId}, ${clienteId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
+}
+
+// --- CORREGIR UN PAGO MAL REGISTRADO ---
+// El dueño de la cuenta puede borrar un pago que registró por error (monto
+// equivocado, día equivocado, cliente que en realidad no pagó, etc.). Al
+// borrarlo, el saldo del préstamo se recalcula solo — no hace falta tocar
+// nada más. Si lo que quieres es corregir el monto, simplemente bórralo y
+// vuelve a registrarlo bien con "Registrar pago" o "Pagó ✅".
+async function eliminarPago(pagoId, prestamoId, clienteId) {
+  if (!requiereConexion()) return;
+  const confirmado = await mostrarConfirmacion("¿Seguro que quieres borrar este pago? Esto no se puede deshacer, y el saldo del cliente se recalculará sin este pago.");
+  if (!confirmado) return;
+
+  const { error } = await supabaseClient.from("pagos").delete().eq("id", pagoId);
+  if (error) { mostrarAlerta("No fue posible borrar el pago: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("🗑️ Pago eliminado.");
+  delete historialPagosCache[prestamoId];
+  cargarPrestamosDeCliente(clienteId);
 }
 
 async function mostrarRecibo(clienteId, monto, fecha, estado) {

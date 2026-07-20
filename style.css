@@ -800,6 +800,7 @@ body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
 .caja-diaria { margin: 12px 0 2px; }
 .caja-cabecera { display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: white; padding: 12px 14px; border-radius: 14px 14px 0 0; }
 .caja-cabecera span, .caja-cabecera strong { display: block; font-size: 12px; }.caja-cabecera strong { font-size: 15px; }.caja-cabecera button { width: auto; margin: 0; padding: 7px 10px; font-size: 11px; background: #334155; }
+.btn-contar-caja-auto { width: auto; margin: 0; padding: 7px 10px; font-size: 11px; background: #334155; color: white; border: none; border-radius: 8px; }
 .caja-metricas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #e2e8f0; }.caja-metricas span { background: var(--card); padding: 9px 12px; font-size: 11px; color: var(--text-muted); }.caja-metricas b { display: block; color: var(--text); font-size: 13px; }
 .caja-total { background: var(--card); padding: 11px 12px; border-radius: 0 0 14px 14px; font-size: 12px; color: var(--text-muted); }.caja-total strong { color: var(--success); }.caja-aviso { background: #fff9e6; padding: 10px; border-radius: 10px; font-size: 12px; color: #6b5a00; }
 
@@ -904,41 +905,17 @@ body.modo-oscuro .vista-previa-prestamo { background: #292550; color: #ddd6fe; }
   font-size: 15px;
 }
 
-.link-editar-meta {
-  font-size: 11px;
-  color: var(--primary);
-  cursor: pointer;
-  text-transform: none;
-  font-weight: 600;
-}
-
-.barra-meta {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.barra-meta-etiqueta {
+.btn-aporte-propio {
+  width: 100%;
+  margin-top: 8px;
   font-size: 12px;
-  margin-bottom: 6px;
-  color: var(--text);
-}
-
-.barra-meta-fondo {
-  background: #eee;
+  font-weight: 600;
+  padding: 9px;
   border-radius: 8px;
-  height: 10px;
-  overflow: hidden;
+  background: #f5f3ff;
+  color: var(--primary-dark);
 }
-
-.barra-meta-relleno {
-  background: linear-gradient(90deg, var(--accent), var(--success));
-  height: 100%;
-  border-radius: 8px;
-  transition: width 0.3s;
-}
+body.modo-oscuro .btn-aporte-propio { background: #252044; color: #ddd6fe; }
 
 .comparacion-mes {
   text-align: center;
@@ -975,6 +952,13 @@ body.modo-oscuro .vista-previa-prestamo { background: #292550; color: #ddd6fe; }
   cursor: pointer;
 }
 
+.btn-borrar-pago {
+  cursor: pointer;
+  margin-left: 6px;
+  opacity: 0.6;
+}
+.btn-borrar-pago:hover { opacity: 1; }
+
 #input-busqueda-global {
   margin-bottom: 10px;
 }
@@ -1010,6 +994,15 @@ body.modo-oscuro .aviso-respaldo {
   color: var(--text-muted);
   margin-top: 6px;
   line-height: 1.4;
+}
+
+.link-borrar-todo {
+  font-size: 11px;
+  color: var(--danger);
+  text-align: center;
+  margin-top: 10px;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* Menú de acciones: claro y cómodo para usar con una mano. */
@@ -1201,6 +1194,17 @@ body.modo-oscuro .btn-bloqueo-huella { background: #252044; color: #ddd6fe; }
 body.modo-oscuro .caja-descuadre.cuadrada { background: #123024; }
 body.modo-oscuro .caja-descuadre.sobrante { background: #17233f; }
 body.modo-oscuro .caja-descuadre.faltante { background: #3a1414; }
+
+.caja-subcabecera { background: var(--card); padding: 4px 12px; font-size: 11px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.link-ver-otro-dia { background: none; border: none; color: var(--primary); font-size: 11px; padding: 2px 0; text-decoration: underline; cursor: pointer; }
+.caja-fecha-vista { font-weight: 700; color: var(--text-muted); }
+.caja-aviso-offline { background: #fff9e6; color: #6b5a00; font-size: 11px; padding: 8px 10px; margin: 0; }
+.link-editar-base { background: none; border: none; cursor: pointer; font-size: 11px; padding: 0 0 0 4px; }
+.caja-lista-aportes { background: var(--card); padding: 4px 12px 8px; }
+.fila-aporte { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); padding: 3px 0; }
+.acciones-aporte span { cursor: pointer; padding: 0 4px; }
+body.modo-oscuro .caja-subcabecera { border-color: #34384d; }
+body.modo-oscuro .caja-aviso-offline { background: #3b3211; color: #fde68a; }
 
 /* --- Recordatorio WhatsApp en agenda de vencimientos --- */
 .fila-agenda { flex-wrap: wrap; gap: 4px 8px; }

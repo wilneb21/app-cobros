@@ -31,9 +31,11 @@ Cuando alguien crea una cuenta o pide recuperar su contraseña, Supabase manda u
 
 Si tu app vive en varias URLs (por ejemplo local para pruebas y la publicada), agrega todas las que uses en la lista de **Redirect URLs**.
 
-## Activar notificaciones push reales (cuotas que vencen mañana, con la app cerrada)
+## Activar notificaciones push reales (cuotas que vencen mañana y aviso de caja sin contar, con la app cerrada)
 
 Esto tiene 3 partes: la base de datos, la Edge Function que manda los push, y programarla para que corra sola todos los días.
+
+**Nota si ya la tenías configurada:** la función `recordatorios-push` ahora también avisa a quien tenga el "Cuadre automático de caja" activado y todavía no haya contado su efectivo hoy. No necesitas ninguna migración nueva — solo vuelve a desplegar la función (paso 3) para que tome el cambio.
 
 ### 1. Base de datos
 Ejecuta `supabase/migrations/20260722_push_y_preferencias.sql` en el SQL Editor (crea `push_subscriptions` y `preferencias_usuario`, ambas con RLS).

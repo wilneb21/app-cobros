@@ -263,7 +263,7 @@ async function cargarPrestamosDeCliente(clienteId) {
         <div id="mas-opciones-${p.id}" class="mas-opciones oculto">
           ${recargoTexto}
           ${moraTexto}
-          <button class="btn-historial" onclick="verHistorial(${p.id})">Ver historial completo</button>
+          <button class="btn-historial" onclick="verHistorial(${p.id}, ${clienteId})">Ver historial completo</button>
           <div id="historial-${p.id}" class="historial oculto"></div>
           <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>
         </div>

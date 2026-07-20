@@ -2,6 +2,18 @@
 
 Este documento explica cómo funciona la app hoy, qué implementé en esta ronda, una corrección a mi análisis anterior, y qué queda pendiente y por qué.
 
+## -3. Ronda nueva (2026-07-19, noche): quitar metas, caja diaria con base automática y efectivo propio
+
+**❌ Metas de recaudo — eliminadas por completo.** Se quitó el bloque del Inicio, el botón en Configuración, y las funciones `editarMetas`/`obtenerMetas`/`cargarProgresoMetas`. La tabla `metas` en Supabase no se borró (por si acaso), pero la app ya no la usa ni la incluye en el respaldo manual.
+
+**💰 Caja diaria — mejorada con dos cosas:**
+1. **Base automática heredada del día anterior.** Antes había que escribir a mano cada mañana con cuánto efectivo se empezaba. Ahora, al tocar "Abrir caja", la app ya trae precargado (pero editable) lo que debería quedar de ayer: si cerraste caja ayer contando el efectivo real, usa ese número; si no la cerraste, calcula lo que teóricamente debería haber quedado (base + cobros + aportes − gastos − prestado de ayer). Siempre puedes corregirlo si contaste algo distinto.
+2. **Efectivo propio, separado de la cartera.** Nuevo botón "➕ Agregar efectivo propio" dentro de la caja diaria, para cuando el cobrador mete plata de su bolsillo (no del negocio) — por ejemplo, para completar un préstamo. Queda en una tabla aparte (`aportes_capital`, con fecha, monto y nota opcional), se suma al efectivo esperado del día, pero no se mezcla con los cobros reales en los reportes de ganancia.
+
+**Nueva migración que debes correr en Supabase:**
+`supabase/migrations/20260724_aportes_capital.sql` — crea la tabla `aportes_capital` con su RLS. Sin esta migración, el botón de "Agregar efectivo propio" va a fallar (con un mensaje en español explicando que falta la actualización).
+
+
 ## -2. Ronda nueva (2026-07-19, tarde): simplificar, push real, y seguridad/consistencia
 
 **Simplificado / quitado:**

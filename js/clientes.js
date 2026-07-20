@@ -325,7 +325,8 @@ async function pintarTabInfo(cliente) {
       ? `<button class="btn-editar-cliente" onclick="desarchivarCliente(${cliente.id})">📤 Desarchivar cliente</button>`
       : tieneHistorial
         ? `<button class="btn-eliminar" onclick="archivarCliente(${cliente.id})">📦 Archivar cliente</button>
-           <p class="nota-ayuda">Este cliente tiene ${count} préstamo(s) en su historial, por eso no se puede eliminar — se archiva para proteger tus reportes.</p>`
+           <p class="nota-ayuda">Este cliente tiene ${count} préstamo(s) en su historial — lo normal es archivarlo, no borrarlo, para no perder tus reportes de meses pasados.</p>
+           <p class="link-borrar-todo" onclick="forzarEliminarCliente(${cliente.id}, '${escaparAtributoJs(cliente.nombre)}')">¿Fue un error? Borrar cliente y TODO su historial para siempre</p>`
         : `<button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">🗑️ Eliminar cliente</button>`
     }
   `;
@@ -404,6 +405,47 @@ async function exportarEstadoCuentaPDF(clienteId) {
   ventana.print();
 }
 
+// --- BORRAR UN CLIENTE CON HISTORIAL (avanzado / errores) ---
+// Lo normal es archivar, no borrar, un cliente que ya tuvo préstamos: así tus
+// reportes de meses pasados no cambian. Pero si de verdad fue un error (un
+// cliente de prueba, uno duplicado, etc.), el dueño de la cuenta puede
+// forzar el borrado completo: se elimina el cliente Y todo su historial de
+// préstamos y pagos, para siempre. Por lo delicado que es, pide escribir el
+// nombre exacto del cliente para confirmar (no basta un simple "sí").
+async function forzarEliminarCliente(clienteId, nombreCliente) {
+  if (!requiereConexion()) return;
+  const entendido = await mostrarConfirmacion(
+    `⚠️ Esto borrará a "${nombreCliente}" Y todo su historial de préstamos y pagos, para siempre. Tus reportes de meses pasados van a cambiar (ya no aparecerá lo que le cobraste).<br><br>Esto normalmente NO se recomienda — para eso existe "Archivar". Solo hazlo si de verdad fue un error.<br><br>¿Quieres continuar?`
+  );
+  if (!entendido) return;
+
+  const escrito = await mostrarPrompt(`Para confirmar, escribe el nombre exacto del cliente: ${nombreCliente}`);
+  if (escrito === null) return;
+  if (escrito.trim().toLowerCase() !== nombreCliente.trim().toLowerCase()) {
+    mostrarAlerta("El nombre no coincide exactamente. No se borró nada, por seguridad.");
+    return;
+  }
+
+  const { data: prestamos, error: errorConsulta } = await supabaseClient.from("prestamos").select("id").eq("cliente_id", clienteId);
+  if (errorConsulta) { mostrarAlerta("Error: " + traducirErrorSupabase(errorConsulta)); return; }
+  const idsPrestamos = (prestamos || []).map(p => p.id);
+
+  if (idsPrestamos.length) {
+    const { error: errorPagos } = await supabaseClient.from("pagos").delete().in("prestamo_id", idsPrestamos);
+    if (errorPagos) { mostrarAlerta("No fue posible borrar los pagos del historial: " + traducirErrorSupabase(errorPagos)); return; }
+
+    const { error: errorPrestamos } = await supabaseClient.from("prestamos").delete().eq("cliente_id", clienteId);
+    if (errorPrestamos) { mostrarAlerta("No fue posible borrar los préstamos del historial: " + traducirErrorSupabase(errorPrestamos)); return; }
+  }
+
+  const { error } = await supabaseClient.from("clientes").delete().eq("id", clienteId);
+  if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("🗑️ Cliente y todo su historial fueron eliminados.");
+  cerrarDetalleCliente();
+  cargarClientes();
+}
+
 async function eliminarCliente(clienteId) {
   if (!requiereConexion()) return;
   // Solo se llega aquí cuando el cliente NO tiene ningún préstamo en su historial
@@ -466,5 +508,23 @@ async function pintarTabHistorial() {
     : pagos.map(p => `
         <div class="fila-historial">
           <span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span>
+          <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${p.id})">🗑️</span>
         </div>`).join("");
+}
+
+// Igual que eliminarPago() en pagos.js, pero llamado desde la pestaña
+// Historial del detalle del cliente — refresca esa pestaña en vez de la
+// tarjeta de Cobrar.
+async function eliminarPagoDesdeDetalle(pagoId) {
+  if (!requiereConexion()) return;
+  const confirmado = await mostrarConfirmacion("¿Seguro que quieres borrar este pago? Esto no se puede deshacer, y el saldo del cliente se recalculará sin este pago.");
+  if (!confirmado) return;
+
+  const { error } = await supabaseClient.from("pagos").delete().eq("id", pagoId);
+  if (error) { mostrarAlerta("No fue posible borrar el pago: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("🗑️ Pago eliminado.");
+  pintarTabHistorial();
+  const { data: cliente } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("id", clienteDetalleActualId).single();
+  if (cliente) pintarTabInfo(cliente);
 }

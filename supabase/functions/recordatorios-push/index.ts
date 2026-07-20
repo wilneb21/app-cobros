@@ -1,8 +1,9 @@
 // Edge Function: recordatorios-push
 // Se ejecuta una vez al día (programada con pg_cron, ver SUPABASE_SETUP.md).
-// Revisa, para cada usuario, qué cuotas vencen MAÑANA y le manda un push real
-// a cada dispositivo donde haya activado las notificaciones — sin depender de
-// que la app esté abierta.
+// Revisa, para cada usuario, qué cuotas vencen MAÑANA y si tiene el cuadre
+// automático de caja activado sin haber contado el efectivo físico HOY, y le
+// manda un push real a cada dispositivo donde haya activado las
+// notificaciones — sin depender de que la app esté abierta.
 //
 // Variables de entorno necesarias (Supabase → Project Settings → Edge Functions → Secrets):
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (ej: mailto:tucorreo@dominio.com)
@@ -46,6 +47,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const manana = fechaBogota(1);
+  const hoy = fechaBogota(0);
 
   const { data: prestamos, error: errorPrestamos } = await supabase
     .from("prestamos")
@@ -76,23 +78,49 @@ Deno.serve(async (req) => {
     porUsuario[p.user_id].monto += Number(p.cuota);
   }
 
-  const usuariosConCuotas = Object.keys(porUsuario);
-  if (usuariosConCuotas.length === 0) {
-    return new Response(JSON.stringify({ enviados: 0, motivo: "sin cuotas para mañana" }), { status: 200 });
+  // Caja sin verificar: solo aplica a quienes tienen el cuadre AUTOMÁTICO
+  // activado (en modo manual, cerrar caja ya obliga a contar cada día, así
+  // que no hace falta recordárselo). Se avisa si hoy todavía no se ha
+  // contado el efectivo físico (efectivo_final sigue en null).
+  const { data: preferencias } = await supabase
+    .from("preferencias_usuario").select("user_id").eq("caja_automatica", true);
+  const usuariosConAutomatico = (preferencias ?? []).map((p) => p.user_id);
+
+  const usuariosSinVerificarCaja = new Set<string>();
+  if (usuariosConAutomatico.length > 0) {
+    const { data: cajasHoy } = await supabase
+      .from("caja_diaria").select("user_id, efectivo_final").eq("fecha", hoy).in("user_id", usuariosConAutomatico);
+    const yaContaron = new Set((cajasHoy ?? []).filter((c) => c.efectivo_final !== null && c.efectivo_final !== undefined).map((c) => c.user_id));
+    const cajasAbiertasHoy = new Set((cajasHoy ?? []).map((c) => c.user_id));
+    for (const uid of usuariosConAutomatico) {
+      // Solo se avisa si la caja de hoy existe (o sea, ya se usó la app hoy)
+      // y no se ha contado — si nunca se abrió, no tiene caso recordarle.
+      if (cajasAbiertasHoy.has(uid) && !yaContaron.has(uid)) usuariosSinVerificarCaja.add(uid);
+    }
+  }
+
+  const usuariosAAvisar = new Set([...Object.keys(porUsuario), ...usuariosSinVerificarCaja]);
+  if (usuariosAAvisar.size === 0) {
+    return new Response(JSON.stringify({ enviados: 0, motivo: "nada que avisar hoy" }), { status: 200 });
   }
 
   const { data: suscripciones, error: errorSuscripciones } = await supabase
-    .from("push_subscriptions").select("*").in("user_id", usuariosConCuotas);
+    .from("push_subscriptions").select("*").in("user_id", [...usuariosAAvisar]);
   if (errorSuscripciones) return new Response(JSON.stringify({ error: errorSuscripciones.message }), { status: 500 });
 
   let enviados = 0;
   for (const sub of suscripciones ?? []) {
     const resumen = porUsuario[sub.user_id];
-    if (!resumen) continue;
+    const faltaContarCaja = usuariosSinVerificarCaja.has(sub.user_id);
+    if (!resumen && !faltaContarCaja) continue;
+
+    const partes: string[] = [];
+    if (resumen) partes.push(`Tienes ${resumen.cantidad} cuota${resumen.cantidad > 1 ? "s" : ""} por ${formatoPesos(resumen.monto)} que vence${resumen.cantidad > 1 ? "n" : ""} mañana.`);
+    if (faltaContarCaja) partes.push("Todavía no has contado tu caja física hoy.");
 
     const payload = JSON.stringify({
-      title: "📅 Cuotas que vencen mañana",
-      body: `Tienes ${resumen.cantidad} cuota${resumen.cantidad > 1 ? "s" : ""} por ${formatoPesos(resumen.monto)} que vence${resumen.cantidad > 1 ? "n" : ""} mañana.`,
+      title: resumen && faltaContarCaja ? "📅💰 Pendientes de hoy" : resumen ? "📅 Cuotas que vencen mañana" : "💰 Cuenta tu caja",
+      body: partes.join(" "),
       url: "./"
     });
 
