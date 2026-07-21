@@ -1349,3 +1349,120 @@ body.modo-oscuro .grupo-prestamo-historial { border-color: #34384d; }
   color: var(--text-muted);
   margin-bottom: 6px;
 }
+
+/* --- CARTERA / CAPITAL INICIAL (Reportes y Configuración) --- */
+.tarjeta-capital-inicial {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(64,86,214,.09);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.tarjeta-capital-inicial .etiqueta-capital-inicial {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.tarjeta-capital-inicial strong {
+  display: block;
+  font-size: 18px;
+  color: var(--primary-dark);
+}
+.tarjeta-capital-inicial small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* --- RANGO PERSONALIZADO DE REPORTES --- */
+.reporte-rango {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin: 8px 0 12px;
+}
+.reporte-rango label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 3px;
+}
+.reporte-rango button {
+  width: auto;
+  padding: 9px 14px;
+  margin: 0;
+}
+
+/* --- LIBRO DIARIO (flujo de caja día por día) --- */
+.tabla-libro-diario-envoltura {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(64,86,214,.08);
+  margin-bottom: 10px;
+}
+.fila-libro-diario {
+  display: grid;
+  grid-template-columns: 88px 90px 90px 90px 90px 90px 74px 100px;
+  gap: 0;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(64,86,214,.06);
+  white-space: nowrap;
+}
+.fila-libro-diario:last-child { border-bottom: none; }
+.fila-libro-diario-cabecera {
+  background: rgba(64,86,214,.09);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: .3px;
+  position: sticky;
+  top: 0;
+}
+.tono-exito-texto { color: var(--success); font-weight: 700; }
+.tono-peligro-texto { color: var(--danger); font-weight: 700; }
+.tono-advertencia-texto { color: var(--warning); font-weight: 700; }
+
+.resumen-clientes-dia {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 4px;
+  font-size: 13px;
+}
+.fila-cliente-dia {
+  cursor: pointer;
+}
+.fila-cliente-dia .nombre-cliente-dia {
+  font-weight: 700;
+}
+.fila-cliente-dia-datos {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.fila-cliente-dia-datos b {
+  color: var(--text);
+}
+
+.libro-diario-totales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+body.modo-oscuro .tarjeta-capital-inicial { background: rgba(64,86,214,.18); }
+body.modo-oscuro .fila-libro-diario-cabecera { background: #262b45; }
+body.modo-oscuro .fila-libro-diario { border-bottom-color: #34384d; }
+body.modo-oscuro .tabla-libro-diario-envoltura { border-color: #34384d; }

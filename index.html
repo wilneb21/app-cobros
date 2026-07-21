@@ -192,19 +192,42 @@
 
       <section id="seccion-reportes" class="seccion oculto">
         <h3>Reportes</h3>
+
+        <div id="tarjeta-capital-inicial" class="tarjeta-capital-inicial oculto">
+          <div><span class="etiqueta-capital-inicial">Cartera inicial</span><strong id="capital-inicial-monto">$0</strong><small id="capital-inicial-fecha"></small></div>
+          <button type="button" class="link-editar-base" onclick="configurarCapitalInicial()" title="Corregir cartera inicial">✏️</button>
+        </div>
+
         <select id="reporte-tipo" onchange="cambiarTipoReporte()">
           <option value="dia">Reporte diario</option>
           <option value="semana">Reporte semanal</option>
           <option value="mes" selected>Reporte mensual</option>
           <option value="anio">Reporte anual</option>
+          <option value="rango">Rango de fechas (desde/hasta)</option>
         </select>
         <input type="date" id="reporte-fecha-dia" class="oculto">
         <input type="month" id="reporte-mes">
         <input type="number" id="reporte-anio" class="oculto" placeholder="Ej: 2026" min="2020" max="2100">
+        <div id="reporte-rango" class="reporte-rango oculto">
+          <label>Desde <input type="date" id="reporte-rango-desde"></label>
+          <label>Hasta <input type="date" id="reporte-rango-hasta"></label>
+          <button type="button" onclick="cargarReporteMes()">Ver reporte</button>
+        </div>
         <div id="resumen-mes" class="resumen-dia"></div>
         <button type="button" class="btn-exportar-csv" onclick="exportarReporteCSV()">⬇️ Exportar este reporte a CSV</button>
         <div id="comparacion-mes" class="comparacion-mes oculto"></div>
         <div id="respaldo-recordatorio" class="oculto"></div>
+
+        <div id="detalle-clientes-dia-envoltura" class="oculto">
+          <h4>👥 Clientes del día</h4>
+          <p class="texto-ayuda">Quién pagó, quién no, y cómo va cada uno con su crédito ese día.</p>
+          <div id="detalle-clientes-dia"></div>
+        </div>
+
+        <h4>📒 Flujo de caja día por día</h4>
+        <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día, lo prestado, lo cobrado, los gastos y la utilidad — con el cierre de caja de ese día.</p>
+        <div class="tabla-libro-diario-envoltura"><div id="libro-diario"></div></div>
+        <div id="libro-diario-totales" class="libro-diario-totales"></div>
 
         <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('reportes-cartera-rutas', this, '📈 Ver cartera por semana y rendimiento por ruta', '📈 Ocultar cartera y rendimiento por ruta')">📈 Ver cartera por semana y rendimiento por ruta</button>
         <div id="reportes-cartera-rutas" class="oculto">
@@ -265,6 +288,8 @@
           <button type="button" class="fila-config" onclick="mostrarSeccion('cuentas')"><span class="config-icono">▤</span><span><b>Cuentas por cobrar</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('rutas')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono">💰</span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
         </div>
         <button type="button" class="btn-cerrar-sesion-config" onclick="cerrarSesion()">Cerrar sesión</button>
       </section>
@@ -381,6 +406,7 @@
   <script src="js/clientes.js"></script>
   <script src="js/prestamos.js"></script>
   <script src="js/pagos.js"></script>
+  <script src="js/capital.js"></script>
   <script src="js/reportes.js"></script>
   <script src="js/ganancia.js"></script>
   <script src="js/gastos.js"></script>

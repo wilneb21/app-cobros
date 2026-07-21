@@ -209,7 +209,7 @@ async function cargarPrestamosDeCliente(clienteId) {
 
     const ultimoPago = pagos && pagos.length > 0 ? pagos[0] : null;
     const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
-    const textoUltimo = ultimoPago ? `Último registro: ${ultimoPago.fecha_pago} — ${etiquetas[ultimoPago.estado]}` : "Sin pagos registrados";
+    const textoUltimo = ultimoPago ? `Último registro: ${formatoFecha(ultimoPago.fecha_pago)} — ${etiquetas[ultimoPago.estado]}` : "Sin pagos registrados";
 
     let rachaSinPagar = 0;
     if (pagos) for (const pg of pagos) { if (pg.estado === "no_pago") rachaSinPagar++; else break; }

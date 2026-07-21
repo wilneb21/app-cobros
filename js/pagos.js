@@ -112,7 +112,7 @@ function pintarHistorial(prestamoId, clienteId, limite) {
 
   const visibles = limite ? pagos.slice(0, limite) : pagos;
   const restantes = limite ? pagos.length - visibles.length : 0;
-  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span><span class="btn-borrar-pago" onclick="eliminarPago(${p.id}, ${prestamoId}, ${clienteId})">🗑️</span></div>`).join("")
+  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${formatoFecha(p.fecha_pago)}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span><span class="btn-borrar-pago" onclick="eliminarPago(${p.id}, ${prestamoId}, ${clienteId})">🗑️</span></div>`).join("")
     + (restantes > 0 ? `<p class="link-ver-mas-historial" onclick="pintarHistorial(${prestamoId}, ${clienteId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
 }
 
@@ -143,7 +143,7 @@ async function mostrarRecibo(clienteId, monto, fecha, estado) {
     <div class="recibo-titulo">🧾 Comprobante de pago</div>
     <div class="recibo-monto">${formatoPesos(monto)}</div>
     <div class="recibo-linea"><span>Cliente</span><span>${escaparHtml(cliente ? cliente.nombre : "")}</span></div>
-    <div class="recibo-linea"><span>Fecha</span><span>${fecha}</span></div>
+    <div class="recibo-linea"><span>Fecha</span><span>${formatoFecha(fecha)}</span></div>
     <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>
     <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}')">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
   document.getElementById("modal-recibo").classList.remove("oculto");
@@ -152,7 +152,7 @@ async function mostrarRecibo(clienteId, monto, fecha, estado) {
 
 async function compartirRecibo(clienteId, monto, fecha, estado) {
   const { data: cliente } = await supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single();
-  const texto = `Comprobante de pago\nCliente: ${cliente?.nombre || "Cliente"}\nMonto: ${formatoPesos(monto)}\nFecha: ${fecha}\nTipo: ${estado === "pago" ? "Pago de cuota" : "Abono parcial"}`;
+  const texto = `Comprobante de pago\nCliente: ${cliente?.nombre || "Cliente"}\nMonto: ${formatoPesos(monto)}\nFecha: ${formatoFecha(fecha)}\nTipo: ${estado === "pago" ? "Pago de cuota" : "Abono parcial"}`;
   try {
     if (navigator.share) await navigator.share({ title: "Comprobante de pago", text: texto });
     else { await navigator.clipboard.writeText(texto); mostrarAlerta("Comprobante copiado. Ya puedes pegarlo en WhatsApp."); }

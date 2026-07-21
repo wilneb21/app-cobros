@@ -2,6 +2,19 @@
 
 Este documento explica cómo funciona la app hoy, qué implementé en esta ronda, una corrección a mi análisis anterior, y qué queda pendiente y por qué.
 
+## -4. Ronda nueva (2026-07-21): cartera inicial, libro diario en Reportes y fecha DD/MM/AAAA
+
+**💰 Cartera/capital inicial (nuevo).** Es el monto de una sola vez con el que arrancó el negocio (distinto de la base diaria de la caja, que cambia todos los días). Se configura desde Configuración → "Cartera / capital inicial" (nuevo `js/capital.js`), queda fijo con su fecha, y se muestra como tarjeta destacada arriba de Reportes. Sirve como punto de partida del libro diario cuando el reporte incluye días anteriores a que existiera la caja automática.
+
+**📒 Libro diario en Reportes (nuevo).** Tabla día por día con las columnas `Fecha | Base | Préstamos | Cobro | Gasto | Utilidad | Utilidad % | Cierre`, más una fila de totales del período — es el mismo formato que ya llevaba el cliente a mano (Fecha, Préstamos, Utilidad, Utilidad total/%, Cobro, Gasto, Base), agregando "Cierre" para que además sirva como flujo de caja diario. "Utilidad" es solo la parte de interés/mora que es ganancia real (no el capital que regresa); "Utilidad %" es esa utilidad sobre lo cobrado ese día. Se exporta tanto en el botón CSV del reporte como en una hoja nueva "Libro diario" dentro de "Exportar todo a Excel".
+
+**🗓️ Reportes por rango de fechas (nuevo).** Se agregó la opción "Rango de fechas (desde/hasta)" al selector de tipo de reporte, además de día/semana/mes/año que ya existían.
+
+**📅 Fechas en formato DD/MM/AAAA (nuevo).** Se agregó `formatoFecha()` (en `js/navegacion.js`) y se aplicó en todos los lugares donde una fecha se **muestra** en pantalla (historial de pagos, préstamos, gastos, comprobantes, caja de otro día). Esto no cambia cómo se guardan las fechas en la base de datos ni cómo funcionan los `<input type="date">` (esos siguen usando AAAA-MM-DD internamente, como debe ser).
+
+**Nueva migración que debes correr en Supabase:** `supabase/migrations/20260731_capital_inicial.sql` — agrega `capital_inicial` y `capital_inicial_fecha` a `preferencias_usuario`, y crea la tabla `historial_capital_inicial`.
+
+
 ## -3. Ronda nueva (2026-07-19, noche): quitar metas, caja diaria con base automática y efectivo propio
 
 **❌ Metas de recaudo — eliminadas por completo.** Se quitó el bloque del Inicio, el botón en Configuración, y las funciones `editarMetas`/`obtenerMetas`/`cargarProgresoMetas`. La tabla `metas` en Supabase no se borró (por si acaso), pero la app ya no la usa ni la incluye en el respaldo manual.

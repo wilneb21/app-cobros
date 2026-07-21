@@ -13,11 +13,19 @@ function cambiarTipoReporte() {
   document.getElementById("reporte-fecha-dia").classList.add("oculto");
   document.getElementById("reporte-mes").classList.add("oculto");
   document.getElementById("reporte-anio").classList.add("oculto");
+  document.getElementById("reporte-rango").classList.add("oculto");
   if (tipo === "dia") document.getElementById("reporte-fecha-dia").classList.remove("oculto");
   if (tipo === "mes") document.getElementById("reporte-mes").classList.remove("oculto");
   if (tipo === "anio") document.getElementById("reporte-anio").classList.remove("oculto");
+  if (tipo === "rango") {
+    document.getElementById("reporte-rango").classList.remove("oculto");
+    const hoy = obtenerFechaLocal();
+    if (!document.getElementById("reporte-rango-desde").value) document.getElementById("reporte-rango-desde").value = sumarDias(hoy, -6);
+    if (!document.getElementById("reporte-rango-hasta").value) document.getElementById("reporte-rango-hasta").value = hoy;
+  }
   // "semana" no necesita selector propio: siempre es la semana actual (lunes a domingo)
-  cargarReporteMes();
+  // "rango" se dispara con el botón "Ver reporte" (para no recargar con cada tecla mientras se escribe la fecha)
+  if (tipo !== "rango") cargarReporteMes();
 }
 
 // Devuelve el lunes de la semana que contiene la fecha dada ("YYYY-MM-DD")
@@ -53,6 +61,16 @@ async function cargarReporteMes() {
     finFecha.setDate(finFecha.getDate() + 7);
     fin = finFecha.toISOString().split("T")[0];
     etiquetaPeriodo = "esta semana";
+  } else if (tipo === "rango") {
+    const desde = document.getElementById("reporte-rango-desde").value;
+    const hasta = document.getElementById("reporte-rango-hasta").value;
+    if (!desde || !hasta) return; // el botón "Ver reporte" espera a que se llenen las dos fechas
+    if (desde > hasta) { mostrarAlerta("La fecha \"Desde\" no puede ser posterior a \"Hasta\"."); return; }
+    inicio = desde;
+    const finFecha = new Date(hasta + "T00:00:00");
+    finFecha.setDate(finFecha.getDate() + 1);
+    fin = finFecha.toISOString().split("T")[0];
+    etiquetaPeriodo = `del ${formatoFecha(desde)} al ${formatoFecha(hasta)}`;
   } else if (tipo === "anio") {
     const inputAnio = document.getElementById("reporte-anio");
     if (!inputAnio.value) inputAnio.value = hoy.substring(0, 4);
@@ -127,7 +145,198 @@ async function cargarReporteMes() {
   await cargarRefinanciamientosPeriodo(refinanciados, inicio, fin);
   await cargarTendenciaCartera();
   await cargarComparativoRutas(inicio, fin);
+  await cargarLibroDiario(inicio, fin);
+  await cargarDetalleClientesDelDia(inicio, fin, tipo === "dia");
   await verificarRecordatorioRespaldo();
+}
+
+// --- LIBRO DIARIO: FECHA | BASE | PRÉSTAMOS | COBRO | GASTO | UTILIDAD | UTILIDAD % | CIERRE ---
+// Reconstruye, día por día dentro del período del reporte, el mismo formato
+// que ya llevaba el cliente a mano: cuánta caja tenía al empezar el día
+// (BASE), cuánto prestó, cuánto cobró, cuánto gastó, cuánto fue GANANCIA real
+// (solo intereses + mora aplicada — no el capital que simplemente regresa) y
+// con cuánto cerró el día (que es la BASE del día siguiente). "UTILIDAD %"
+// se calcula como la utilidad del día sobre lo COBRADO ese día (qué porción
+// de lo que entró en efectivo fue ganancia real, no capital recuperado) — es
+// la lectura más útil de "porcentaje de ganancia", pero si el negocio prefiere
+// verla como % sobre lo PRESTADO o como ganancia acumulada en pesos, es un
+// cambio de una sola fórmula aquí abajo.
+let ultimoLibroDiario = null;
+
+async function cargarLibroDiario(inicio, fin) {
+  const contenedor = document.getElementById("libro-diario");
+  const totalesEl = document.getElementById("libro-diario-totales");
+  if (!contenedor) return;
+  contenedor.innerHTML = '<div class="cargando">⏳ Calculando...</div>';
+
+  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }, { data: cargosMora }, capitalInicial] = await Promise.all([
+    supabaseClient.from("caja_diaria").select("fecha, base_inicial").gte("fecha", inicio).lt("fecha", fin),
+    supabaseClient.from("pagos").select("fecha_pago, monto_pagado, prestamos(interes_porcentaje)").gte("fecha_pago", inicio).lt("fecha_pago", fin),
+    supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin),
+    supabaseClient.from("aportes_capital").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
+    supabaseClient.from("cargos_mora").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
+    obtenerCapitalInicial()
+  ]);
+
+  const baseGuardada = {};
+  (caja || []).forEach(c => baseGuardada[c.fecha] = Number(c.base_inicial));
+  const cobroPorDia = {}, utilidadPorDia = {};
+  (pagos || []).forEach(p => {
+    const interes = Number(p.prestamos?.interes_porcentaje) || 0;
+    const fraccion = interes / (100 + interes);
+    cobroPorDia[p.fecha_pago] = (cobroPorDia[p.fecha_pago] || 0) + Number(p.monto_pagado);
+    utilidadPorDia[p.fecha_pago] = (utilidadPorDia[p.fecha_pago] || 0) + Number(p.monto_pagado) * fraccion;
+  });
+  (cargosMora || []).forEach(c => utilidadPorDia[c.fecha] = (utilidadPorDia[c.fecha] || 0) + Number(c.monto));
+  const gastoPorDia = {};
+  (gastos || []).forEach(g => gastoPorDia[g.fecha] = (gastoPorDia[g.fecha] || 0) + Number(g.monto));
+  const aportePorDia = {};
+  (aportes || []).forEach(a => aportePorDia[a.fecha] = (aportePorDia[a.fecha] || 0) + Number(a.monto));
+  const prestamosPorDia = {};
+  (prestamos || []).forEach(p => (prestamosPorDia[p.fecha_inicio] ||= []).push(p));
+
+  // Base del primer día del período: si ese día ya tiene caja_diaria guardada,
+  // se usa esa; si no, y el período empieza justo en (o después de) la fecha
+  // de la cartera inicial, se usa la cartera inicial como punto de partida.
+  let baseCorriente = baseGuardada[inicio] !== undefined
+    ? baseGuardada[inicio]
+    : (capitalInicial && capitalInicial.fecha <= inicio ? capitalInicial.monto : 0);
+
+  const filas = [];
+  let fechaCursor = inicio;
+  const totales = { prestado: 0, cobro: 0, gasto: 0, utilidad: 0 };
+
+  while (fechaCursor < fin) {
+    const base = baseGuardada[fechaCursor] !== undefined ? baseGuardada[fechaCursor] : baseCorriente;
+    const prestamosDia = prestamosPorDia[fechaCursor] || [];
+    const prestado = await calcularDesembolsoReal(prestamosDia);
+    const cobro = cobroPorDia[fechaCursor] || 0;
+    const gasto = gastoPorDia[fechaCursor] || 0;
+    const aporte = aportePorDia[fechaCursor] || 0;
+    const utilidad = utilidadPorDia[fechaCursor] || 0;
+    const cierre = base + cobro + aporte - gasto - prestado;
+    const utilidadPct = cobro > 0 ? (utilidad / cobro) * 100 : 0;
+
+    filas.push({ fecha: fechaCursor, base, prestado, cobro, gasto, utilidad, utilidadPct, cierre });
+    totales.prestado += prestado; totales.cobro += cobro; totales.gasto += gasto; totales.utilidad += utilidad;
+
+    baseCorriente = cierre;
+    fechaCursor = sumarDias(fechaCursor, 1);
+  }
+
+  ultimoLibroDiario = { inicio, fin, filas };
+
+  if (filas.length === 0) {
+    contenedor.innerHTML = '<div class="estado-vacio">No hay días en este período.</div>';
+    totalesEl.innerHTML = "";
+    return;
+  }
+
+  contenedor.innerHTML = `
+    <div class="fila-libro-diario fila-libro-diario-cabecera">
+      <span>Fecha</span><span>Base</span><span>Préstamos</span><span>Cobro</span><span>Gasto</span><span>Utilidad</span><span>Utilidad %</span><span>Cierre</span>
+    </div>
+    ${filas.map(f => `
+      <div class="fila-libro-diario">
+        <span>${formatoFecha(f.fecha)}</span>
+        <span>${formatoPesos(f.base)}</span>
+        <span>${f.prestado > 0 ? "-" + formatoPesos(f.prestado) : formatoPesos(0)}</span>
+        <span>${formatoPesos(f.cobro)}</span>
+        <span>${f.gasto > 0 ? "-" + formatoPesos(f.gasto) : formatoPesos(0)}</span>
+        <span class="${f.utilidad >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidad)}</span>
+        <span>${f.utilidadPct.toFixed(1)}%</span>
+        <span><b>${formatoPesos(f.cierre)}</b></span>
+      </div>`).join("")}`;
+
+  const utilidadPctTotal = totales.cobro > 0 ? (totales.utilidad / totales.cobro) * 100 : 0;
+  totalesEl.innerHTML = `
+    <div class="resumen-caja tono-primario"><span class="numero">${formatoPesos(totales.prestado)}</span><span class="etiqueta">Total prestado</span></div>
+    <div class="resumen-caja tono-exito"><span class="numero">${formatoPesos(totales.cobro)}</span><span class="etiqueta">Total cobrado</span></div>
+    <div class="resumen-caja tono-peligro"><span class="numero">${formatoPesos(totales.gasto)}</span><span class="etiqueta">Total gastos</span></div>
+    <div class="resumen-caja ${totales.utilidad >= 0 ? "tono-exito" : "tono-peligro"}"><span class="numero">${formatoPesos(totales.utilidad)}</span><span class="etiqueta">Utilidad total</span><span class="subetiqueta">${utilidadPctTotal.toFixed(1)}% de lo cobrado</span></div>
+    <div class="resumen-caja tono-primario"><span class="numero">${formatoPesos(filas[filas.length - 1].cierre)}</span><span class="etiqueta">Cierre del período</span><span class="subetiqueta">Flujo de caja al final de ${formatoFecha(filas[filas.length - 1].fecha)}</span></div>`;
+}
+
+// --- CLIENTES DEL DÍA (solo para el reporte tipo "día") ---
+// Lista, cliente por cliente, lo que pasó ese día puntual: cuánto cobró,
+// cuánto lleva pagado en total de ese crédito hasta esa fecha, cuánto le
+// falta para terminarlo, y si pagó completo / parcial / no pagó — con el
+// mismo color que ya usa la pantalla de "Cobrar" (verde/amarillo/rojo), para
+// que se lea igual de rápido. Solo tiene sentido para UN día puntual — en
+// semana/mes/año/rango se vería una lista enorme mezclando muchos días, así
+// que ahí se oculta y basta con el Libro diario de más abajo.
+// OJO: "Le falta" usa la mora ACTUAL del crédito (no una foto histórica de
+// cómo estaba la mora justo ese día), porque es el dato que de verdad importa
+// al revisar el reporte: cuánto falta HOY, no cuánto faltaba en ese momento.
+async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
+  const envoltura = document.getElementById("detalle-clientes-dia-envoltura");
+  const contenedor = document.getElementById("detalle-clientes-dia");
+  if (!envoltura || !contenedor) return;
+
+  if (!esReporteDeUnDia) { envoltura.classList.add("oculto"); contenedor.innerHTML = ""; return; }
+  envoltura.classList.remove("oculto");
+  contenedor.innerHTML = '<div class="cargando">⏳ Cargando clientes del día...</div>';
+
+  const { data: pagosDia, error } = await supabaseClient
+    .from("pagos")
+    .select("id, monto_pagado, estado, prestamo_id, prestamos(id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, clientes(id, nombre))")
+    .gte("fecha_pago", inicio).lt("fecha_pago", fin);
+  if (error) { contenedor.innerHTML = '<p class="texto-ayuda">No fue posible cargar el detalle de clientes de este día.</p>'; return; }
+
+  if (!pagosDia || pagosDia.length === 0) {
+    contenedor.innerHTML = '<div class="estado-vacio">No hay pagos registrados este día.</div>';
+    return;
+  }
+
+  // Cuánto llevaba pagado cada crédito HASTA (e incluyendo) este día, para
+  // mostrar "lleva pagado" e "saldo pendiente" tal como quedaron al cierre
+  // de ese día — no el acumulado de hoy si estás viendo un día pasado.
+  const idsPrestamos = [...new Set(pagosDia.map(p => p.prestamo_id))];
+  const { data: pagosHastaEseDia } = await supabaseClient
+    .from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", idsPrestamos).lt("fecha_pago", fin);
+  const pagadoAcumulado = {};
+  (pagosHastaEseDia || []).forEach(pg => pagadoAcumulado[pg.prestamo_id] = (pagadoAcumulado[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
+
+  const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
+  // Mismos colores que ya usa la pantalla de Cobrar: verde = al día, amarillo
+  // = parcial, rojo = no pagó — para que el ojo no tenga que aprender un
+  // código de colores nuevo.
+  const clases = { pago: "estado-al-dia", parcial: "estado-atencion", no_pago: "estado-mora" };
+  const orden = { no_pago: 0, parcial: 1, pago: 2 };
+
+  const filasOrdenadas = [...pagosDia].sort((a, b) => (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3));
+  let cantidadPago = 0, cantidadParcial = 0, cantidadNoPago = 0;
+
+  const filasHtml = filasOrdenadas.map(pg => {
+    const prestamo = pg.prestamos;
+    const nombre = prestamo?.clientes?.nombre || "Cliente eliminado";
+    const clienteId = prestamo?.clientes?.id;
+    const totalPagado = pagadoAcumulado[pg.prestamo_id] || 0;
+    const saldoPendiente = prestamo ? calcularSaldoPendiente(prestamo, totalPagado) : 0;
+    if (pg.estado === "pago") cantidadPago++; else if (pg.estado === "parcial") cantidadParcial++; else cantidadNoPago++;
+
+    return `
+      <div class="subtarjeta fila-cliente-dia ${clases[pg.estado] || ""}" ${clienteId ? `onclick="abrirDetalleCliente(${clienteId})"` : ""}>
+        <div class="fila-resumen-credito">
+          <span class="nombre-cliente-dia">${escaparHtml(nombre)}</span>
+          <span class="badge-estado">${etiquetas[pg.estado] || escaparHtml(pg.estado)}</span>
+        </div>
+        <div class="fila-cliente-dia-datos">
+          <span>Cobrado hoy <b>${formatoPesos(pg.monto_pagado)}</b></span>
+          <span>Lleva pagado <b>${formatoPesos(totalPagado)}</b></span>
+          <span>Le falta <b>${formatoPesos(saldoPendiente)}</b></span>
+        </div>
+      </div>`;
+  }).join("");
+
+  contenedor.innerHTML = `
+    <div class="resumen-clientes-dia">
+      <span class="tono-exito-texto">✅ ${cantidadPago} pagaron</span>
+      <span class="tono-advertencia-texto">⚠️ ${cantidadParcial} parcial</span>
+      <span class="tono-peligro-texto">❌ ${cantidadNoPago} no pagaron</span>
+    </div>
+    ${filasHtml}`;
 }
 
 // --- COMPARAR RENDIMIENTO ENTRE RUTAS ---
@@ -200,11 +409,15 @@ function exportarReporteCSV() {
   const r = ultimoReporteExportable;
   const filas = [
     ["Reporte", r.etiquetaPeriodo],
-    ["Desde", r.inicio], ["Hasta (exclusivo)", r.fin],
+    ["Desde", formatoFecha(r.inicio)], ["Hasta", formatoFecha(sumarDias(r.fin, -1))],
     ["Desembolso nuevo", r.totalPrestadoNuevo], ["Cobrado", r.totalCobrado],
     ["Gastos", r.totalGastos], ["Flujo de caja", r.flujoNeto],
     ["Ganancia por intereses", r.gananciaBruta], ["Mora cobrada", r.moraCobrada],
-    ["Ganancia neta", r.gananciaNeta], [], ["Detalle de pagos del período"],
+    ["Ganancia neta", r.gananciaNeta], [],
+    ["Flujo de caja día por día"],
+    ["Fecha", "Base", "Préstamos", "Cobro", "Gasto", "Utilidad", "Utilidad %", "Cierre"],
+    ...(ultimoLibroDiario?.filas || []).map(f => [formatoFecha(f.fecha), f.base, f.prestado, f.cobro, f.gasto, f.utilidad.toFixed(0), f.utilidadPct.toFixed(1), f.cierre]),
+    [], ["Detalle de pagos del período"],
     ["Monto pagado"], ...r.pagosPeriodo.map(p => [p.monto_pagado])
   ];
   const csv = filas.map(fila => fila.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -314,6 +527,8 @@ async function cargarTendenciaCartera() {
 document.getElementById("reporte-fecha-dia").addEventListener("change", cargarReporteMes);
 document.getElementById("reporte-mes").addEventListener("change", cargarReporteMes);
 document.getElementById("reporte-anio").addEventListener("change", cargarReporteMes);
+document.getElementById("reporte-rango-desde").addEventListener("change", cargarReporteMes);
+document.getElementById("reporte-rango-hasta").addEventListener("change", cargarReporteMes);
 
 // --- EXPORTAR A EXCEL (.xlsx con estilo: encabezados de color, bordes, franjas alternadas) ---
 // Se usa xlsx-js-style (mismo API que SheetJS, con soporte de colores/bordes) solo
@@ -455,6 +670,23 @@ async function exportarExcel(evento) {
        { header: "Monto", key: "monto", tipo: "moneda", ancho: 16 }],
       "E11D48"
     ), "Gastos");
+
+    // Hoja "Libro diario": el mismo desglose día por día que se ve en
+    // Reportes (fecha, prestado, utilidad, cobro, gasto y base/cierre de
+    // caja), en el período que estaba abierto en Reportes al exportar.
+    if (ultimoLibroDiario && ultimoLibroDiario.filas.length) {
+      XLSX.utils.book_append_sheet(libro, construirHojaEstilizada(
+        ultimoLibroDiario.filas.map(f => ({
+          fecha: formatoFecha(f.fecha), prestamos: f.prestado, utilidad: f.utilidad,
+          utilidadPct: f.utilidadPct, cobro: f.cobro, gasto: f.gasto, base: f.base, cierre: f.cierre
+        })),
+        [{ header: "Fecha", key: "fecha", ancho: 14 }, { header: "Préstamos", key: "prestamos", tipo: "moneda", ancho: 16 },
+         { header: "Utilidad", key: "utilidad", tipo: "moneda", ancho: 16 }, { header: "Utilidad %", key: "utilidadPct", tipo: "porcentaje", ancho: 14 },
+         { header: "Cobro", key: "cobro", tipo: "moneda", ancho: 16 }, { header: "Gasto", key: "gasto", tipo: "moneda", ancho: 16 },
+         { header: "Base", key: "base", tipo: "moneda", ancho: 16 }, { header: "Cierre (flujo de caja)", key: "cierre", tipo: "moneda", ancho: 20 }],
+        "0EA5E9"
+      ), "Libro diario");
+    }
 
     // --- Hoja "Resumen": totales generales de todo lo exportado, con la
     // ganancia neta real (solo intereses cobrados, menos gastos operativos).

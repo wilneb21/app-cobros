@@ -455,12 +455,12 @@ async function exportarEstadoCuentaPDF(clienteId) {
     const moraTexto = Number(p.mora_acumulada) > 0 ? ` (incluye ${formatoPesos(p.mora_acumulada)} de mora aplicada)` : "";
 
     filasPrestamos += `
-      <h3>Préstamo del ${p.fecha_inicio} — ${escaparHtml(p.estado)}</h3>
+      <h3>Préstamo del ${formatoFecha(p.fecha_inicio)} — ${escaparHtml(p.estado)}</h3>
       <p>Monto: ${formatoPesos(p.monto_prestado)} | Interés: ${p.interes_porcentaje}% | Total a pagar: ${formatoPesos(totalConInteres)}</p>
       <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(saldoConMora)}${moraTexto}</p>
       <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px;">
         <tr><th>Fecha</th><th>Estado</th><th>Monto</th></tr>
-        ${(pagos || []).map(pg => `<tr><td>${pg.fecha_pago}</td><td>${escaparHtml(pg.estado)}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}
+        ${(pagos || []).map(pg => `<tr><td>${formatoFecha(pg.fecha_pago)}</td><td>${escaparHtml(pg.estado)}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}
       </table><br>`;
   }
 
@@ -595,7 +595,7 @@ async function pintarTabPrestamos() {
 
     return `
       <div class="tarjeta-prestamo-actual">
-        <strong>Préstamo activo desde el ${p.fecha_inicio}</strong>
+        <strong>Préstamo activo desde el ${formatoFecha(p.fecha_inicio)}</strong>
         <div class="detalle-prestamo-grid">
           <div><small>Monto prestado</small><b>${formatoPesos(p.monto_prestado)}</b></div>
           <div><small>Interés</small><b>${p.interes_porcentaje}%</b></div>
@@ -609,7 +609,7 @@ async function pintarTabPrestamos() {
           ? '<p class="texto-ayuda">Sin pagos registrados todavía.</p>'
           : pagosPrestamo.map(pg => `
               <div class="fila-historial">
-                <span>${pg.fecha_pago}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
+                <span>${formatoFecha(pg.fecha_pago)}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
                 <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
               </div>`).join("")}
       </div>`;
@@ -655,7 +655,7 @@ async function pintarTabHistorial() {
     return `
       <div class="grupo-prestamo-historial">
         <div class="cabecera-prestamo-historial">
-          <strong>Préstamo del ${p.fecha_inicio}${p.estado !== "activo" ? ` al ${fechaFin}` : ""}</strong>
+          <strong>Préstamo del ${formatoFecha(p.fecha_inicio)}${p.estado !== "activo" ? ` al ${formatoFecha(fechaFin)}` : ""}</strong>
           <span class="etiqueta-estado-prestamo">${etiquetaEstadoPrestamo[p.estado] || escaparHtml(p.estado)}</span>
         </div>
         <div class="datos-prestamo-historial">
@@ -667,7 +667,7 @@ async function pintarTabHistorial() {
           ? '<p class="texto-ayuda">Sin pagos registrados en este préstamo.</p>'
           : pagosPrestamo.map(pg => `
               <div class="fila-historial">
-                <span>${pg.fecha_pago}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
+                <span>${formatoFecha(pg.fecha_pago)}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
                 <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
               </div>`).join("")}
       </div>`;

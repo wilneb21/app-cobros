@@ -73,6 +73,11 @@ async function cargarCajaDiaria(fecha) {
   const hayConteo = cierre !== null && cierre !== undefined;
   const descuadre = hayConteo ? Number(cierre) - esperado : 0;
 
+  // Capital inicial: solo se ofrece el botón manual "Usar capital inicial"
+  // el día de hoy, y solo si ya lo configuraste en algún momento. Nunca se
+  // aplica solo — es una acción que el cobrador decide y confirma.
+  const capitalInicialCfg = esHoy ? await obtenerCapitalInicial() : null;
+
   const colaOffline = esHoy ? obtenerColaOffline().length : 0;
   const avisoOffline = colaOffline > 0
     ? `<div class="caja-aviso-offline">⏳ Tienes ${colaOffline} pago${colaOffline > 1 ? "s" : ""} sin sincronizar todavía — el "Cobrado" de aquí abajo no los incluye aún. Espera a tener señal antes de ${automatica ? "contar la caja" : "cerrar caja"} para que el conteo sea exacto.</div>`
@@ -88,7 +93,7 @@ async function cargarCajaDiaria(fecha) {
 
   const encabezadoFecha = esHoy
     ? `<button type="button" class="link-ver-otro-dia" onclick="verCajaDeOtroDia()">📅 Ver otro día</button>`
-    : `<span class="caja-fecha-vista">📅 ${fechaVista} (solo lectura)</span> <button type="button" class="link-ver-otro-dia" onclick="volverACajaDeHoy()">← Volver a hoy</button>`;
+    : `<span class="caja-fecha-vista">📅 ${formatoFecha(fechaVista)} (solo lectura)</span> <button type="button" class="link-ver-otro-dia" onclick="volverACajaDeHoy()">← Volver a hoy</button>`;
 
   // En modo automático no hay "Abrir/Cerrar caja" (eso ya pasó solo); en su
   // lugar se ofrece un conteo físico OPCIONAL, para quien igual quiera
@@ -108,6 +113,13 @@ async function cargarCajaDiaria(fecha) {
   const botonReabrir = esHoy && caja.data && !automatica && hayConteo
     ? ` <button type="button" class="link-editar-base" onclick="reabrirCajaDeHoy()" title="Deshacer el cierre de hoy">🔓 Reabrir</button>` : "";
 
+  // Botón manual: mete el capital inicial configurado como base de HOY. Solo
+  // aparece si ya configuraste un capital inicial. No pasa nada automático —
+  // el cobrador lo toca cuando quiere (típicamente el primer día real que usa
+  // la caja, o si necesita corregir la base de hoy con ese mismo número).
+  const botonAplicarCapital = capitalInicialCfg
+    ? ` <button type="button" class="link-editar-base" onclick="aplicarCapitalInicialACajaHoy()" title="Usar el capital inicial como base de hoy">📥 Usar capital inicial</button>` : "";
+
   const listaAportesHtml = listaAportes.length === 0 ? "" : `
     <div class="caja-lista-aportes">
       ${listaAportes.map(a => `
@@ -122,7 +134,7 @@ async function cargarCajaDiaria(fecha) {
 
   contenedor.innerHTML = `
     <div class="caja-cabecera"><div><span>Caja diaria</span><strong>${!caja.data ? "Sin abrir" : !esHoy ? "Cerrada" : automatica ? (hayConteo ? "🧮 Automática · ✅ Verificada hoy" : "🧮 Automática · ⏳ Sin verificar hoy") : "Jornada en curso"}</strong></div>${botonAccion}</div>
-    <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}</div>
+    <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}${botonAplicarCapital}</div>
     ${avisoOffline}
     ${avisoRacha}
     <div class="caja-metricas"><span>Base <b>${formatoPesos(base)}</b>${editarBase}</span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
@@ -282,6 +294,123 @@ async function editarBaseCaja() {
   const user = await obtenerUsuarioActual();
   const { error } = await supabaseClient.from("caja_diaria").update({ base_inicial: valor }).eq("user_id", user.id).eq("fecha", hoy);
   if (error) { mostrarAlerta("No fue posible corregir la base: " + traducirErrorSupabase(error)); return; }
+  cargarCajaDiaria(hoy);
+}
+
+// Acción MANUAL: mete el capital inicial configurado (Configuración > Cartera
+// / capital inicial) como base de la caja de HOY. Nada de esto pasa solo —
+// el cobrador lo toca cuando quiere, típicamente el primer día real que
+// empieza a usar la caja, o si necesita corregir la base de hoy con ese
+// mismo número. Si hoy ya tiene una base guardada (a mano o automática), se
+// avisa antes de reemplazarla para no perder un número real por accidente.
+// Si hoy ya se contó el efectivo físico (cierre), ese conteo NO se toca —
+// solo se reemplaza la base, para que el cobrador pueda revisar el cuadre.
+async function aplicarCapitalInicialACajaHoy() {
+  if (!requiereConexion()) return;
+  const capital = await obtenerCapitalInicial(true);
+  if (!capital) { mostrarAlerta("Primero configura tu capital inicial en Configuración > Cartera / capital inicial."); return; }
+
+  const hoy = obtenerFechaLocal();
+  const { data: cajaHoy } = await supabaseClient.from("caja_diaria").select("*").eq("fecha", hoy).maybeSingle();
+
+  let mensaje = `¿Usar tu capital inicial de ${formatoPesos(capital.monto)} como base de la caja de hoy?`;
+  if (cajaHoy) {
+    mensaje = `Hoy ya tienes una base de ${formatoPesos(cajaHoy.base_inicial || 0)}. ¿Reemplazarla por tu capital inicial de ${formatoPesos(capital.monto)}?`;
+    if (cajaHoy.efectivo_final !== null && cajaHoy.efectivo_final !== undefined) {
+      mensaje += ` Ya contaste el efectivo de hoy (${formatoPesos(cajaHoy.efectivo_final)}) — ese conteo NO se borra, pero el cuadre puede cambiar al cambiar la base.`;
+    }
+  }
+  const confirmado = await mostrarConfirmacion(mensaje);
+  if (!confirmado) return;
+
+  const user = await obtenerUsuarioActual();
+  const { error } = cajaHoy
+    ? await supabaseClient.from("caja_diaria").update({ base_inicial: capital.monto }).eq("user_id", user.id).eq("fecha", hoy)
+    : await supabaseClient.from("caja_diaria").insert({ user_id: user.id, fecha: hoy, base_inicial: capital.monto, efectivo_final: null });
+  if (error) { mostrarAlerta("No fue posible aplicar el capital inicial: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("✅ Capital inicial aplicado como base de hoy.");
+  cargarCajaDiaria(hoy);
+}
+
+// Recalcula hacia ADELANTE la base de cada día de caja, empezando desde el
+// capital inicial configurado — para cuando corriges el capital inicial
+// (monto o fecha) DESPUÉS de que la caja ya llevaba días abriéndose sola sin
+// ese dato, y quieres que esos días queden acordes con la fecha correcta.
+// Reglas para no pisar nada real:
+//  - Si un día YA se cerró (tiene efectivo_final contado), no se le toca la
+//    base: se usa su efectivo_final real como punto de partida del día
+//    siguiente, igual que hace el cálculo automático normal.
+//  - Si un día está abierto pero sin contar, se recalcula su base.
+//  - Si faltan días sin ningún registro de caja en el rango, se crean.
+async function recalcularCajaDesdeCapitalInicial(pedirConfirmacion = true) {
+  if (!requiereConexion()) return;
+  const capital = await obtenerCapitalInicial(true);
+  if (!capital || !capital.fecha) { mostrarAlerta("Primero configura tu capital inicial (con fecha) en Configuración > Cartera / capital inicial."); return; }
+
+  const hoy = obtenerFechaLocal();
+  if (capital.fecha > hoy) { mostrarAlerta("La fecha de tu capital inicial es futura — no hay nada que recalcular todavía."); return; }
+
+  if (pedirConfirmacion) {
+    const confirmado = await mostrarConfirmacion(`Esto revisa la caja día por día desde el ${formatoFecha(capital.fecha)} hasta hoy, y ajusta la base de los días que NO hayas cerrado a mano (los que ya contaste el efectivo no se tocan). ¿Continuar?`);
+    if (!confirmado) return;
+  }
+
+  const [{ data: cajaExistente }, { data: pagosRango }, { data: gastosRango }, { data: prestamosRango }, { data: aportesRango }] = await Promise.all([
+    supabaseClient.from("caja_diaria").select("*").gte("fecha", capital.fecha).lte("fecha", hoy),
+    supabaseClient.from("pagos").select("monto_pagado, fecha_pago").gte("fecha_pago", capital.fecha).lte("fecha_pago", hoy),
+    supabaseClient.from("gastos").select("monto, fecha").gte("fecha", capital.fecha).lte("fecha", hoy),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", capital.fecha).lte("fecha_inicio", hoy),
+    supabaseClient.from("aportes_capital").select("monto, fecha").gte("fecha", capital.fecha).lte("fecha", hoy)
+  ]);
+
+  const cajaPorFecha = {};
+  (cajaExistente || []).forEach(c => cajaPorFecha[c.fecha] = c);
+  const cobrosPorFecha = {};
+  (pagosRango || []).forEach(p => cobrosPorFecha[p.fecha_pago] = (cobrosPorFecha[p.fecha_pago] || 0) + Number(p.monto_pagado));
+  const gastosPorFecha = {};
+  (gastosRango || []).forEach(g => gastosPorFecha[g.fecha] = (gastosPorFecha[g.fecha] || 0) + Number(g.monto));
+  const aportesPorFecha = {};
+  (aportesRango || []).forEach(a => aportesPorFecha[a.fecha] = (aportesPorFecha[a.fecha] || 0) + Number(a.monto));
+  const prestamosPorFecha = {};
+  (prestamosRango || []).forEach(p => (prestamosPorFecha[p.fecha_inicio] = prestamosPorFecha[p.fecha_inicio] || []).push(p));
+
+  const user = await obtenerUsuarioActual();
+  let diasActualizados = 0;
+  let huboFaltante = false;
+  let baseParaHoy = capital.monto; // arrastre entre iteraciones
+  let fecha = capital.fecha;
+
+  while (fecha <= hoy) {
+    const filaExistente = cajaPorFecha[fecha];
+    const verificado = filaExistente && filaExistente.efectivo_final !== null && filaExistente.efectivo_final !== undefined;
+
+    let baseUsadaHoy;
+    if (verificado) {
+      // Día ya cerrado a mano: se respeta tal cual, no se toca.
+      baseUsadaHoy = Number(filaExistente.base_inicial);
+    } else {
+      baseUsadaHoy = fecha === capital.fecha ? capital.monto : Math.max(0, Math.round(baseParaHoy));
+      if (baseParaHoy < 0) huboFaltante = true;
+      if (!filaExistente || Number(filaExistente.base_inicial) !== baseUsadaHoy) {
+        await supabaseClient.from("caja_diaria").upsert(
+          { user_id: user.id, fecha, base_inicial: baseUsadaHoy, efectivo_final: filaExistente?.efectivo_final ?? null },
+          { onConflict: "user_id,fecha" }
+        );
+        diasActualizados++;
+      }
+    }
+
+    const cobros = cobrosPorFecha[fecha] || 0;
+    const gastosDia = gastosPorFecha[fecha] || 0;
+    const aportesDia = aportesPorFecha[fecha] || 0;
+    const prestado = await calcularDesembolsoReal(prestamosPorFecha[fecha]);
+    baseParaHoy = verificado ? Number(filaExistente.efectivo_final) : baseUsadaHoy + cobros + aportesDia - gastosDia - prestado;
+
+    fecha = sumarDias(fecha, 1);
+  }
+
+  mostrarAlerta(`✅ Caja recalculada: ${diasActualizados} día(s) ajustado(s) desde el ${formatoFecha(capital.fecha)}.${huboFaltante ? " ⚠️ En algún punto el cálculo dio negativo (prestaste/gastaste más efectivo del que había) — revisa esos días." : ""}`);
   cargarCajaDiaria(hoy);
 }
 

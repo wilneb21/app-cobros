@@ -45,7 +45,7 @@ async function cargarGastosDelPeriodo(inicio, fin) {
     ? `<div class="estado-vacio">Sin gastos registrados en este período.</div>`
     : gastos.map(g => `
         <div class="fila-historial">
-          <span>${g.fecha}</span><span>${escaparHtml(g.concepto)}${g.rutas ? ` · 📍 ${escaparHtml(g.rutas.nombre)}` : ""}</span>
+          <span>${formatoFecha(g.fecha)}</span><span>${escaparHtml(g.concepto)}${g.rutas ? ` · 📍 ${escaparHtml(g.rutas.nombre)}` : ""}</span>
           <span>${formatoPesos(g.monto)}</span>
           <span class="btn-borrar-gasto" onclick="eliminarGasto(${g.id})">🗑️</span>
         </div>`).join("");

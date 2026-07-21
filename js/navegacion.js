@@ -16,8 +16,9 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   if (nombre === "cobrar") cargarClientesParaCobrar();
   if (nombre === "cuentas") cargarCuentasPorCobrar();
   if (nombre === "rutas") cargarRutas();
-  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); }
+  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); }
   if (nombre === "reportes") {
+    pintarCapitalInicial();
     cargarReporteMes();
     if (!document.getElementById("gasto-fecha").value) document.getElementById("gasto-fecha").value = obtenerFechaLocal();
     cargarRutasEnSelectorGasto();
@@ -58,6 +59,19 @@ document.addEventListener("keydown", (evento) => {
 function marcarNavActivo(nombre) {
   document.querySelectorAll(".nav-btn, .barra-nav-btn, .btn-accion-flotante").forEach(btn => btn.classList.remove("activo"));
   document.querySelectorAll(`[data-nav="${nombre}"]`).forEach(btn => btn.classList.add("activo"));
+}
+
+// Convierte una fecha guardada como "AAAA-MM-DD" (el formato que usa la base
+// de datos y los <input type="date">) al formato que el cobrador quiere ver
+// en pantalla: "DD/MM/AAAA". Esto NO cambia cómo se guarda la fecha (eso
+// seguiría rompiendo los <input type="date"> y las consultas a Supabase si se
+// tocara) — solo cambia cómo se MUESTRA en listas, tablas y reportes.
+function formatoFecha(fechaTexto) {
+  if (!fechaTexto) return "";
+  const partes = String(fechaTexto).split("-");
+  if (partes.length !== 3) return fechaTexto; // por si ya viene en otro formato, no lo dañamos
+  const [año, mes, dia] = partes;
+  return `${dia}/${mes}/${año}`;
 }
 
 // Suma días de forma segura a una fecha "YYYY-MM-DD" (sin líos de UTC)
