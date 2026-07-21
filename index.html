@@ -313,17 +313,25 @@
         <button class="btn-cerrar-detalle" onclick="cerrarModalNuevoCliente()">✕</button>
       </div>
       <form onsubmit="crearClienteNuevo(event)" class="tarjeta-form">
+        <label class="etiqueta-select">Nombre completo</label>
         <input type="text" id="nuevo-cliente-nombre" placeholder="Nombre completo" required>
-        <input type="text" id="nuevo-cliente-cedula" placeholder="Número de cédula" inputmode="numeric">
-        <input type="text" id="nuevo-cliente-telefono" placeholder="Teléfono">
+        <label class="etiqueta-select">Identificación</label>
+        <div class="fila-identificacion">
+          <select id="nuevo-cliente-tipo-doc">
+            <option value="CC" selected>CC</option>
+            <option value="TI">TI</option>
+            <option value="CE">CE</option>
+            <option value="NIT">NIT</option>
+            <option value="PAS">PAS</option>
+          </select>
+          <input type="text" id="nuevo-cliente-cedula" placeholder="Número de documento" inputmode="numeric">
+        </div>
+        <label class="etiqueta-select">Teléfono / Celular</label>
+        <input type="text" id="nuevo-cliente-telefono" placeholder="Teléfono / Celular">
+        <label class="etiqueta-select">Dirección</label>
         <input type="text" id="nuevo-cliente-direccion" placeholder="Dirección">
+        <label class="etiqueta-select">Notas</label>
         <textarea id="nuevo-cliente-notas" placeholder="Notas (opcional)" rows="2"></textarea>
-        <label class="etiqueta-select">Nivel de riesgo</label>
-        <select id="nuevo-cliente-riesgo">
-          <option value="bueno" selected>🟢 Bueno</option>
-          <option value="regular">🟡 Regular</option>
-          <option value="riesgoso">🔴 Riesgoso</option>
-        </select>
         <label class="etiqueta-select">Ruta</label>
         <select id="nuevo-cliente-ruta" onchange="manejarSeleccionRutaNuevoCliente()">
           <option value="">Sin ruta por ahora</option>

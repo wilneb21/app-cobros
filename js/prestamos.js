@@ -17,13 +17,14 @@ function actualizarVistaPreviaPrestamo() {
   vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
 }
 
-async function cargarClientesEnSelector() {
+async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
   const { data, error } = await supabaseClient.from("clientes").select("id, nombre").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
   const selector = document.getElementById("prestamo-cliente");
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
   data.forEach(c => selector.innerHTML += `<option value="${c.id}">${escaparHtml(c.nombre)}</option>`);
   if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = obtenerFechaLocal();
+  if (clienteSeleccionadoId) selector.value = String(clienteSeleccionadoId);
 }
 
 async function crearPrestamo(event) {
@@ -251,15 +252,19 @@ async function cargarPrestamosDeCliente(clienteId) {
           <span class="badge-estado">${textoMora}</span>
           <strong class="saldo-credito">Cuota ${formatoPesos(p.cuota)}</strong>
         </div>
+        <div class="fila-saldo-restante">
+          <span>Saldo para terminar</span>
+          <b>${formatoPesos(saldoPendiente)}</b>
+        </div>
         <div class="botones-pago">
           <button class="btn-pago pago-si" onclick="registrarPago(${p.id}, ${p.cuota}, 'pago', ${clienteId})">Pagó ✅</button>
           <button class="btn-pago pago-parcial" onclick="abrirRegistrarPago(${p.id}, ${clienteId}, ${montoDebe})">${montoDebe > 0 ? "Registrar pago 💰" : "Parcial ⚠️"}</button>
           <button class="btn-pago pago-no" onclick="registrarPago(${p.id}, 0, 'no_pago', ${clienteId})">No pagó ❌</button>
         </div>
+        <button class="btn-pago-completo" onclick="confirmarPagoCompleto(${p.id}, ${saldoPendiente}, ${clienteId})">💯 Pagar saldo total y terminar</button>
         <p class="link-mas-opciones" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
         <div id="mas-opciones-${p.id}" class="mas-opciones oculto">
           <div class="subinfo-credito">
-            <span>Saldo total: ${formatoPesos(saldoPendiente)}</span>
             <span class="ultimo-registro">${textoUltimo}</span>
             ${textoRacha}
           </div>

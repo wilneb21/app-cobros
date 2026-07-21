@@ -48,6 +48,19 @@ async function registrarPago(prestamoId, monto, estado, clienteId) {
   if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
 }
 
+// --- PAGAR EL SALDO TOTAL DE UN PRÉSTAMO (dar por terminado el crédito) ---
+// Reutiliza registrarPago (mismo camino de guardado offline, recibo, etc.)
+// pero con el saldo restante completo en vez de la cuota, para que el
+// cobrador pueda cerrar un crédito en un solo toque desde "Cobrar".
+async function confirmarPagoCompleto(prestamoId, saldoPendiente, clienteId) {
+  if (!(saldoPendiente > 0)) { mostrarAlerta("Este préstamo ya no tiene saldo pendiente."); return; }
+  const confirmado = await mostrarConfirmacion(
+    `¿Registrar el pago del saldo total de ${formatoPesos(saldoPendiente)} y dar por terminado este préstamo?`
+  );
+  if (!confirmado) return;
+  await registrarPago(prestamoId, saldoPendiente, "pago", clienteId);
+}
+
 // --- REGISTRAR PAGO (flujo único para parcial / ponerse al día) ---
 // Antes existían dos caminos separados para lo mismo: "Parcial" (monto libre,
 // sin contexto de cuánto se debe) y "Ponerse al día" (precargaba el total

@@ -1,6 +1,64 @@
 let clientesCache = [];
 let mostrandoArchivados = false;
 
+// --- NIVEL DE RIESGO AUTOMÁTICO ---
+// Ya no se elige a mano: se calcula solo según cuántas CUOTAS lleva atrasadas
+// el cliente en su(s) préstamo(s) activo(s) (no días). Hasta 6 cuotas
+// atrasadas (incluye estar al día) = Bueno. Entre 7 y 12 cuotas atrasadas =
+// Regular. Más de 12 cuotas atrasadas = Riesgoso. Un cliente sin crédito
+// activo (nunca tuvo uno, o los tiene todos pagados) se considera Bueno.
+const UMBRAL_CUOTAS_REGULAR = 6;
+const UMBRAL_CUOTAS_MALO = 12;
+
+function cuotasAtrasadasPrestamo(p, totalPagado) {
+  const hoy = obtenerFechaLocal();
+  const hoyDate = new Date(hoy + "T00:00:00");
+  const fechaInicio = new Date(p.fecha_inicio + "T00:00:00");
+  const dias = Math.floor((hoyDate - fechaInicio) / (1000 * 60 * 60 * 24));
+  let cuotasEsperadas = p.frecuencia === "diario" ? dias + 1 : Math.floor(dias / 7) + 1;
+  cuotasEsperadas = Math.min(cuotasEsperadas, p.numero_cuotas);
+  const cuotasPagadas = Math.floor(totalPagado / Number(p.cuota));
+  return Math.max(cuotasEsperadas - cuotasPagadas, 0);
+}
+
+function nivelRiesgoDesdeCuotasAtrasadas(cuotasAtrasadas) {
+  if (cuotasAtrasadas > UMBRAL_CUOTAS_MALO) return "riesgoso";
+  if (cuotasAtrasadas > UMBRAL_CUOTAS_REGULAR) return "regular";
+  return "bueno";
+}
+
+// Calcula de una sola vez el riesgo de TODOS los clientes con crédito activo
+// (dos consultas en total, no una por cliente) y lo deja en caché para que
+// pintarClientesLista lo use sin volver a consultar la base de datos.
+let riesgoClientesCache = {};
+
+async function calcularRiesgoTodosClientes() {
+  const { data: prestamos } = await supabaseClient.from("prestamos")
+    .select("id, cliente_id, cuota, frecuencia, fecha_inicio, numero_cuotas").eq("estado", "activo");
+  const ids = (prestamos || []).map(p => p.id);
+  const { data: pagos } = ids.length
+    ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids)
+    : { data: [] };
+  const pagadoPorPrestamo = {};
+  (pagos || []).forEach(pg => pagadoPorPrestamo[pg.prestamo_id] = (pagadoPorPrestamo[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
+
+  const peorCuotasPorCliente = {};
+  (prestamos || []).forEach(p => {
+    const atraso = cuotasAtrasadasPrestamo(p, pagadoPorPrestamo[p.id] || 0);
+    if (!(p.cliente_id in peorCuotasPorCliente) || atraso > peorCuotasPorCliente[p.cliente_id]) peorCuotasPorCliente[p.cliente_id] = atraso;
+  });
+
+  riesgoClientesCache = {};
+  Object.keys(peorCuotasPorCliente).forEach(clienteId => {
+    riesgoClientesCache[clienteId] = nivelRiesgoDesdeCuotasAtrasadas(peorCuotasPorCliente[clienteId]);
+  });
+  return riesgoClientesCache;
+}
+
+function obtenerRiesgoCliente(clienteId) {
+  return riesgoClientesCache[clienteId] || "bueno";
+}
+
 async function cargarClientes() {
   mostrarCargando("lista-clientes");
   const { data, error } = await supabaseClient
@@ -10,6 +68,7 @@ async function cargarClientes() {
   if (error) { mostrarAlerta("No fue posible cargar los clientes."); return; }
   data.sort(compararClientesPorRutaYOrden);
   clientesCache = data;
+  await calcularRiesgoTodosClientes();
   pintarClientesLista(data);
 }
 
@@ -121,12 +180,12 @@ function pintarClientesLista(data) {
       contenedor.innerHTML += `<div class="grupo-ruta-titulo">📍 ${nombreRuta ? escaparHtml(nombreRuta) : "Sin ruta asignada"}</div>`;
       rutaAnterior = nombreRuta;
     }
-    const riesgo = cliente.riesgo || "bueno";
+    const riesgo = obtenerRiesgoCliente(cliente.id);
     const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
     contenedor.innerHTML += `
       <div class="tarjeta cliente-clickable" onclick="abrirDetalleCliente(${cliente.id})">
         <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
-        ${cliente.cedula ? `<span>🪪 C.C. ${escaparHtml(cliente.cedula)}</span><br>` : ""}
+        ${cliente.cedula ? `<span>🪪 ${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)}</span><br>` : ""}
         <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
       </div>`;
   });
@@ -154,11 +213,11 @@ function armarNumeroWhatsapp(telefono) {
 // --- CREAR CLIENTE DIRECTO (modal desde la pestaña Clientes) ---
 async function abrirModalNuevoCliente() {
   document.getElementById("nuevo-cliente-nombre").value = "";
+  document.getElementById("nuevo-cliente-tipo-doc").value = "CC";
   document.getElementById("nuevo-cliente-cedula").value = "";
   document.getElementById("nuevo-cliente-telefono").value = "";
   document.getElementById("nuevo-cliente-direccion").value = "";
   document.getElementById("nuevo-cliente-notas").value = "";
-  document.getElementById("nuevo-cliente-riesgo").value = "bueno";
 
   await cargarRutasEnSelectorNuevoCliente();
 
@@ -203,11 +262,11 @@ async function crearClienteNuevo(event) {
     return;
   }
   const nombre = document.getElementById("nuevo-cliente-nombre").value.trim();
+  const tipoDocumento = document.getElementById("nuevo-cliente-tipo-doc").value;
   const cedula = document.getElementById("nuevo-cliente-cedula").value.trim();
   const telefono = document.getElementById("nuevo-cliente-telefono").value.trim();
   const direccion = document.getElementById("nuevo-cliente-direccion").value.trim();
   const notas = document.getElementById("nuevo-cliente-notas").value.trim();
-  const riesgo = document.getElementById("nuevo-cliente-riesgo").value;
   const rutaId = document.getElementById("nuevo-cliente-ruta").value;
   if (!nombre) { mostrarAlerta("El nombre del cliente es obligatorio."); return; }
 
@@ -241,7 +300,7 @@ async function crearClienteNuevo(event) {
 
   const user = await obtenerUsuarioActual();
   const { error } = await supabaseClient.from("clientes").insert({
-    nombre, cedula, telefono, direccion, notas, riesgo, ruta_id: rutaId || null, user_id: user.id, archivado: false
+    nombre, cedula, tipo_documento: tipoDocumento, telefono, direccion, notas, riesgo: "bueno", ruta_id: rutaId || null, user_id: user.id, archivado: false
   });
   if (error) { mostrarAlerta("No fue posible crear el cliente: " + traducirErrorSupabase(error)); return; }
 
@@ -282,7 +341,6 @@ function cambiarTabDetalle(tab) {
 
 async function pintarTabInfo(cliente) {
   const telefonoLimpio = (cliente.telefono || "").replace(/\D/g, "");
-  const riesgo = cliente.riesgo || "bueno";
 
   const { count } = await supabaseClient
     .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", cliente.id);
@@ -298,6 +356,11 @@ async function pintarTabInfo(cliente) {
   (pagosActivos || []).forEach(pago => pagadoPorPrestamo[pago.prestamo_id] = (pagadoPorPrestamo[pago.prestamo_id] || 0) + Number(pago.monto_pagado));
   const saldoActivo = (activos || []).reduce((total, prestamo) => total + calcularSaldoPendiente(prestamo, pagadoPorPrestamo[prestamo.id] || 0), 0);
   const proximaCuota = (activos || []).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio))[0];
+  // Nivel de riesgo automático: la peor cantidad de cuotas atrasadas entre
+  // todos los créditos activos del cliente (0 si no tiene ninguno activo).
+  const cuotasAtrasadasCliente = (activos || []).reduce((peor, p) => Math.max(peor, cuotasAtrasadasPrestamo(p, pagadoPorPrestamo[p.id] || 0)), 0);
+  const riesgo = nivelRiesgoDesdeCuotasAtrasadas(cuotasAtrasadasCliente);
+  const etiquetaRiesgo = { bueno: "🟢 Bueno", regular: "🟡 Regular", riesgoso: "🔴 Riesgoso" }[riesgo];
   // Antes esta sugerencia se calculaba y mostraba siempre, aunque el cliente
   // ya tuviera un crédito activo y el cobrador no estuviera pensando en
   // prestarle de nuevo. Ahora solo aparece cuando de verdad podría servir:
@@ -305,20 +368,31 @@ async function pintarTabInfo(cliente) {
   const sugerenciaCupo = (!activos || activos.length === 0) ? await calcularSugerenciaCupo(cliente.id, riesgo) : null;
 
   document.getElementById("tab-info").innerHTML = `
-    ${activos?.length ? `<div class="resumen-cliente-operativo"><div><small>Saldo activo</small><b>${formatoPesos(saldoActivo)}</b></div><div><small>Créditos activos</small><b>${activos.length}</b></div><div><small>Cuota siguiente</small><b>${formatoPesos(proximaCuota.cuota)}</b></div></div>` : `<div class="resumen-cliente-operativo sin-credito"><span>Sin créditos activos</span><button type="button" onclick="abrirPrestamoParaCliente(${cliente.id})">Crear préstamo</button></div>`}
+    <div class="badge-riesgo-cliente badge-riesgo-${riesgo}">Nivel de riesgo: ${etiquetaRiesgo}${cuotasAtrasadasCliente > 0 ? ` · ${cuotasAtrasadasCliente} cuota${cuotasAtrasadasCliente > 1 ? "s" : ""} atrasada${cuotasAtrasadasCliente > 1 ? "s" : ""}` : ""}</div>
+    ${activos?.length ? `<div class="resumen-cliente-operativo"><div><small>Saldo activo</small><b>${formatoPesos(saldoActivo)}</b></div><div><small>Créditos activos</small><b>${activos.length}</b></div><div><small>Cuota siguiente</small><b>${formatoPesos(proximaCuota.cuota)}</b></div></div>
+       <button type="button" class="btn-nuevo-prestamo-adicional" onclick="abrirPrestamoParaCliente(${cliente.id})">+ Nuevo préstamo para este cliente</button>`
+     : `<div class="resumen-cliente-operativo sin-credito"><span>Sin créditos activos</span><button type="button" onclick="abrirPrestamoParaCliente(${cliente.id})">Crear préstamo</button></div>`}
     ${sugerenciaCupo ? `<div class="sugerencia-cupo">💡 <b>Cupo sugerido: ${formatoPesos(sugerenciaCupo.monto)}</b>${escaparHtml(sugerenciaCupo.razon)}</div>` : ""}
     <form onsubmit="guardarEdicionCliente(event, ${cliente.id})" class="tarjeta-form">
+      <label class="etiqueta-select">Nombre completo</label>
       <input type="text" id="editar-nombre" value="${escaparHtml(cliente.nombre)}" required>
-      <input type="text" id="editar-cedula" value="${escaparHtml(cliente.cedula || "")}" placeholder="Número de cédula" inputmode="numeric">
-      <input type="text" id="editar-telefono" value="${escaparHtml(cliente.telefono || "")}" placeholder="Teléfono">
+      <label class="etiqueta-select">Identificación</label>
+      <div class="fila-identificacion">
+        <select id="editar-tipo-doc">
+          <option value="CC" ${(cliente.tipo_documento || "CC") === "CC" ? "selected" : ""}>CC</option>
+          <option value="TI" ${cliente.tipo_documento === "TI" ? "selected" : ""}>TI</option>
+          <option value="CE" ${cliente.tipo_documento === "CE" ? "selected" : ""}>CE</option>
+          <option value="NIT" ${cliente.tipo_documento === "NIT" ? "selected" : ""}>NIT</option>
+          <option value="PAS" ${cliente.tipo_documento === "PAS" ? "selected" : ""}>PAS</option>
+        </select>
+        <input type="text" id="editar-cedula" value="${escaparHtml(cliente.cedula || "")}" placeholder="Número de documento" inputmode="numeric">
+      </div>
+      <label class="etiqueta-select">Teléfono / Celular</label>
+      <input type="text" id="editar-telefono" value="${escaparHtml(cliente.telefono || "")}" placeholder="Teléfono / Celular">
+      <label class="etiqueta-select">Dirección</label>
       <input type="text" id="editar-direccion" value="${escaparHtml(cliente.direccion || "")}" placeholder="Dirección">
+      <label class="etiqueta-select">Notas</label>
       <textarea id="editar-notas" rows="2" placeholder="Notas">${escaparHtml(cliente.notas || "")}</textarea>
-      <label class="etiqueta-select">Nivel de riesgo</label>
-      <select id="editar-riesgo">
-        <option value="bueno" ${riesgo === "bueno" ? "selected" : ""}>🟢 Bueno</option>
-        <option value="regular" ${riesgo === "regular" ? "selected" : ""}>🟡 Regular</option>
-        <option value="riesgoso" ${riesgo === "riesgoso" ? "selected" : ""}>🔴 Riesgoso</option>
-      </select>
       <button type="submit" class="btn-editar-cliente">💾 Guardar cambios</button>
     </form>
     ${telefonoLimpio ? `<button class="btn-whatsapp" onclick="window.open('https://wa.me/${armarNumeroWhatsapp(cliente.telefono)}')">💬 Enviar WhatsApp</button>` : ""}
@@ -344,27 +418,21 @@ async function abrirMapaCliente(clienteId) {
 
 function abrirPrestamoParaCliente(clienteId) {
   cerrarDetalleCliente();
-  mostrarSeccion("prestamos");
-  const seleccionar = () => {
-    const selector = document.getElementById("prestamo-cliente");
-    if (!selector.querySelector(`option[value="${clienteId}"]`)) return setTimeout(seleccionar, 100);
-    selector.value = String(clienteId);
-  };
-  seleccionar();
+  mostrarSeccion("prestamos", false, { clienteId });
 }
 
 async function guardarEdicionCliente(event, clienteId) {
   event.preventDefault();
   if (!requiereConexion()) return;
   const nombre = document.getElementById("editar-nombre").value.trim();
+  const tipoDocumento = document.getElementById("editar-tipo-doc").value;
   const cedula = document.getElementById("editar-cedula").value.trim();
   const telefono = document.getElementById("editar-telefono").value.trim();
   const direccion = document.getElementById("editar-direccion").value.trim();
   const notas = document.getElementById("editar-notas").value.trim();
-  const riesgo = document.getElementById("editar-riesgo").value;
   if (!nombre) return mostrarAlerta("El nombre del cliente es obligatorio.");
 
-  const { error } = await supabaseClient.from("clientes").update({ nombre, cedula, telefono, direccion, notas, riesgo }).eq("id", clienteId);
+  const { error } = await supabaseClient.from("clientes").update({ nombre, cedula, tipo_documento: tipoDocumento, telefono, direccion, notas }).eq("id", clienteId);
   if (error) { mostrarAlerta("Error al guardar: " + traducirErrorSupabase(error)); return; }
 
   mostrarAlerta("✅ Cambios guardados");
@@ -402,7 +470,7 @@ async function exportarEstadoCuentaPDF(clienteId) {
     <body style="font-family:Arial,sans-serif;padding:24px;">
       <h1>Estado de cuenta</h1>
       <h2>${escaparHtml(cliente.nombre)}</h2>
-      <p>${cliente.cedula ? `C.C. ${escaparHtml(cliente.cedula)} | ` : ""}Teléfono: ${escaparHtml(cliente.telefono || "N/A")} | Dirección: ${escaparHtml(cliente.direccion || "N/A")}</p>
+      <p>${cliente.cedula ? `${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)} | ` : ""}Teléfono: ${escaparHtml(cliente.telefono || "N/A")} | Dirección: ${escaparHtml(cliente.direccion || "N/A")}</p>
       <hr>
       ${filasPrestamos || "<p>Sin préstamos registrados.</p>"}
     </body></html>
@@ -490,32 +558,120 @@ async function desarchivarCliente(clienteId) {
   cargarClientes();
 }
 
+// --- Pestaña "Préstamos" del detalle de cliente ---
+// A diferencia de la pestaña "Cobrar" (que muestra botones de Pagó/Parcial/No
+// pagó para registrar el cobro del día), esta vista es solo de consulta: el
+// préstamo activo del cliente desde su fecha de inicio, con el historial
+// completo de pagos de ESE préstamo y cuánto le falta para terminarlo. No
+// reutiliza cargarPrestamosDeCliente (esa sigue siendo la de "Cobrar") para
+// no arriesgar romper el flujo de cobro diario.
 async function pintarTabPrestamos() {
-  document.getElementById("tab-prestamos").innerHTML = `<div id="prestamos-cliente-${clienteDetalleActualId}">Cargando...</div>`;
-  cargarPrestamosDeCliente(clienteDetalleActualId);
+  const contenedor = document.getElementById("tab-prestamos");
+  contenedor.innerHTML = "Cargando...";
+
+  const { data: activos, error } = await supabaseClient
+    .from("prestamos").select("*").eq("cliente_id", clienteDetalleActualId).eq("estado", "activo")
+    .order("fecha_inicio", { ascending: false });
+  if (error) { contenedor.textContent = "No fue posible cargar el préstamo."; return; }
+
+  if (!activos || activos.length === 0) {
+    contenedor.innerHTML = `<div class="estado-vacio">Este cliente no tiene ningún préstamo activo por ahora.</div>`;
+    return;
+  }
+
+  const idsActivos = activos.map(p => p.id);
+  const { data: pagos } = await supabaseClient
+    .from("pagos").select("*").in("prestamo_id", idsActivos).order("fecha_pago", { ascending: false });
+  const pagosPorPrestamo = {};
+  (pagos || []).forEach(pg => (pagosPorPrestamo[pg.prestamo_id] = pagosPorPrestamo[pg.prestamo_id] || []).push(pg));
+
+  const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
+
+  contenedor.innerHTML = activos.map(p => {
+    const pagosPrestamo = pagosPorPrestamo[p.id] || [];
+    const totalPagado = pagosPrestamo.reduce((s, pg) => s + Number(pg.monto_pagado), 0);
+    const totalConInteres = calcularTotalConInteres(p.monto_prestado, p.interes_porcentaje);
+    const saldoRestante = calcularSaldoPendiente(p, totalPagado);
+
+    return `
+      <div class="tarjeta-prestamo-actual">
+        <strong>Préstamo activo desde el ${p.fecha_inicio}</strong>
+        <div class="detalle-prestamo-grid">
+          <div><small>Monto prestado</small><b>${formatoPesos(p.monto_prestado)}</b></div>
+          <div><small>Interés</small><b>${p.interes_porcentaje}%</b></div>
+          <div><small>Total a pagar</small><b>${formatoPesos(totalConInteres + (Number(p.mora_acumulada) || 0))}</b></div>
+          <div><small>Pagado hasta hoy</small><b>${formatoPesos(totalPagado)}</b></div>
+          <div class="dato-saldo-restante"><small>Saldo para terminar</small><b>${formatoPesos(saldoRestante)}</b></div>
+          <div><small>Cuota</small><b>${formatoPesos(p.cuota)} · ${p.frecuencia}</b></div>
+        </div>
+        <div class="subtitulo-historial-prestamo">Historial de pagos de este préstamo</div>
+        ${pagosPrestamo.length === 0
+          ? '<p class="texto-ayuda">Sin pagos registrados todavía.</p>'
+          : pagosPrestamo.map(pg => `
+              <div class="fila-historial">
+                <span>${pg.fecha_pago}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
+                <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
+              </div>`).join("")}
+      </div>`;
+  }).join("");
 }
 
+// --- Pestaña "Historial" del detalle de cliente ---
+// Antes mostraba todos los pagos de todos los préstamos mezclados en una
+// sola lista, sin decir a qué préstamo pertenecía cada uno. Ahora se agrupa
+// por préstamo: fecha de inicio, fecha en que terminó (o "En curso"/
+// "Refinanciado" si no ha terminado), monto prestado + interés, y debajo el
+// detalle de pagos de ese préstamo.
 async function pintarTabHistorial() {
-  const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id").eq("cliente_id", clienteDetalleActualId);
+  const { data: prestamos, error } = await supabaseClient.from("prestamos")
+    .select("id, fecha_inicio, monto_prestado, interes_porcentaje, estado")
+    .eq("cliente_id", clienteDetalleActualId)
+    .order("fecha_inicio", { ascending: false });
   if (error) { document.getElementById("tab-historial").textContent = "No fue posible cargar el historial."; return; }
-  const idsPrestamos = prestamos.map(p => p.id);
 
-  if (idsPrestamos.length === 0) {
+  if (prestamos.length === 0) {
     document.getElementById("tab-historial").innerHTML = "<p>Sin historial todavía.</p>";
     return;
   }
 
+  const idsPrestamos = prestamos.map(p => p.id);
   const { data: pagos } = await supabaseClient
     .from("pagos").select("*").in("prestamo_id", idsPrestamos).order("fecha_pago", { ascending: false });
 
+  const pagosPorPrestamo = {};
+  (pagos || []).forEach(pg => (pagosPorPrestamo[pg.prestamo_id] = pagosPorPrestamo[pg.prestamo_id] || []).push(pg));
+
   const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌" };
-  document.getElementById("tab-historial").innerHTML = pagos.length === 0
-    ? "<p>Sin pagos registrados todavía.</p>"
-    : pagos.map(p => `
-        <div class="fila-historial">
-          <span>${p.fecha_pago}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span>
-          <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${p.id})">🗑️</span>
-        </div>`).join("");
+  const etiquetaEstadoPrestamo = { activo: "🟢 En curso", pagado: "✅ Terminado", refinanciado: "🔄 Refinanciado" };
+
+  document.getElementById("tab-historial").innerHTML = prestamos.map(p => {
+    const pagosPrestamo = pagosPorPrestamo[p.id] || [];
+    // pagosPrestamo viene ordenado de más reciente a más antiguo: el primero
+    // es la fecha del último pago, que usamos como "fecha en que terminó"
+    // cuando el préstamo ya no está activo.
+    const fechaFin = p.estado === "activo" ? "En curso" : (pagosPrestamo[0] ? pagosPrestamo[0].fecha_pago : "—");
+    const totalConInteres = calcularTotalConInteres(p.monto_prestado, p.interes_porcentaje);
+
+    return `
+      <div class="grupo-prestamo-historial">
+        <div class="cabecera-prestamo-historial">
+          <strong>Préstamo del ${p.fecha_inicio}${p.estado !== "activo" ? ` al ${fechaFin}` : ""}</strong>
+          <span class="etiqueta-estado-prestamo">${etiquetaEstadoPrestamo[p.estado] || escaparHtml(p.estado)}</span>
+        </div>
+        <div class="datos-prestamo-historial">
+          <span>Monto: ${formatoPesos(p.monto_prestado)}</span>
+          <span>Interés: ${p.interes_porcentaje}%</span>
+          <span>Total con interés: ${formatoPesos(totalConInteres)}</span>
+        </div>
+        ${pagosPrestamo.length === 0
+          ? '<p class="texto-ayuda">Sin pagos registrados en este préstamo.</p>'
+          : pagosPrestamo.map(pg => `
+              <div class="fila-historial">
+                <span>${pg.fecha_pago}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
+                <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
+              </div>`).join("")}
+      </div>`;
+  }).join("");
 }
 
 // Igual que eliminarPago() en pagos.js, pero llamado desde la pestaña

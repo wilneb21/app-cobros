@@ -368,13 +368,14 @@ async function exportarExcel(evento) {
     await cargarLibreriaExcel();
 
     const [clientes, prestamos, pagos, gastos] = await Promise.all([
-      supabaseClient.from("clientes").select("nombre, telefono, direccion, riesgo, archivado, rutas(nombre)").order("nombre"),
+      supabaseClient.from("clientes").select("id, nombre, telefono, direccion, archivado, rutas(nombre)").order("nombre"),
       supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, estado, prestamo_anterior_id, clientes(nombre)").order("fecha_inicio", { ascending: false }),
       supabaseClient.from("pagos").select("fecha_pago, monto_pagado, estado, prestamos(interes_porcentaje, clientes(nombre))").order("fecha_pago", { ascending: false }),
       supabaseClient.from("gastos").select("fecha, concepto, monto").order("fecha", { ascending: false })
     ]);
     const conError = [clientes, prestamos, pagos, gastos].find(r => r.error);
     if (conError) { mostrarAlerta("No fue posible exportar a Excel: " + traducirErrorSupabase(conError.error)); return; }
+    await calcularRiesgoTodosClientes();
 
     const etiquetasEstado = { pago: "Pagó", parcial: "Parcial", no_pago: "No pagó" };
     const etiquetasRiesgo = { bueno: "Bueno", regular: "Regular", riesgoso: "Riesgoso" };
@@ -383,7 +384,7 @@ async function exportarExcel(evento) {
     XLSX.utils.book_append_sheet(libro, construirHojaEstilizada(
       (clientes.data || []).map(c => ({
         nombre: c.nombre, telefono: c.telefono || "", direccion: c.direccion || "",
-        ruta: c.rutas?.nombre || "sin ruta", riesgo: etiquetasRiesgo[c.riesgo] || "Bueno", archivado: c.archivado ? "Sí" : "No"
+        ruta: c.rutas?.nombre || "sin ruta", riesgo: etiquetasRiesgo[obtenerRiesgoCliente(c.id)] || "Bueno", archivado: c.archivado ? "Sí" : "No"
       })),
       [{ header: "Nombre", key: "nombre", ancho: 24 }, { header: "Teléfono", key: "telefono", ancho: 16 },
        { header: "Dirección", key: "direccion", ancho: 28 }, { header: "Ruta", key: "ruta", ancho: 18 },

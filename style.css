@@ -168,6 +168,11 @@ button.secundario {
   flex-direction: column;
 }
 
+.fila-identificacion { display: flex; gap: 8px; }
+.fila-identificacion select { flex: 0 0 78px; }
+.fila-identificacion input { flex: 1; min-width: 0; }
+
+
 .seccion form:not(.tarjeta-form) {
   display: flex;
   flex-direction: column;
@@ -1059,6 +1064,15 @@ button { border-radius: 13px; box-shadow: 0 5px 12px rgba(64,86,214,.16); }
 .nav-links .nav-btn:nth-of-type(2) .nav-icon { color: #f97316; }.nav-links .nav-btn:nth-of-type(3) .nav-icon { color: #8b5cf6; }
 .barra-meta-relleno { background: linear-gradient(90deg, #4056d6, #8b5cf6); }.fila-agenda.agenda-hoy { border-left-color: #f97316; background: #fff7ed; }
 .btn-mapa { background: #8b5cf6; }.btn-whatsapp { background: #4056d6; }.btn-respaldo { background: linear-gradient(135deg, #334155, #475569); }
+.btn-nuevo-prestamo-adicional { background: #0f9f91; margin-bottom: 10px; }
+
+.badge-riesgo-cliente { padding: 9px 13px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+.badge-riesgo-bueno { background: #e5f7ee; color: #0e7d43; }
+.badge-riesgo-regular { background: #fff6de; color: #92650a; }
+.badge-riesgo-riesgoso { background: #fdeaea; color: #b3261e; }
+body.modo-oscuro .badge-riesgo-bueno { background: #103524; color: #6ee0a5; }
+body.modo-oscuro .badge-riesgo-regular { background: #3a2f10; color: #f2cc6b; }
+body.modo-oscuro .badge-riesgo-riesgoso { background: #3a1414; color: #f19c95; }
 
 .texto-ayuda-export {
   font-size: 12px;
@@ -1244,3 +1258,94 @@ body.modo-oscuro .sugerencia-cupo b { color: #ddd6fe; }
 .comparar-rutas-fila .mora-alta { color: var(--danger); font-weight: 700; }
 .comparar-rutas-fila .mora-baja { color: var(--success); font-weight: 700; }
 body.modo-oscuro .comparar-rutas-fila { border-color: #35514d; }
+
+/* --- Saldo restante visible en la pestaña Cobrar + botón de pago total --- */
+.fila-saldo-restante {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.fila-saldo-restante b { color: var(--primary-dark); }
+body.modo-oscuro .fila-saldo-restante b { color: #c7d2fe; }
+
+.btn-pago-completo {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: var(--primary-dark);
+}
+
+/* --- Pestaña Clientes > Préstamos: solo el préstamo actual --- */
+.tarjeta-prestamo-actual {
+  background: var(--card);
+  border: 1px solid #eee;
+  border-left: 5px solid var(--primary);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+body.modo-oscuro .tarjeta-prestamo-actual { border-color: #34384d; border-left-color: var(--primary); }
+
+.detalle-prestamo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+}
+.detalle-prestamo-grid > div {
+  padding: 8px;
+  background: #effaf8;
+  border: 1px solid #d7ebe7;
+  border-radius: 10px;
+  text-align: center;
+}
+.detalle-prestamo-grid small { display: block; color: #6a8580; font-size: 9px; }
+.detalle-prestamo-grid b { display: block; margin-top: 3px; color: #08776d; font-size: 13px; }
+.detalle-prestamo-grid .dato-saldo-restante b { color: #b3261e; }
+body.modo-oscuro .detalle-prestamo-grid > div { background: #213d38; border-color: #35514d; }
+
+.subtitulo-historial-prestamo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 6px 0 4px;
+}
+
+/* --- Pestaña Clientes > Historial: agrupado por préstamo --- */
+.grupo-prestamo-historial {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+body.modo-oscuro .grupo-prestamo-historial { border-color: #34384d; }
+
+.cabecera-prestamo-historial {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.etiqueta-estado-prestamo {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.datos-prestamo-historial {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}

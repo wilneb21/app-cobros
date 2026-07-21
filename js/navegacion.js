@@ -5,14 +5,14 @@
 
 let periodoInicioActivo = "hoy";
 
-function mostrarSeccion(nombre, desdeHistorial = false) {
+function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   document.querySelectorAll(".seccion").forEach(sec => sec.classList.add("oculto"));
   document.getElementById("seccion-" + nombre).classList.remove("oculto");
   marcarNavActivo(nombre);
 
   if (nombre === "inicio") { cargarResumenDia(); cargarGraficoSemana(); cargarCajaDiaria(obtenerFechaLocal()); cargarTendenciaCobro(); cargarAgendaVencimientos(); cargarGananciaInicio(); }
   if (nombre === "clientes") cargarClientes();
-  if (nombre === "prestamos") cargarClientesEnSelector();
+  if (nombre === "prestamos") cargarClientesEnSelector(opciones.clienteId || "");
   if (nombre === "cobrar") cargarClientesParaCobrar();
   if (nombre === "cuentas") cargarCuentasPorCobrar();
   if (nombre === "rutas") cargarRutas();
