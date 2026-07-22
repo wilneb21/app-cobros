@@ -387,7 +387,7 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
     totalCobradoHoy += f.cobradoHoy; totalUtilidadHoy += f.utilidadHoy; totalFaltante += f.saldoPendiente;
 
     return `
-      <div class="subtarjeta fila-cliente-dia ${clases[f.estado] || ""}" ${f.clienteId ? `onclick="abrirDetalleCliente(${f.clienteId})"` : ""}>
+      <div class="subtarjeta fila-cliente-dia ${clases[f.estado] || ""}" ${f.clienteId ? `role="button" tabindex="0" onclick="abrirDetalleCliente(${f.clienteId})"` : ""}>
         <div class="fila-resumen-credito">
           <span class="nombre-cliente-dia">${escaparHtml(f.nombre)}</span>
           <span class="badge-estado">${etiquetas[f.estado] || escaparHtml(f.estado)}</span>

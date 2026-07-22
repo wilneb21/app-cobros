@@ -140,8 +140,8 @@ function pintarHistorial(prestamoId, clienteId, limite) {
 
   const visibles = limite ? pagos.slice(0, limite) : pagos;
   const restantes = limite ? pagos.length - visibles.length : 0;
-  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${formatoFecha(p.fecha_pago)}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span><span class="btn-borrar-pago" onclick="eliminarPago(${p.id}, ${prestamoId}, ${clienteId})">🗑️</span></div>`).join("")
-    + (restantes > 0 ? `<p class="link-ver-mas-historial" onclick="pintarHistorial(${prestamoId}, ${clienteId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
+  contenedor.innerHTML = visibles.map(p => `<div class="fila-historial"><span>${formatoFecha(p.fecha_pago)}</span><span>${etiquetas[p.estado]}</span><span>${formatoPesos(p.monto_pagado)}</span><span class="btn-borrar-pago" role="button" tabindex="0" aria-label="Eliminar pago" onclick="eliminarPago(${p.id}, ${prestamoId}, ${clienteId})">🗑️</span></div>`).join("")
+    + (restantes > 0 ? `<p class="link-ver-mas-historial" role="button" tabindex="0" onclick="pintarHistorial(${prestamoId}, ${clienteId}, null)">Ver los ${restantes} pagos anteriores</p>` : "");
 }
 
 // --- CORREGIR UN PAGO MAL REGISTRADO ---

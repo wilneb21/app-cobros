@@ -56,6 +56,22 @@ body {
 
 .oculto { display: none !important; }
 
+/* Oculta visualmente pero deja disponible para lectores de pantalla — para
+   poner <label> reales en campos donde el diseño ya usa el placeholder como
+   etiqueta visible, sin cambiar cómo se ve la app. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+
 input, select, textarea {
   width: 100%;
   padding: 13px;
@@ -71,6 +87,32 @@ input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--primary);
   background: white;
+}
+
+/* --- FOCO VISIBLE PARA NAVEGACIÓN POR TECLADO ---
+   Antes ningún botón mostraba dónde estabas parado al moverte con Tab (los
+   inputs sí, pero muy sutil). Esto afecta a cualquiera que no use el dedo/
+   mouse: teclado, switch, control por voz, etc. Se usa :focus-visible (no
+   :focus) para que el resalte solo aparezca al navegar con teclado, no al
+   tocar o hacer clic — así no cambia el look habitual de la app. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+body.modo-oscuro a:focus-visible,
+body.modo-oscuro button:focus-visible,
+body.modo-oscuro input:focus-visible,
+body.modo-oscuro select:focus-visible,
+body.modo-oscuro textarea:focus-visible,
+body.modo-oscuro [tabindex]:focus-visible {
+  outline-color: #8fa3ff;
 }
 
 textarea {
@@ -1572,7 +1614,6 @@ body.modo-oscuro .tabla-libro-diario-envoltura { border-color: #34384d; }
 }
 body.modo-oscuro .badge-contador { background: rgba(15,159,145,.22); color: #6be0cf; }
 
-.bloque-clientes-mora { margin-top: 4px; }
 .recargo-mora-aplicado {
   display: block;
   margin-top: 6px;

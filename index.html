@@ -31,11 +31,11 @@
       <div class="bloqueo-logo">🔒</div>
       <h2>App bloqueada</h2>
       <p class="texto-ayuda">Escribe tu PIN para continuar</p>
-      <input type="password" id="bloqueo-pin-input" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••" onkeydown="if(event.key==='Enter') verificarPinBloqueo()">
+      <input type="password" id="bloqueo-pin-input" aria-label="PIN de acceso" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••" onkeydown="if(event.key==='Enter') verificarPinBloqueo()">
       <p id="bloqueo-error" class="bloqueo-error"></p>
       <button type="button" class="btn-bloqueo-entrar" onclick="verificarPinBloqueo()">Entrar</button>
       <button type="button" id="btn-bloqueo-huella" class="btn-bloqueo-huella oculto" onclick="intentarDesbloqueoBiometrico(false)">👆 Usar huella / Face ID</button>
-      <p class="link-olvide" onclick="olvidoPinBloqueo()">¿Olvidaste tu PIN?</p>
+      <p class="link-olvide" role="button" tabindex="0" onclick="olvidoPinBloqueo()">¿Olvidaste tu PIN?</p>
     </div>
   </div>
 
@@ -43,11 +43,11 @@
     <div class="logo-login">💰</div>
     <h1>App de Cobros</h1>
     <p class="subtitulo">Gestiona tus créditos y rutas de cobro</p>
-    <input type="email" id="email" placeholder="Correo electrónico">
-    <input type="password" id="password" placeholder="Contraseña">
+    <input type="email" id="email" aria-label="Correo electrónico" placeholder="Correo electrónico">
+    <input type="password" id="password" aria-label="Contraseña" placeholder="Contraseña">
     <button onclick="iniciarSesion()">Entrar</button>
     <button onclick="abrirModalCrearCuenta()" class="secundario">Crear cuenta nueva</button>
-    <p class="link-olvide" onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</p>
+    <p class="link-olvide" role="button" tabindex="0" onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</p>
     <p id="mensaje-error"></p>
   </div>
 
@@ -56,9 +56,9 @@
     <header class="top-bar">
       <h2>💰 App de Cobros</h2>
       <div class="top-bar-acciones">
-        <button id="indicador-offline" class="btn-icono indicador-offline oculto" onclick="sincronizarColaOffline(false)" title="Tocar para sincronizar ahora">⏳</button>
-        <button onclick="abrirBusquedaGlobal()" class="btn-icono">🔍</button>
-        <button onclick="toggleModoOscuro()" class="btn-icono">🌙</button>
+        <button id="indicador-offline" class="btn-icono indicador-offline oculto" onclick="sincronizarColaOffline(false)" title="Tocar para sincronizar ahora" aria-label="Sincronizar pagos pendientes">⏳</button>
+        <button onclick="abrirBusquedaGlobal()" class="btn-icono" aria-label="Buscar cliente">🔍</button>
+        <button onclick="toggleModoOscuro()" class="btn-icono" id="btn-modo-oscuro" aria-pressed="false" aria-label="Cambiar a modo oscuro">🌙</button>
         <button onclick="cerrarSesion()" class="btn-salir">Salir</button>
       </div>
     </header>
@@ -81,9 +81,8 @@
         <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
 
         <h4>Pendientes por cobrar hoy</h4>
-        <p class="texto-ayuda">Organizados por ruta y con prioridad para las cuotas vencidas.</p>
+        <p class="texto-ayuda">Organizados por ruta, con los atrasados primero y los días que llevan vencidos.</p>
         <div id="jornada-por-rutas"></div>
-        <div id="lista-pendientes-hoy"></div>
 
         <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver ganancia, gráficos y agenda de vencimientos</button>
 
@@ -116,7 +115,7 @@
 
           <h4>Agenda de vencimientos</h4>
           <p class="texto-ayuda">Próximas cuotas esperadas durante los siguientes 7 días.</p>
-          <p id="link-activar-recordatorios" class="link-olvide oculto" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
+          <p id="link-activar-recordatorios" class="link-olvide oculto" role="button" tabindex="0" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
           <div id="agenda-vencimientos"></div>
         </div>
       </section>
@@ -130,8 +129,8 @@
           <button type="button" class="chip-cobrar" data-estado-cobro="aldia" onclick="cambiarFiltroCobrar('aldia')">Al día</button>
         </div>
         <div class="fila-filtros">
-          <input type="text" id="buscar-cliente-cobrar" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesCobrar()">
-          <select id="filtro-ruta-cobrar" onchange="filtrarClientesCobrar()">
+          <input type="text" id="buscar-cliente-cobrar" aria-label="Buscar cliente para cobrar" placeholder="🔍 Buscar cliente..." oninput="filtrarClientesCobrar()">
+          <select id="filtro-ruta-cobrar" aria-label="Filtrar por ruta" onchange="filtrarClientesCobrar()">
             <option value="">Todas las rutas</option>
           </select>
         </div>
@@ -140,9 +139,9 @@
 
       <section id="seccion-clientes" class="seccion oculto">
         <div class="cabecera-lista-clientes"><div><h3>Clientes <span id="contador-clientes" class="badge-contador"></span></h3><p class="texto-ayuda">Consulta y administra todos tus clientes.</p></div><button type="button" class="btn-nuevo-cliente" onclick="abrirModalNuevoCliente()">＋ Nuevo</button></div>
-        <input type="text" id="buscar-cliente-lista" placeholder="🔍 Buscar por nombre o cédula..." oninput="filtrarClientesLista()">
-        <p id="link-ver-archivados" class="link-olvide" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
-        <p id="link-ver-ranking" class="link-olvide funcion-avanzada oculto" onclick="toggleRankingClientes()">🏆 Ver ranking de cumplimiento</p>
+        <input type="text" id="buscar-cliente-lista" aria-label="Buscar cliente por nombre o cédula" placeholder="🔍 Buscar por nombre o cédula..." oninput="filtrarClientesLista()">
+        <p id="link-ver-archivados" class="link-olvide" role="button" tabindex="0" onclick="toggleVerArchivados()">📦 Ver clientes archivados</p>
+        <p id="link-ver-ranking" class="link-olvide funcion-avanzada oculto" role="button" tabindex="0" onclick="toggleRankingClientes()">🏆 Ver ranking de cumplimiento</p>
         <div id="ranking-clientes" class="oculto"></div>
         <div id="lista-clientes"></div>
       </section>
@@ -159,11 +158,11 @@
         <h3>Nuevo préstamo</h3>
         <p class="texto-ayuda">Elige el cliente para crear su préstamo. Si aún no existe, créalo primero desde la pestaña Clientes.</p>
         <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
-          <select id="prestamo-cliente" required><option value="">Selecciona un cliente</option></select>
-          <input type="text" id="prestamo-monto" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
-          <input type="number" id="prestamo-interes" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
-          <input type="number" id="prestamo-cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
-          <select id="prestamo-frecuencia" required onchange="actualizarVisibilidadDomingosFestivos()">
+          <select id="prestamo-cliente" aria-label="Cliente del préstamo" required><option value="">Selecciona un cliente</option></select>
+          <input type="text" id="prestamo-monto" aria-label="Monto prestado" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
+          <input type="number" id="prestamo-interes" aria-label="Interés en porcentaje" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
+          <input type="number" id="prestamo-cuotas" aria-label="Número de cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
+          <select id="prestamo-frecuencia" aria-label="Frecuencia de pago" required onchange="actualizarVisibilidadDomingosFestivos()">
             <option value="">Frecuencia de pago</option>
             <option value="diario">Diario</option>
             <option value="semanal">Semanal</option>
@@ -172,13 +171,13 @@
             <input type="checkbox" id="prestamo-contar-domingos-festivos" checked>
             Contar domingos y festivos (Colombia) como día de cuota
           </label>
-          <input type="date" id="prestamo-fecha" required>
+          <input type="date" id="prestamo-fecha" aria-label="Fecha de inicio del préstamo" required>
           <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
           <label class="etiqueta-select">Mora por atraso (deja el % en 0 si este préstamo no debe tener)</label>
           <div id="prestamo-mora-campos">
-            <input type="number" id="prestamo-mora-porcentaje" placeholder="% de recargo por mora (ej: 10)" value="10">
-            <input type="number" id="prestamo-mora-dias" placeholder="Días de atraso antes de aplicar la mora (ej: 3)" min="0" value="0">
+            <input type="number" id="prestamo-mora-porcentaje" aria-label="Porcentaje de recargo por mora" placeholder="% de recargo por mora (ej: 10)" value="10">
+            <input type="number" id="prestamo-mora-dias" aria-label="Días de atraso antes de aplicar la mora" placeholder="Días de atraso antes de aplicar la mora (ej: 3)" min="0" value="0">
           </div>
 
           <button type="submit">+ Registrar préstamo</button>
@@ -188,8 +187,8 @@
       <section id="seccion-rutas" class="seccion oculto">
         <h3>Rutas</h3>
         <form onsubmit="crearRuta(event)" class="tarjeta-form">
-          <input type="text" id="ruta-nombre" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
-          <input type="text" id="ruta-descripcion" placeholder="Descripción (opcional)">
+          <input type="text" id="ruta-nombre" aria-label="Nombre de la ruta" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
+          <input type="text" id="ruta-descripcion" aria-label="Descripción de la ruta" placeholder="Descripción (opcional)">
           <button type="submit">+ Agregar ruta</button>
         </form>
         <div id="lista-rutas"></div>
@@ -203,16 +202,16 @@
           <button type="button" class="link-editar-base" onclick="configurarCapitalInicial()" title="Corregir cartera inicial">✏️</button>
         </div>
 
-        <select id="reporte-tipo" onchange="cambiarTipoReporte()">
+        <select id="reporte-tipo" aria-label="Tipo de reporte" onchange="cambiarTipoReporte()">
           <option value="dia">Reporte diario</option>
           <option value="semana">Reporte semanal</option>
           <option value="mes" selected>Reporte mensual</option>
           <option value="anio">Reporte anual</option>
           <option value="rango">Rango de fechas (desde/hasta)</option>
         </select>
-        <input type="date" id="reporte-fecha-dia" class="oculto">
-        <input type="month" id="reporte-mes">
-        <input type="number" id="reporte-anio" class="oculto" placeholder="Ej: 2026" min="2020" max="2100">
+        <input type="date" id="reporte-fecha-dia" aria-label="Fecha del reporte" class="oculto">
+        <input type="month" id="reporte-mes" aria-label="Mes del reporte">
+        <input type="number" id="reporte-anio" aria-label="Año del reporte" class="oculto" placeholder="Ej: 2026" min="2020" max="2100">
         <div id="reporte-rango" class="reporte-rango oculto">
           <label>Desde <input type="date" id="reporte-rango-desde"></label>
           <label>Hasta <input type="date" id="reporte-rango-hasta"></label>
@@ -298,11 +297,11 @@
     </main>
 
     <nav class="menu-inferior" id="menu-inferior" aria-label="Navegación principal">
-      <button onclick="mostrarSeccion('inicio')" class="barra-nav-btn" data-nav="inicio"><span>⌂</span><small>Inicio</small></button>
-      <button onclick="mostrarSeccion('clientes')" class="barra-nav-btn" data-nav="clientes"><span>♙</span><small>Clientes</small></button>
-      <button onclick="mostrarSeccion('prestamos')" class="barra-nav-btn" data-nav="prestamos"><span>¤</span><small>Préstamos</small></button>
-      <button onclick="mostrarSeccion('cobrar')" class="barra-nav-btn" data-nav="cobrar"><span>✓</span><small>Cobrar</small></button>
-      <button onclick="mostrarSeccion('configuracion')" class="barra-nav-btn" data-nav="configuracion"><span>⚙</span><small>Config.</small></button>
+      <button onclick="mostrarSeccion('inicio')" class="barra-nav-btn" data-nav="inicio"><span aria-hidden="true">⌂</span><small>Inicio</small></button>
+      <button onclick="mostrarSeccion('clientes')" class="barra-nav-btn" data-nav="clientes"><span aria-hidden="true">♙</span><small>Clientes</small></button>
+      <button onclick="mostrarSeccion('prestamos')" class="barra-nav-btn" data-nav="prestamos"><span aria-hidden="true">¤</span><small>Préstamos</small></button>
+      <button onclick="mostrarSeccion('cobrar')" class="barra-nav-btn" data-nav="cobrar"><span aria-hidden="true">✓</span><small>Cobrar</small></button>
+      <button onclick="mostrarSeccion('configuracion')" class="barra-nav-btn" data-nav="configuracion"><span aria-hidden="true">⚙</span><small>Config.</small></button>
     </nav>
 
   </div>
@@ -319,7 +318,7 @@
     <div class="modal-caja modal-grande">
       <div class="detalle-header">
         <h3 id="detalle-nombre-cliente"></h3>
-        <button class="btn-cerrar-detalle" onclick="cerrarDetalleCliente()">✕</button>
+        <button class="btn-cerrar-detalle" onclick="cerrarDetalleCliente()" aria-label="Cerrar detalle del cliente">✕</button>
       </div>
       <div class="tabs-detalle">
         <button class="tab-btn activo" data-tab="info" onclick="cambiarTabDetalle('info')">Info</button>
@@ -336,29 +335,29 @@
     <div class="modal-caja">
       <div class="detalle-header">
         <h3>Nuevo cliente</h3>
-        <button class="btn-cerrar-detalle" onclick="cerrarModalNuevoCliente()">✕</button>
+        <button class="btn-cerrar-detalle" onclick="cerrarModalNuevoCliente()" aria-label="Cerrar formulario de nuevo cliente">✕</button>
       </div>
       <form onsubmit="crearClienteNuevo(event)" class="tarjeta-form">
-        <label class="etiqueta-select">Nombre completo</label>
+        <label class="etiqueta-select" for="nuevo-cliente-nombre">Nombre completo</label>
         <input type="text" id="nuevo-cliente-nombre" placeholder="Nombre completo" required>
         <label class="etiqueta-select">Identificación</label>
         <div class="fila-identificacion">
-          <select id="nuevo-cliente-tipo-doc">
+          <select id="nuevo-cliente-tipo-doc" aria-label="Tipo de documento de identificación">
             <option value="CC" selected>CC</option>
             <option value="TI">TI</option>
             <option value="CE">CE</option>
             <option value="NIT">NIT</option>
             <option value="PAS">PAS</option>
           </select>
-          <input type="text" id="nuevo-cliente-cedula" placeholder="Número de documento" inputmode="numeric">
+          <input type="text" id="nuevo-cliente-cedula" aria-label="Número de documento" placeholder="Número de documento" inputmode="numeric">
         </div>
-        <label class="etiqueta-select">Teléfono / Celular</label>
+        <label class="etiqueta-select" for="nuevo-cliente-telefono">Teléfono / Celular</label>
         <input type="text" id="nuevo-cliente-telefono" placeholder="Teléfono / Celular">
-        <label class="etiqueta-select">Dirección</label>
+        <label class="etiqueta-select" for="nuevo-cliente-direccion">Dirección</label>
         <input type="text" id="nuevo-cliente-direccion" placeholder="Dirección">
-        <label class="etiqueta-select">Notas</label>
+        <label class="etiqueta-select" for="nuevo-cliente-notas">Notas</label>
         <textarea id="nuevo-cliente-notas" placeholder="Notas (opcional)" rows="2"></textarea>
-        <label class="etiqueta-select">Ruta</label>
+        <label class="etiqueta-select" for="nuevo-cliente-ruta">Ruta</label>
         <select id="nuevo-cliente-ruta" onchange="manejarSeleccionRutaNuevoCliente()">
           <option value="">Sin ruta por ahora</option>
           <option value="__nueva__">➕ Crear nueva ruta...</option>
@@ -372,20 +371,20 @@
     <div class="modal-caja modal-grande">
       <div class="detalle-header">
         <h3>Buscar cliente</h3>
-        <button class="btn-cerrar-detalle" onclick="cerrarBusquedaGlobal()">✕</button>
+        <button class="btn-cerrar-detalle" onclick="cerrarBusquedaGlobal()" aria-label="Cerrar búsqueda">✕</button>
       </div>
-      <input type="text" id="input-busqueda-global" placeholder="Escribe un nombre..." oninput="ejecutarBusquedaGlobal()">
+      <input type="text" id="input-busqueda-global" aria-label="Buscar cliente" placeholder="Escribe un nombre..." oninput="ejecutarBusquedaGlobal()">
       <div id="resultados-busqueda-global"></div>
     </div>
   </div>
 
   <div id="modal-crear-cuenta" class="modal-overlay oculto">
     <div class="modal-caja">
-      <div class="detalle-header"><h3>Crear cuenta</h3><button class="btn-cerrar-detalle" onclick="cerrarModalCrearCuenta()">✕</button></div>
+      <div class="detalle-header"><h3>Crear cuenta</h3><button class="btn-cerrar-detalle" onclick="cerrarModalCrearCuenta()" aria-label="Cerrar creación de cuenta">✕</button></div>
       <p class="texto-ayuda">Usa una contraseña de mínimo 8 caracteres.</p>
-      <input type="email" id="crear-email" placeholder="Correo electrónico">
-      <input type="password" id="crear-password" placeholder="Contraseña">
-      <input type="password" id="crear-password-confirmar" placeholder="Confirma tu contraseña">
+      <input type="email" id="crear-email" aria-label="Correo electrónico" placeholder="Correo electrónico">
+      <input type="password" id="crear-password" aria-label="Contraseña" placeholder="Contraseña">
+      <input type="password" id="crear-password-confirmar" aria-label="Confirma tu contraseña" placeholder="Confirma tu contraseña">
       <button onclick="registrarUsuario()">Crear mi cuenta</button>
       <p id="mensaje-crear-cuenta" class="mensaje-modal"></p>
     </div>
@@ -395,13 +394,13 @@
     <div class="modal-caja">
       <div class="detalle-header">
         <h3>💸 Registrar gasto</h3>
-        <button class="btn-cerrar-detalle" onclick="cerrarModalGastos()">✕</button>
+        <button class="btn-cerrar-detalle" onclick="cerrarModalGastos()" aria-label="Cerrar registro de gasto">✕</button>
       </div>
       <form onsubmit="crearGasto(event)" class="tarjeta-form">
-        <input type="text" id="gasto-concepto" placeholder="Concepto (ej: gasolina)" required>
-        <input type="text" id="gasto-monto" inputmode="numeric" placeholder="Monto (ej: 20.000)" required>
-        <input type="date" id="gasto-fecha" required>
-        <select id="gasto-ruta">
+        <input type="text" id="gasto-concepto" aria-label="Concepto del gasto" placeholder="Concepto (ej: gasolina)" required>
+        <input type="text" id="gasto-monto" aria-label="Monto del gasto" inputmode="numeric" placeholder="Monto (ej: 20.000)" required>
+        <input type="date" id="gasto-fecha" aria-label="Fecha del gasto" required>
+        <select id="gasto-ruta" aria-label="Ruta asociada al gasto (opcional)">
           <option value="">General (no aplica a una ruta)</option>
         </select>
         <button type="submit">+ Registrar gasto</button>
@@ -414,7 +413,7 @@
     <div class="modal-caja modal-grande">
       <div class="detalle-header">
         <h3>📜 Historial de gastos</h3>
-        <button class="btn-cerrar-detalle" onclick="cerrarHistorialGastos()">✕</button>
+        <button class="btn-cerrar-detalle" onclick="cerrarHistorialGastos()" aria-label="Cerrar historial de gastos">✕</button>
       </div>
       <div id="lista-gastos"></div>
     </div>

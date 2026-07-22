@@ -55,8 +55,14 @@ document.addEventListener("keydown", (evento) => {
 });
 
 function marcarNavActivo(nombre) {
-  document.querySelectorAll(".nav-btn, .barra-nav-btn, .btn-accion-flotante").forEach(btn => btn.classList.remove("activo"));
-  document.querySelectorAll(`[data-nav="${nombre}"]`).forEach(btn => btn.classList.add("activo"));
+  document.querySelectorAll(".nav-btn, .barra-nav-btn, .btn-accion-flotante").forEach(btn => {
+    btn.classList.remove("activo");
+    btn.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(`[data-nav="${nombre}"]`).forEach(btn => {
+    btn.classList.add("activo");
+    btn.setAttribute("aria-current", "page");
+  });
 }
 
 // Convierte una fecha guardada como "AAAA-MM-DD" (el formato que usa la base

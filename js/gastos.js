@@ -75,7 +75,7 @@ async function cargarGastosDelPeriodo(inicio, fin) {
         <div class="fila-historial">
           <span>${formatoFecha(g.fecha)}</span><span>${escaparHtml(g.concepto)}${g.rutas ? ` · 📍 ${escaparHtml(g.rutas.nombre)}` : ""}</span>
           <span>${formatoPesos(g.monto)}</span>
-          <span class="btn-borrar-gasto" onclick="eliminarGasto(${g.id})">🗑️</span>
+          <span class="btn-borrar-gasto" role="button" tabindex="0" aria-label="Eliminar gasto" onclick="eliminarGasto(${g.id})">🗑️</span>
         </div>`).join("");
 
   return gastos.reduce((s, g) => s + Number(g.monto), 0);

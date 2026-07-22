@@ -55,3 +55,18 @@ function mostrarAlerta(mensaje) {
 function cerrarModalGenerico() {
   document.getElementById("modal-generico").classList.add("oculto");
 }
+
+// --- ACTIVACIÓN POR TECLADO DE ELEMENTOS "role=button" ---
+// Varias tarjetas y enlaces de la app (ej. la tarjeta de un cliente en la
+// lista, el 🗑️ de borrar un pago) son <div>/<span>/<p> con onclick, no
+// <button> reales, para no romper el diseño (flex, grid, texto en línea).
+// Se les agrega role="button" + tabindex="0" en su HTML; este único
+// listener delegado hace que Enter o Espacio los activen igual que un
+// clic, sin repetir el mismo onkeydown en cada plantilla.
+document.addEventListener("keydown", (evento) => {
+  if (evento.key !== "Enter" && evento.key !== " ") return;
+  const elemento = evento.target.closest('[role="button"]');
+  if (!elemento) return;
+  evento.preventDefault();
+  elemento.click();
+});

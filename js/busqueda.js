@@ -26,7 +26,7 @@ function ejecutarBusquedaGlobal() {
   contenedor.innerHTML = resultados.length === 0
     ? `<div class="estado-vacio">Sin resultados para "${escaparHtml(texto)}"</div>`
     : resultados.map(c => `
-        <div class="tarjeta cliente-clickable" onclick="irADetalleDesdeBusqueda(${c.id})">
+        <div class="tarjeta cliente-clickable" role="button" tabindex="0" onclick="irADetalleDesdeBusqueda(${c.id})">
           <strong>${escaparHtml(c.nombre)}</strong>
           <span>📍 ${escaparHtml(c.rutas ? c.rutas.nombre : "sin ruta")}</span>
         </div>`).join("");

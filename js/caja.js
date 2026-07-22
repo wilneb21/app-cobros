@@ -139,8 +139,8 @@ async function cargarCajaDiaria(fecha) {
         <div class="fila-aporte">
           <span>+${formatoPesos(a.monto)}${a.nota ? ` · ${escaparHtml(a.nota)}` : ""}</span>
           ${esHoy ? `<span class="acciones-aporte">
-            <span onclick="editarAportePropio(${a.id})" title="Editar">✏️</span>
-            <span onclick="eliminarAportePropio(${a.id})" title="Eliminar">🗑️</span>
+            <span onclick="editarAportePropio(${a.id})" title="Editar" role="button" tabindex="0" aria-label="Editar aporte">✏️</span>
+            <span onclick="eliminarAportePropio(${a.id})" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar aporte">🗑️</span>
           </span>` : ""}
         </div>`).join("")}
     </div>`;

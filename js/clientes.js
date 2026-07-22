@@ -190,7 +190,7 @@ function pintarClientesLista(data) {
     const riesgo = obtenerRiesgoCliente(cliente.id);
     const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
     contenedor.innerHTML += `
-      <div class="tarjeta cliente-clickable" onclick="abrirDetalleCliente(${cliente.id})">
+      <div class="tarjeta cliente-clickable" role="button" tabindex="0" onclick="abrirDetalleCliente(${cliente.id})">
         <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
         ${cliente.cedula ? `<span>🪪 ${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)}</span><br>` : ""}
         <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
@@ -413,7 +413,7 @@ async function pintarTabInfo(cliente) {
       : tieneHistorial
         ? `<button class="btn-eliminar" onclick="archivarCliente(${cliente.id})">📦 Archivar cliente</button>
            <p class="nota-ayuda">Este cliente tiene ${count} préstamo(s) en su historial — lo normal es archivarlo, no borrarlo, para no perder tus reportes de meses pasados.</p>
-           <p class="link-borrar-todo" onclick="forzarEliminarCliente(${cliente.id}, '${escaparAtributoJs(cliente.nombre)}')">¿Fue un error? Borrar cliente y TODO su historial para siempre</p>`
+           <p class="link-borrar-todo" role="button" tabindex="0" onclick="forzarEliminarCliente(${cliente.id}, '${escaparAtributoJs(cliente.nombre)}')">¿Fue un error? Borrar cliente y TODO su historial para siempre</p>`
         : `<button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">🗑️ Eliminar cliente</button>`
     }
   `;
@@ -619,7 +619,7 @@ async function pintarTabPrestamos() {
           : pagosPrestamo.map(pg => `
               <div class="fila-historial">
                 <span>${formatoFecha(pg.fecha_pago)}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
-                <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
+                <span class="btn-borrar-pago" role="button" tabindex="0" aria-label="Eliminar pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
               </div>`).join("")}
       </div>`;
   }).join("");
@@ -677,7 +677,7 @@ async function pintarTabHistorial() {
           : pagosPrestamo.map(pg => `
               <div class="fila-historial">
                 <span>${formatoFecha(pg.fecha_pago)}</span><span>${etiquetas[pg.estado]}</span><span>${formatoPesos(pg.monto_pagado)}</span>
-                <span class="btn-borrar-pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
+                <span class="btn-borrar-pago" role="button" tabindex="0" aria-label="Eliminar pago" onclick="eliminarPagoDesdeDetalle(${pg.id})">🗑️</span>
               </div>`).join("")}
       </div>`;
   }).join("");

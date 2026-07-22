@@ -121,14 +121,14 @@ async function cargarCuentasPorCobrar() {
 
   activas.innerHTML = !prestamos?.length ? '<div class="estado-vacio">🎉 No tienes cuentas activas por cobrar.</div>' : prestamos.map(p => {
     const saldo = calcularSaldoPendiente(p, acumulados[p.id] || 0);
-    return `<div class="tarjeta tarjeta-cuenta" onclick="abrirDetalleCliente(${p.cliente_id})"><div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div><div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div></div>`;
+    return `<div class="tarjeta tarjeta-cuenta" role="button" tabindex="0" onclick="abrirDetalleCliente(${p.cliente_id})"><div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div><div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div></div>`;
   }).join("");
 
   const { data: finalizados, error: errorFinalizados } = await supabaseClient
     .from("prestamos").select("cliente_id, clientes(id, nombre, telefono, rutas(nombre))").eq("estado", "pagado");
   if (errorFinalizados) { pagados.textContent = "No fue posible cargar los clientes finalizados."; return; }
   const clientesUnicos = [...new Map((finalizados || []).filter(p => p.clientes).map(p => [p.cliente_id, p.clientes])).values()];
-  pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" onclick="abrirDetalleCliente(${c.id})"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
+  pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" role="button" tabindex="0" onclick="abrirDetalleCliente(${c.id})"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
 }
 
 // Llena el selector de "filtrar por ruta" con las rutas que realmente tienen clientes
@@ -273,7 +273,7 @@ async function cargarPrestamosDeCliente(clienteId) {
           <button class="btn-pago pago-no" onclick="registrarPago(${p.id}, 0, 'no_pago', ${clienteId})">No pagó ❌</button>
         </div>
         <button class="btn-pago-completo" onclick="confirmarPagoCompleto(${p.id}, ${saldoPendiente}, ${clienteId})">💯 Pagar saldo total y terminar</button>
-        <p class="link-mas-opciones" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
+        <p class="link-mas-opciones" role="button" tabindex="0" onclick="toggleMasOpciones(${p.id})">⋯ Más opciones</p>
         <div id="mas-opciones-${p.id}" class="mas-opciones oculto">
           <div class="subinfo-credito">
             <span class="ultimo-registro">${textoUltimo}</span>

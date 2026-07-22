@@ -6,6 +6,14 @@ function toggleModoOscuro() {
   document.body.classList.toggle("modo-oscuro");
   const activo = document.body.classList.contains("modo-oscuro");
   localStorage.setItem("modoOscuro", activo ? "1" : "0");
+  actualizarEtiquetaModoOscuro(activo);
+}
+
+function actualizarEtiquetaModoOscuro(activo) {
+  const boton = document.getElementById("btn-modo-oscuro");
+  if (!boton) return;
+  boton.setAttribute("aria-pressed", String(activo));
+  boton.setAttribute("aria-label", activo ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
 }
 
 (function aplicarModoOscuroGuardado() {
@@ -13,6 +21,7 @@ function toggleModoOscuro() {
     document.body.classList.add("modo-oscuro");
   }
 })();
+document.addEventListener("DOMContentLoaded", () => actualizarEtiquetaModoOscuro(document.body.classList.contains("modo-oscuro")));
 
 // --- FUNCIONES AVANZADAS ---
 // Ranking de cumplimiento, mora manual y sugerencia de cupo quedan siempre
