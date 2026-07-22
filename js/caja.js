@@ -45,9 +45,9 @@ async function cargarCajaDiaria(fecha) {
 
   const [caja, pagos, gastos, prestamos, aportes] = await Promise.all([
     supabaseClient.from("caja_diaria").select("*").eq("fecha", fechaVista).maybeSingle(),
-    supabaseClient.from("pagos").select("monto_pagado").eq("fecha_pago", fechaVista),
-    supabaseClient.from("gastos").select("monto").eq("fecha", fechaVista),
-    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_inicio", fechaVista),
+    supabaseClient.from("pagos").select("id, monto_pagado, estado, prestamos(clientes(nombre))").eq("fecha_pago", fechaVista),
+    supabaseClient.from("gastos").select("id, concepto, monto").eq("fecha", fechaVista),
+    supabaseClient.from("prestamos").select("id, monto_prestado, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_inicio", fechaVista),
     supabaseClient.from("aportes_capital").select("*").eq("fecha", fechaVista).order("creado_en")
   ]);
 
@@ -72,11 +72,6 @@ async function cargarCajaDiaria(fecha) {
   const cierre = caja.data?.efectivo_final;
   const hayConteo = cierre !== null && cierre !== undefined;
   const descuadre = hayConteo ? Number(cierre) - esperado : 0;
-
-  // Capital inicial: solo se ofrece el botón manual "Usar capital inicial"
-  // el día de hoy, y solo si ya lo configuraste en algún momento. Nunca se
-  // aplica solo — es una acción que el cobrador decide y confirma.
-  const capitalInicialCfg = esHoy ? await obtenerCapitalInicial() : null;
 
   const colaOffline = esHoy ? obtenerColaOffline().length : 0;
   const avisoOffline = colaOffline > 0
@@ -113,12 +108,30 @@ async function cargarCajaDiaria(fecha) {
   const botonReabrir = esHoy && caja.data && !automatica && hayConteo
     ? ` <button type="button" class="link-editar-base" onclick="reabrirCajaDeHoy()" title="Deshacer el cierre de hoy">🔓 Reabrir</button>` : "";
 
-  // Botón manual: mete el capital inicial configurado como base de HOY. Solo
-  // aparece si ya configuraste un capital inicial. No pasa nada automático —
-  // el cobrador lo toca cuando quiere (típicamente el primer día real que usa
-  // la caja, o si necesita corregir la base de hoy con ese mismo número).
-  const botonAplicarCapital = capitalInicialCfg
-    ? ` <button type="button" class="link-editar-base" onclick="aplicarCapitalInicialACajaHoy()" title="Usar el capital inicial como base de hoy">📥 Usar capital inicial</button>` : "";
+  // --- MOVIMIENTOS DEL DÍA: préstamos entregados, cobros recibidos (uno por
+  // cliente), gastos y aportes propios, todos juntos en un solo detalle. Va
+  // escondido por defecto (<details> nativo) para no llenar la pantalla — el
+  // cobrador lo despliega solo si quiere ver el detalle completo del día.
+  const listaPagosMov = (pagos.data || []).filter(p => Number(p.monto_pagado) > 0);
+  const listaGastosMov = gastos.data || [];
+  const listaPrestamosMov = prestamos.data || [];
+  // Los aportes propios NO se repiten aquí — ya se ven justo abajo, en su
+  // propia lista editable (con ✏️/🗑️). Este detalle es para lo que hoy NO
+  // tenía forma de verse uno por uno: préstamos entregados, cada cobro
+  // recibido y cada gasto.
+  const totalMovimientos = listaPrestamosMov.length + listaPagosMov.length + listaGastosMov.length;
+  const movimientosHtml = totalMovimientos === 0 ? "" : `
+    <details class="detalle-movimientos-dia">
+      <summary>▸ Ver movimientos de ${esHoy ? "hoy" : "este día"} (${totalMovimientos})</summary>
+      <div class="lista-movimientos-dia">
+        ${listaPrestamosMov.map(p => `
+          <div class="fila-movimiento"><span>📤 Préstamo a ${escaparHtml(p.clientes?.nombre || "Cliente eliminado")}${p.prestamo_anterior_id ? " (renovación)" : ""}</span><span class="tono-peligro-texto">-${formatoPesos(p.monto_prestado)}</span></div>`).join("")}
+        ${listaPagosMov.map(p => `
+          <div class="fila-movimiento"><span>💰 Cobro a ${escaparHtml(p.prestamos?.clientes?.nombre || "Cliente eliminado")}</span><span class="tono-exito-texto">+${formatoPesos(p.monto_pagado)}</span></div>`).join("")}
+        ${listaGastosMov.map(g => `
+          <div class="fila-movimiento"><span>💸 Gasto: ${escaparHtml(g.concepto || "Sin concepto")}</span><span class="tono-peligro-texto">-${formatoPesos(g.monto)}</span></div>`).join("")}
+      </div>
+    </details>`;
 
   const listaAportesHtml = listaAportes.length === 0 ? "" : `
     <div class="caja-lista-aportes">
@@ -134,10 +147,11 @@ async function cargarCajaDiaria(fecha) {
 
   contenedor.innerHTML = `
     <div class="caja-cabecera"><div><span>Caja diaria</span><strong>${!caja.data ? "Sin abrir" : !esHoy ? "Cerrada" : automatica ? (hayConteo ? "🧮 Automática · ✅ Verificada hoy" : "🧮 Automática · ⏳ Sin verificar hoy") : "Jornada en curso"}</strong></div>${botonAccion}</div>
-    <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}${botonAplicarCapital}</div>
+    <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}</div>
     ${avisoOffline}
     ${avisoRacha}
     <div class="caja-metricas"><span>Base <b>${formatoPesos(base)}</b>${editarBase}</span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
+    ${movimientosHtml}
     ${listaAportesHtml}
     <div class="caja-total">Efectivo esperado: <strong>${formatoPesos(esperado)}</strong>${hayConteo ? ` · Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}` : ""}</div>
     ${hayConteo ? `
@@ -294,42 +308,6 @@ async function editarBaseCaja() {
   const user = await obtenerUsuarioActual();
   const { error } = await supabaseClient.from("caja_diaria").update({ base_inicial: valor }).eq("user_id", user.id).eq("fecha", hoy);
   if (error) { mostrarAlerta("No fue posible corregir la base: " + traducirErrorSupabase(error)); return; }
-  cargarCajaDiaria(hoy);
-}
-
-// Acción MANUAL: mete el capital inicial configurado (Configuración > Cartera
-// / capital inicial) como base de la caja de HOY. Nada de esto pasa solo —
-// el cobrador lo toca cuando quiere, típicamente el primer día real que
-// empieza a usar la caja, o si necesita corregir la base de hoy con ese
-// mismo número. Si hoy ya tiene una base guardada (a mano o automática), se
-// avisa antes de reemplazarla para no perder un número real por accidente.
-// Si hoy ya se contó el efectivo físico (cierre), ese conteo NO se toca —
-// solo se reemplaza la base, para que el cobrador pueda revisar el cuadre.
-async function aplicarCapitalInicialACajaHoy() {
-  if (!requiereConexion()) return;
-  const capital = await obtenerCapitalInicial(true);
-  if (!capital) { mostrarAlerta("Primero configura tu capital inicial en Configuración > Cartera / capital inicial."); return; }
-
-  const hoy = obtenerFechaLocal();
-  const { data: cajaHoy } = await supabaseClient.from("caja_diaria").select("*").eq("fecha", hoy).maybeSingle();
-
-  let mensaje = `¿Usar tu capital inicial de ${formatoPesos(capital.monto)} como base de la caja de hoy?`;
-  if (cajaHoy) {
-    mensaje = `Hoy ya tienes una base de ${formatoPesos(cajaHoy.base_inicial || 0)}. ¿Reemplazarla por tu capital inicial de ${formatoPesos(capital.monto)}?`;
-    if (cajaHoy.efectivo_final !== null && cajaHoy.efectivo_final !== undefined) {
-      mensaje += ` Ya contaste el efectivo de hoy (${formatoPesos(cajaHoy.efectivo_final)}) — ese conteo NO se borra, pero el cuadre puede cambiar al cambiar la base.`;
-    }
-  }
-  const confirmado = await mostrarConfirmacion(mensaje);
-  if (!confirmado) return;
-
-  const user = await obtenerUsuarioActual();
-  const { error } = cajaHoy
-    ? await supabaseClient.from("caja_diaria").update({ base_inicial: capital.monto }).eq("user_id", user.id).eq("fecha", hoy)
-    : await supabaseClient.from("caja_diaria").insert({ user_id: user.id, fecha: hoy, base_inicial: capital.monto, efectivo_final: null });
-  if (error) { mostrarAlerta("No fue posible aplicar el capital inicial: " + traducirErrorSupabase(error)); return; }
-
-  mostrarAlerta("✅ Capital inicial aplicado como base de hoy.");
   cargarCajaDiaria(hoy);
 }
 

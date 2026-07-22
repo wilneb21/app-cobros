@@ -232,7 +232,8 @@ button.secundario {
 }
 
 .resumen-caja {
-  flex: 1 1 140px;
+  flex: 1 1 0;
+  min-width: 130px;
   background: var(--card);
   border-radius: 14px;
   padding: 14px 8px;
@@ -245,6 +246,7 @@ button.secundario {
   font-weight: 700;
   display: block;
   color: var(--primary-dark);
+  overflow-wrap: anywhere;
 }
 
 .resumen-caja .etiqueta {
@@ -274,6 +276,69 @@ button.secundario {
 
 .resumen-caja.tono-peligro { background: rgba(225,29,72,.1); }
 .resumen-caja.tono-peligro .numero { color: var(--danger); }
+
+/* Banner de período: grande y a propósito difícil de ignorar, porque es lo
+   primero que se confunde ("hoy" vs. "el mes") si solo se lee la tarjeta. */
+.resumen-banner-periodo {
+  background: rgba(64,86,214,.1);
+  color: var(--primary-dark);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* Resumen en un solo nivel: las 2 tarjetas que de verdad importan al abrir
+   Reportes, con el MISMO estilo (mismo tamaño, misma alineación) que las
+   tarjetas de "Flujo de caja día por día" — una sola forma de tarjeta en
+   toda la pantalla, no dos que se ven distintas. El detalle por período
+   vive ahí abajo, para no repetir las mismas cifras dos veces. */
+.resumen-destacado {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  justify-content: center;
+}
+
+.resumen-destacado .resumen-caja {
+  flex: 1 1 0;
+  max-width: 260px;
+}
+
+/* --- MOVIMIENTOS DEL DÍA (caja diaria de Inicio) --- */
+/* <details> nativo: escondido por defecto, se despliega con un click en el
+   <summary>, sin necesitar JS aparte para abrir/cerrar. */
+.detalle-movimientos-dia {
+  margin: 10px 0;
+}
+
+.detalle-movimientos-dia summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--primary-dark);
+  padding: 6px 0;
+  list-style: none;
+}
+
+.detalle-movimientos-dia summary::-webkit-details-marker { display: none; }
+
+.lista-movimientos-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.fila-movimiento {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card);
+  border-radius: 10px;
+  font-size: 13px;
+}
 
 /* --- REFINANCIAMIENTOS DEL PERÍODO --- */
 .bloque-refinanciamientos {
@@ -410,6 +475,7 @@ button.secundario {
 .estado-al-dia { border-left-color: var(--success); }
 .estado-atencion { border-left-color: var(--warning); background-color: #fffdf3; }
 .estado-mora { border-left-color: var(--danger); background-color: #fff5f5; }
+.estado-pendiente { border-left-color: var(--text-muted); background-color: #f7f7fa; }
 
 .fila-resumen-credito {
   display: flex;
@@ -1429,6 +1495,7 @@ body.modo-oscuro .grupo-prestamo-historial { border-color: #34384d; }
 .tono-exito-texto { color: var(--success); font-weight: 700; }
 .tono-peligro-texto { color: var(--danger); font-weight: 700; }
 .tono-advertencia-texto { color: var(--warning); font-weight: 700; }
+.tono-pendiente-texto { color: var(--text-muted); font-weight: 700; }
 
 .resumen-clientes-dia {
   display: flex;
@@ -1456,6 +1523,17 @@ body.modo-oscuro .grupo-prestamo-historial { border-color: #34384d; }
   color: var(--text);
 }
 
+.fila-cliente-dia-total {
+  cursor: default;
+  background: rgba(64,86,214,.07);
+  border: 1px dashed rgba(64,86,214,.3);
+  margin-top: 4px;
+}
+.fila-cliente-dia-total .nombre-cliente-dia {
+  color: var(--primary-dark);
+}
+body.modo-oscuro .fila-cliente-dia-total { background: rgba(129,140,248,.1); border-color: rgba(129,140,248,.35); }
+
 .libro-diario-totales {
   display: flex;
   flex-wrap: wrap;
@@ -1466,3 +1544,53 @@ body.modo-oscuro .tarjeta-capital-inicial { background: rgba(64,86,214,.18); }
 body.modo-oscuro .fila-libro-diario-cabecera { background: #262b45; }
 body.modo-oscuro .fila-libro-diario { border-bottom-color: #34384d; }
 body.modo-oscuro .tabla-libro-diario-envoltura { border-color: #34384d; }
+
+/* --- Ronda 2026-07-22: nuevas mini-piezas de interfaz --- */
+.fila-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-bg, #f3f6fb);
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 10px;
+}
+.fila-checkbox input[type="checkbox"] { width: 17px; height: 17px; flex: none; }
+
+.badge-contador {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f9f91;
+  background: #dff5f0;
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+body.modo-oscuro .badge-contador { background: rgba(15,159,145,.22); color: #6be0cf; }
+
+.bloque-clientes-mora { margin-top: 4px; }
+.recargo-mora-aplicado {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.gestor-festivos { margin-top: 10px; }
+.lista-festivos { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.fila-festivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--card-bg, #f3f6fb);
+  font-size: 13px;
+}
+.fila-festivo button { width: auto; flex: none; padding: 4px 10px; font-size: 12px; background: #e35d5d; }
+body.modo-oscuro .fila-festivo, body.modo-oscuro .fila-checkbox { background: #262b45; }

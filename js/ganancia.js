@@ -1,11 +1,16 @@
-// --- GANANCIA POR INTERESES (tarjeta de Inicio) ---
+// --- UTILIDAD POR PRÉSTAMOS (tarjeta de Inicio) ---
 // Muestra dos cosas, ambas con selector Diaria / Semanal / Mensual:
-//  1) Cuánto ganaste por intereses en el período elegido (valor bruto: solo
-//     la parte de interés de cada pago, sin restar gastos).
+//  1) La utilidad "al estilo libro de William": se cuenta desde el día en
+//     que se ENTREGA el préstamo, no cuando el cliente lo va pagando poco a
+//     poco. Si hoy prestas $500.000 con 20% de interés, la utilidad de HOY
+//     es $100.000 completos — sin importar cuándo termine de pagar. Misma
+//     fórmula que ya usa la pantalla de Reportes (calcularUtilidadPorPrestamos
+//     en reportes.js), para que los dos números siempre cuadren entre sí.
 //  2) Si la cartera activa (lo que la calle todavía te debe) subió o bajó
 //     comparando el día de hoy contra el inicio del período elegido.
-// Además muestra, aparte, la ganancia bruta ACUMULADA desde el primer pago
-// que registraste en la app (desde que "empezaste con los créditos").
+// Además muestra, aparte, la utilidad ACUMULADA de todos los préstamos
+// hechos desde siempre (calcularUtilidadHistoricaTotal, también compartida
+// con Reportes).
 
 let periodoGananciaActivo = "diaria";
 
@@ -34,26 +39,6 @@ function obtenerRangoGanancia(periodo) {
   return { inicio: hoy, fin: finExclusivo, etiqueta: "hoy", etiquetaCorta: "día", fechaCarteraAnterior: sumarDias(hoy, -1) };
 }
 
-// Ganancia bruta acumulada de TODA la vida de la cuenta (desde el primer pago
-// registrado), sin límite de fechas. Es la misma fórmula que usa Reportes:
-// de cada pago, solo la fracción interés% / (100 + interés%) es ganancia real;
-// el resto es capital propio que regresa.
-async function calcularGananciaAcumuladaTotal() {
-  const { data: pagos, error } = await supabaseClient
-    .from("pagos").select("monto_pagado, prestamos(interes_porcentaje)");
-  if (error || !pagos) return 0;
-  const gananciaIntereses = pagos.reduce((total, p) => {
-    const interes = Number(p.prestamos?.interes_porcentaje) || 0;
-    const fraccionGanancia = interes / (100 + interes);
-    return total + Number(p.monto_pagado) * fraccionGanancia;
-  }, 0);
-  // La mora aplicada de verdad (no el estimado en pantalla) también es ganancia,
-  // igual que en Reportes. Si la migración 20260720 no está instalada, se ignora.
-  const { data: cargosMora } = await supabaseClient.from("cargos_mora").select("monto");
-  const gananciaMora = (cargosMora || []).reduce((s, c) => s + Number(c.monto), 0);
-  return gananciaIntereses + gananciaMora;
-}
-
 async function cargarGananciaInicio() {
   const cajaPeriodo = document.getElementById("ganancia-periodo-caja");
   const cajaAcumulada = document.getElementById("ganancia-acumulada");
@@ -66,23 +51,27 @@ async function cargarGananciaInicio() {
   const rango = obtenerRangoGanancia(periodoGananciaActivo);
   const hoy = obtenerFechaLocal();
 
-  const [gananciaIntereses, moraDelPeriodo, gananciaTotal, carteraHoy, carteraAnterior] = await Promise.all([
-    calcularGananciaPorIntereses(rango.inicio, rango.fin),
+  // calcularUtilidadPorPrestamos, calcularMoraCobrada y
+  // calcularUtilidadHistoricaTotal viven en reportes.js: es la misma cuenta
+  // que ya usa la pantalla de Reportes, para no tener dos fórmulas distintas
+  // de "utilidad" en la app.
+  const [utilidadPrestamosPeriodo, moraDelPeriodo, utilidadTotal, carteraHoy, carteraAnterior] = await Promise.all([
+    calcularUtilidadPorPrestamos(rango.inicio, rango.fin),
     calcularMoraCobrada(rango.inicio, rango.fin),
-    calcularGananciaAcumuladaTotal(),
+    calcularUtilidadHistoricaTotal(),
     supabaseClient.rpc("cartera_activa_en_fecha", { p_fecha: hoy }),
     supabaseClient.rpc("cartera_activa_en_fecha", { p_fecha: rango.fechaCarteraAnterior })
   ]);
-  const gananciaPeriodo = gananciaIntereses + moraDelPeriodo;
+  const utilidadPeriodo = utilidadPrestamosPeriodo + moraDelPeriodo;
 
   cajaPeriodo.innerHTML = `
     <div class="resumen-caja tono-primario">
-      <span class="numero">${formatoPesos(gananciaPeriodo)}</span>
-      <span class="etiqueta">Ganancia bruta · ${rango.etiqueta}</span>
-      <span class="subetiqueta">Intereses + mora cobrada, sin restar gastos</span>
+      <span class="numero">${formatoPesos(utilidadPeriodo)}</span>
+      <span class="etiqueta">Utilidad · ${rango.etiqueta}</span>
+      <span class="subetiqueta">Interés de lo prestado ${rango.etiqueta} + mora cobrada, sin restar gastos</span>
     </div>`;
 
-  cajaAcumulada.innerHTML = `💰 Ganancia bruta acumulada desde que empezaste: <strong>${formatoPesos(gananciaTotal)}</strong>`;
+  cajaAcumulada.innerHTML = `💰 Utilidad total acumulada desde que empezaste: <strong>${formatoPesos(utilidadTotal)}</strong>`;
 
   if (carteraHoy.error || carteraAnterior.error) {
     cajaCartera.innerHTML = `<span class="texto-ayuda">No fue posible calcular la tendencia de cartera. Verifica que la función "cartera_activa_en_fecha" esté instalada en Supabase.</span>`;

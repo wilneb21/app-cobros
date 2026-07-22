@@ -36,6 +36,11 @@ async function cargarResumenDia() {
   mostrarCargando("lista-pendientes-hoy");
   mostrarCargando("jornada-por-rutas");
 
+  // Se dispara sola, una vez por sesión: pone al día la mora de todos los
+  // préstamos que ya llevan uno o más meses de atraso, sin que el cobrador
+  // tenga que tocar ningún botón.
+  await asegurarMoraAutomatica();
+
   const hoy = obtenerFechaLocal();
   const rango = obtenerRangoPeriodoInicio();
   const titulo = document.getElementById("titulo-resumen-inicio");
@@ -51,6 +56,7 @@ async function cargarResumenDia() {
 
   const { data: prestamosActivos, error: errorPrestamos } = await supabaseClient
     .from("prestamos").select("*, clientes(id, nombre, direccion, orden, rutas(nombre))").eq("estado", "activo");
+  // (contar_domingos_festivos ya viene incluido por el select("*") de arriba)
   if (errorPrestamos) { mostrarAlerta("No fue posible cargar la cartera."); return; }
   const prestamos = prestamosActivos || [];
 
@@ -87,18 +93,27 @@ async function cargarResumenDia() {
     });
   }
 
-  const hoyDate = new Date(hoy + "T00:00:00");
+  // Todo cliente atrasado entra aquí, sin importar si lleva 2 días o 60 —
+  // esta es la lista que alimenta la tarjeta "Pendientes por cobrar hoy" del
+  // inicio, así que tiene que reflejar a CUALQUIERA que deba algo vencido.
+  // "Préstamos en mora" (el contador de arriba) sigue siendo más estricto:
+  // solo cuenta a quien lleva 30 días o más, porque ese número se usa como
+  // alerta de mora seria, no como agenda de cobro del día.
+  const clientesAtrasadosNombres = [];
   for (const p of prestamos) {
     const totalPagado = pagosPorPrestamo[p.id] || 0;
     carteraActiva += calcularSaldoPendiente(p, totalPagado);
 
-    const fechaInicio = new Date(p.fecha_inicio + "T00:00:00");
-    const dias = Math.floor((hoyDate - fechaInicio) / (1000 * 60 * 60 * 24));
-    let cuotasEsperadas = p.frecuencia === "diario" ? dias + 1 : Math.floor(dias / 7) + 1;
-    cuotasEsperadas = Math.min(cuotasEsperadas, p.numero_cuotas);
+    const cuotasEsperadas = await calcularCuotasEsperadas(p, hoy);
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const atrasado = totalPagado < montoEsperado;
-    if (atrasado) clientesEnMora++;
+    if (atrasado) {
+      const debe = Math.max(montoEsperado - totalPagado, 0);
+      const diasPorCuota = p.frecuencia === "diario" ? 1 : 7;
+      const diasAtraso = Math.max(Math.round((debe / Number(p.cuota)) * diasPorCuota), 1);
+      if (diasAtraso >= 30) clientesEnMora++;
+      clientesAtrasadosNombres.push({ clienteId: p.cliente_id, nombre: p.clientes?.nombre || "Cliente", debe, diasAtraso, enMora: diasAtraso >= 30 });
+    }
     if (!idsConPagoHoy.includes(p.id)) jornada.push({
       clienteId: p.cliente_id,
       cliente: p.clientes?.nombre || "Cliente",
@@ -116,8 +131,23 @@ async function cargarResumenDia() {
     <div class="resumen-caja"><span class="numero">${clientesEnMora}</span><span class="etiqueta">Préstamos en mora</span></div>
   `;
 
+  // Lista de TODO cliente con algo vencido (con lo que debe y hace cuántos
+  // días lleva atrasado), ordenados de mayor a menor deuda vencida. Los que
+  // ya llevan 30+ días de mora se marcan aparte para que salten a la vista.
   const contenedorPendientes = document.getElementById("lista-pendientes-hoy");
-  contenedorPendientes.innerHTML = "";
+  if (clientesAtrasadosNombres.length === 0) {
+    contenedorPendientes.innerHTML = "";
+  } else {
+    const ordenados = [...clientesAtrasadosNombres].sort((a, b) => b.debe - a.debe);
+    contenedorPendientes.innerHTML = `
+      <div class="bloque-clientes-mora">
+        <p class="titulo-grupo-config">🔴 Pendientes por cobrar (${ordenados.length})</p>
+        ${ordenados.map(c => `
+          <button type="button" class="jornada-cliente jornada-vencida" onclick="abrirCobroCliente(${c.clienteId})">
+            <span>${c.enMora ? "En mora" : "Debe"} · ${c.diasAtraso} ${c.diasAtraso === 1 ? "día" : "días"}</span><b>${escaparHtml(c.nombre)}</b><small>${formatoPesos(c.debe)}</small><i>›</i>
+          </button>`).join("")}
+      </div>`;
+  }
 
   pintarJornadaPorRutas(jornada);
 }

@@ -135,6 +135,123 @@ async function calcularDesembolsoReal(prestamos) {
   return total;
 }
 
+// --- DÍAS FESTIVOS DE COLOMBIA (calculados solos, sin que nadie los agregue) ---
+// Incluye los 6 fijos, los que la Ley Emiliani corre al lunes siguiente, y
+// los 4 que dependen de la Pascua (Jueves y Viernes Santo no se corren;
+// Ascensión, Corpus Christi y Sagrado Corazón sí se corren al lunes).
+// Se calculan una sola vez por año y quedan en memoria (funciona sin
+// conexión, algo que la lista guardada en la base de datos no podía hacer).
+const cacheFestivosPorAnio = {};
+
+function calcularDomingoDePascua(anio) {
+  // Algoritmo de Meeus/Jones/Butcher (calendario gregoriano)
+  const a = anio % 19, b = Math.floor(anio / 100), c = anio % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31) - 1; // 0-indexado
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(anio, mes, dia);
+}
+
+function formatoFechaISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function sumarDiasAFecha(fecha, dias) {
+  const d = new Date(fecha);
+  d.setDate(d.getDate() + dias);
+  return d;
+}
+
+// Ley Emiliani: si el festivo no cae en lunes, se traslada al lunes siguiente (o se queda si ya es lunes).
+function trasladarALunes(fecha) {
+  const d = new Date(fecha);
+  d.setDate(d.getDate() + (8 - d.getDay()) % 7);
+  return d;
+}
+
+function obtenerFestivosColombia(anio) {
+  if (cacheFestivosPorAnio[anio]) return cacheFestivosPorAnio[anio];
+
+  const pascua = calcularDomingoDePascua(anio);
+  const fijos = [
+    new Date(anio, 0, 1),   // Año Nuevo
+    new Date(anio, 4, 1),   // Día del Trabajo
+    new Date(anio, 6, 20),  // Día de la Independencia
+    new Date(anio, 7, 7),   // Batalla de Boyacá
+    new Date(anio, 11, 8),  // Inmaculada Concepción
+    new Date(anio, 11, 25), // Navidad
+  ];
+  const trasladables = [
+    new Date(anio, 0, 6),   // Reyes Magos
+    new Date(anio, 2, 19),  // San José
+    new Date(anio, 5, 29),  // San Pedro y San Pablo
+    new Date(anio, 7, 15),  // Asunción de la Virgen
+    new Date(anio, 9, 12),  // Día de la Raza
+    new Date(anio, 10, 1),  // Todos los Santos
+    new Date(anio, 10, 11), // Independencia de Cartagena
+  ].map(trasladarALunes);
+  const semanaSanta = [
+    sumarDiasAFecha(pascua, -3), // Jueves Santo (no se traslada)
+    sumarDiasAFecha(pascua, -2), // Viernes Santo (no se traslada)
+  ];
+  const basadosEnPascuaTrasladables = [
+    trasladarALunes(sumarDiasAFecha(pascua, 39)), // Ascensión del Señor
+    trasladarALunes(sumarDiasAFecha(pascua, 60)), // Corpus Christi
+    trasladarALunes(sumarDiasAFecha(pascua, 68)), // Sagrado Corazón de Jesús
+  ];
+
+  const set = new Set([...fijos, ...trasladables, ...semanaSanta, ...basadosEnPascuaTrasladables].map(formatoFechaISO));
+  cacheFestivosPorAnio[anio] = set;
+  return set;
+}
+
+function esFestivoColombia(fechaTexto) {
+  const anio = Number(fechaTexto.slice(0, 4));
+  return obtenerFestivosColombia(anio).has(fechaTexto);
+}
+
+function esDomingo(fechaTexto) {
+  const [a, m, d] = fechaTexto.split("-").map(Number);
+  return new Date(a, m - 1, d).getDay() === 0;
+}
+
+// --- CUÁNTAS CUOTAS DEBERÍA LLEVAR PAGADAS UN PRÉSTAMO A UNA FECHA DADA ---
+// Antes esta cuenta (duplicada en 3 archivos) era simplemente "días
+// transcurridos + 1" para cuotas diarias. Ahora, si el préstamo tiene
+// contar_domingos_festivos = false, los domingos y los días que estén en la
+// lista de festivos del usuario NO cuentan como día de cuota — para negocios
+// que no cobran esos días. Las cuotas semanales no cambian.
+async function calcularCuotasEsperadas(prestamo, fechaHoy) {
+  const diasTranscurridos = Math.floor((new Date(fechaHoy + "T00:00:00") - new Date(prestamo.fecha_inicio + "T00:00:00")) / (1000 * 60 * 60 * 24));
+  if (prestamo.frecuencia !== "diario") {
+    return Math.min(Math.floor(diasTranscurridos / 7) + 1, prestamo.numero_cuotas);
+  }
+  if (prestamo.contar_domingos_festivos !== false) {
+    return Math.min(diasTranscurridos + 1, prestamo.numero_cuotas);
+  }
+  let cuotas = 0;
+  let cursor = prestamo.fecha_inicio;
+  while (cursor <= fechaHoy && cuotas < prestamo.numero_cuotas) {
+    if (!esDomingo(cursor) && !esFestivoColombia(cursor)) cuotas++;
+    cursor = sumarDias(cursor, 1);
+  }
+  return cuotas;
+}
+
+// --- MORA AUTOMÁTICA ---
+// Se dispara una sola vez por sesión (al abrir Inicio), para no llamar la
+// función de Supabase en cada pantalla. Si la migración 20260803 todavía no
+// está instalada, falla en silencio (no interrumpe el uso normal de la app).
+let moraAutomaticaEjecutada = false;
+async function asegurarMoraAutomatica() {
+  if (moraAutomaticaEjecutada) return;
+  moraAutomaticaEjecutada = true;
+  try { await supabaseClient.rpc("aplicar_mora_automatica"); } catch { /* silencioso: probablemente falta la migración */ }
+}
+
 // Escapa un texto para poder insertarlo de forma segura dentro de un atributo
 // onclick="funcion('...')": protege comillas simples/backslashes (para el JS)
 // y además comillas dobles/otros caracteres HTML (para el atributo).

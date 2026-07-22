@@ -10,13 +10,9 @@ let mostrandoArchivados = false;
 const UMBRAL_CUOTAS_REGULAR = 6;
 const UMBRAL_CUOTAS_MALO = 12;
 
-function cuotasAtrasadasPrestamo(p, totalPagado) {
+async function cuotasAtrasadasPrestamo(p, totalPagado) {
   const hoy = obtenerFechaLocal();
-  const hoyDate = new Date(hoy + "T00:00:00");
-  const fechaInicio = new Date(p.fecha_inicio + "T00:00:00");
-  const dias = Math.floor((hoyDate - fechaInicio) / (1000 * 60 * 60 * 24));
-  let cuotasEsperadas = p.frecuencia === "diario" ? dias + 1 : Math.floor(dias / 7) + 1;
-  cuotasEsperadas = Math.min(cuotasEsperadas, p.numero_cuotas);
+  const cuotasEsperadas = await calcularCuotasEsperadas(p, hoy);
   const cuotasPagadas = Math.floor(totalPagado / Number(p.cuota));
   return Math.max(cuotasEsperadas - cuotasPagadas, 0);
 }
@@ -34,7 +30,7 @@ let riesgoClientesCache = {};
 
 async function calcularRiesgoTodosClientes() {
   const { data: prestamos } = await supabaseClient.from("prestamos")
-    .select("id, cliente_id, cuota, frecuencia, fecha_inicio, numero_cuotas").eq("estado", "activo");
+    .select("id, cliente_id, cuota, frecuencia, fecha_inicio, numero_cuotas, contar_domingos_festivos").eq("estado", "activo");
   const ids = (prestamos || []).map(p => p.id);
   const { data: pagos } = ids.length
     ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids)
@@ -43,10 +39,10 @@ async function calcularRiesgoTodosClientes() {
   (pagos || []).forEach(pg => pagadoPorPrestamo[pg.prestamo_id] = (pagadoPorPrestamo[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
 
   const peorCuotasPorCliente = {};
-  (prestamos || []).forEach(p => {
-    const atraso = cuotasAtrasadasPrestamo(p, pagadoPorPrestamo[p.id] || 0);
+  for (const p of prestamos || []) {
+    const atraso = await cuotasAtrasadasPrestamo(p, pagadoPorPrestamo[p.id] || 0);
     if (!(p.cliente_id in peorCuotasPorCliente) || atraso > peorCuotasPorCliente[p.cliente_id]) peorCuotasPorCliente[p.cliente_id] = atraso;
-  });
+  }
 
   riesgoClientesCache = {};
   Object.keys(peorCuotasPorCliente).forEach(clienteId => {
@@ -70,6 +66,17 @@ async function cargarClientes() {
   clientesCache = data;
   await calcularRiesgoTodosClientes();
   pintarClientesLista(data);
+  pintarContadorClientes(data.length);
+}
+
+// Total de clientes que se ven en la lista actual (activos, o archivados si
+// se está viendo esa vista), en el encabezado de la pestaña "Clientes".
+function pintarContadorClientes(total) {
+  const el = document.getElementById("contador-clientes");
+  if (!el) return;
+  el.textContent = mostrandoArchivados
+    ? `${total} archivado${total === 1 ? "" : "s"}`
+    : `${total} cliente${total === 1 ? "" : "s"}`;
 }
 
 // --- RANKING DE CLIENTES POR CUMPLIMIENTO ---
@@ -197,9 +204,11 @@ function filtrarClientesLista() {
 
   if (filtrados.length === 0 && texto) {
     document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">🔍 Ningún cliente coincide con "${escaparHtml(texto)}".</div>`;
+    pintarContadorClientes(0);
     return;
   }
   pintarClientesLista(filtrados);
+  pintarContadorClientes(filtrados.length);
 }
 
 // Arma el número para WhatsApp: si ya trae indicativo de país (10-13 dígitos empezando en algo distinto

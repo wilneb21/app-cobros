@@ -1,8 +1,3 @@
-function toggleCampoMora() {
-  const check = document.getElementById("prestamo-mora-check");
-  document.getElementById("prestamo-mora-porcentaje").classList.toggle("oculto", !check.checked);
-}
-
 function actualizarVistaPreviaPrestamo() {
   const monto = obtenerValorNumerico(document.getElementById("prestamo-monto"));
   const interes = parseFloat(document.getElementById("prestamo-interes").value) || 0;
@@ -27,6 +22,14 @@ async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
   if (clienteSeleccionadoId) selector.value = String(clienteSeleccionadoId);
 }
 
+// El checkbox "contar domingos y festivos" solo tiene sentido para cuotas
+// DIARIAS (en semanales cada cuota ya cae una vez por semana). Se muestra
+// u oculta según la frecuencia elegida en el formulario de nuevo préstamo.
+function actualizarVisibilidadDomingosFestivos() {
+  const frecuencia = document.getElementById("prestamo-frecuencia")?.value;
+  document.getElementById("fila-contar-domingos-festivos")?.classList.toggle("oculto", frecuencia !== "diario");
+}
+
 async function crearPrestamo(event) {
   event.preventDefault();
   if (!navigator.onLine) {
@@ -39,9 +42,14 @@ async function crearPrestamo(event) {
   const numeroCuotas = parseInt(document.getElementById("prestamo-cuotas").value);
   const frecuencia = document.getElementById("prestamo-frecuencia").value;
   const fechaInicio = document.getElementById("prestamo-fecha").value;
-  const moraHabilitada = document.getElementById("prestamo-mora-check").checked;
-  const moraPorcentaje = moraHabilitada ? (parseFloat(document.getElementById("prestamo-mora-porcentaje").value) || 0) : 0;
-  if (!fechaInicio || !validarMontoPositivo(monto, "El monto prestado") || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0 || interes < 0 || moraPorcentaje < 0) {
+  // Ya no hay checkbox: la mora queda habilitada sola si le dejaste algún
+  // % (por defecto 10). Si alguien quiere un préstamo sin mora, pone el % en 0.
+  const moraPorcentaje = parseFloat(document.getElementById("prestamo-mora-porcentaje").value) || 0;
+  const moraHabilitada = moraPorcentaje > 0;
+  const moraDiasGracia = parseInt(document.getElementById("prestamo-mora-dias").value, 10) || 0;
+  // Solo aplica de verdad a cuotas diarias; en semanales el checkbox se ignora.
+  const contarDomingosFestivos = document.getElementById("prestamo-contar-domingos-festivos").checked;
+  if (!fechaInicio || !validarMontoPositivo(monto, "El monto prestado") || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0 || interes < 0 || moraPorcentaje < 0 || moraDiasGracia < 0) {
     mostrarAlerta("Revisa los valores del préstamo: cuotas enteras y porcentajes no negativos.");
     return;
   }
@@ -56,7 +64,8 @@ async function crearPrestamo(event) {
     cliente_id: clienteId, monto_prestado: monto, interes_porcentaje: interes,
     cuota, numero_cuotas: numeroCuotas, frecuencia, fecha_inicio: fechaInicio,
     estado: "activo", user_id: user.id,
-    interes_mora_habilitado: moraHabilitada, interes_mora_porcentaje: moraPorcentaje
+    interes_mora_habilitado: moraHabilitada, interes_mora_porcentaje: moraPorcentaje, interes_mora_dias_gracia: moraDiasGracia,
+    contar_domingos_festivos: contarDomingosFestivos
   });
 
   if (error) {
@@ -68,9 +77,9 @@ async function crearPrestamo(event) {
   document.getElementById("prestamo-interes").value = "";
   document.getElementById("prestamo-cuotas").value = "";
   document.getElementById("prestamo-fecha").value = "";
-  document.getElementById("prestamo-mora-check").checked = false;
-  document.getElementById("prestamo-mora-porcentaje").value = "";
-  document.getElementById("prestamo-mora-porcentaje").classList.add("oculto");
+  document.getElementById("prestamo-mora-porcentaje").value = "10";
+  document.getElementById("prestamo-mora-dias").value = "0";
+  document.getElementById("prestamo-contar-domingos-festivos").checked = true;
   document.getElementById("prestamo-cliente").value = "";
   cargarClientesEnSelector();
   cargarClientes();
@@ -181,6 +190,7 @@ function cambiarFiltroCobrar(estado) {
 }
 
 async function cargarPrestamosDeCliente(clienteId) {
+  await asegurarMoraAutomatica();
   const { data: prestamos, error } = await supabaseClient
     .from("prestamos").select("*").eq("cliente_id", clienteId).eq("estado", "activo");
 
@@ -200,7 +210,7 @@ async function cargarPrestamosDeCliente(clienteId) {
 
   if (resultados.some(r => r.error)) { contenedor.textContent = "No fue posible cargar los pagos."; return; }
 
-  const tarjetas = prestamos.map((p, indice) => {
+  const tarjetas = await Promise.all(prestamos.map(async (p, indice) => {
     const pagos = resultados[indice].data;
 
     const totalPagado = pagos ? pagos.reduce((s, pg) => s + Number(pg.monto_pagado), 0) : 0;
@@ -216,31 +226,32 @@ async function cargarPrestamosDeCliente(clienteId) {
     const textoRacha = rachaSinPagar > 0
       ? `<span class="racha-sin-pagar">⚠️ ${rachaSinPagar} ${rachaSinPagar === 1 ? "día seguido" : "días seguidos"} sin pagar</span>` : "";
 
-    const hoy = new Date(obtenerFechaLocal() + "T00:00:00");
-    const fechaInicio = new Date(p.fecha_inicio + "T00:00:00");
-    const diasTranscurridos = Math.floor((hoy - fechaInicio) / (1000 * 60 * 60 * 24));
-    let cuotasEsperadas = p.frecuencia === "diario" ? diasTranscurridos + 1 : Math.floor(diasTranscurridos / 7) + 1;
-    cuotasEsperadas = Math.min(cuotasEsperadas, p.numero_cuotas);
+    const hoyTexto = obtenerFechaLocal();
+    const cuotasEsperadas = await calcularCuotasEsperadas(p, hoyTexto);
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const diferencia = totalPagado - montoEsperado;
 
-    let claseMora, textoMora, recargoTexto = "", montoDebe = 0;
+    let claseMora, textoMora, montoDebe = 0, diasAtraso = 0;
     if (diferencia >= 0) {
       claseMora = "estado-al-dia";
       textoMora = diferencia > 0 ? `🟢 Al día (adelantado ${formatoPesos(diferencia)})` : "🟢 Al día";
     } else {
       montoDebe = Math.round(Math.abs(diferencia));
-      claseMora = montoDebe < Number(p.cuota) * 2 ? "estado-atencion" : "estado-mora";
-      textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)}`;
-
-      if (p.interes_mora_habilitado && p.interes_mora_porcentaje > 0) {
-        const recargo = Math.round(montoDebe * (p.interes_mora_porcentaje / 100));
-        recargoTexto = `<span class="recargo-mora">+ Recargo por mora estimado: ${formatoPesos(recargo)}
-          <button type="button" class="btn-aplicar-mora" onclick="aplicarRecargoMora(${p.id}, ${recargo}, ${clienteId})">Aplicar recargo al saldo</button></span>`;
-      }
+      const diasPorCuota = p.frecuencia === "diario" ? 1 : 7;
+      diasAtraso = Math.max(Math.round((montoDebe / Number(p.cuota)) * diasPorCuota), 1);
+      // "En mora" (rojo) solo cuando el atraso ya lleva un mes (30 días) o
+      // más. Antes bastaba con deber 2 cuotas para pasar a rojo, así que un
+      // cliente diario con apenas 2 días de atraso ya aparecía "en mora".
+      // Antes de ese mes, se muestra en amarillo como "Atrasado", que es lo
+      // que de verdad está pasando.
+      claseMora = diasAtraso >= 30 ? "estado-mora" : "estado-atencion";
+      textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)} (${diasAtraso} ${diasAtraso === 1 ? "día" : "días"} de atraso)`;
     }
+    // La mora ya no se aplica a mano: se calcula y se suma sola al saldo cada
+    // mes que el cliente siga atrasado (ver asegurarMoraAutomatica). Aquí solo
+    // se informa cuánto lleva aplicado a este crédito hasta ahora.
     const moraTexto = moraAcumulada > 0
-      ? `<span class="recargo-mora-aplicado">Mora ya aplicada a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
+      ? `<span class="recargo-mora-aplicado">🔁 Mora aplicada automáticamente a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
 
     // Antes esta tarjeta mostraba hasta 6 cifras de dinero a la vez (saldo,
     // cuota, debe, recargo estimado, mora aplicada, adelantado). Ahora solo
@@ -268,7 +279,6 @@ async function cargarPrestamosDeCliente(clienteId) {
             <span class="ultimo-registro">${textoUltimo}</span>
             ${textoRacha}
           </div>
-          ${recargoTexto}
           ${moraTexto}
           <button class="btn-historial" onclick="verHistorial(${p.id}, ${clienteId})">Ver historial completo</button>
           <div id="historial-${p.id}" class="historial oculto"></div>
@@ -276,7 +286,7 @@ async function cargarPrestamosDeCliente(clienteId) {
           <button class="btn-eliminar-prestamo" onclick="eliminarPrestamo(${p.id}, ${clienteId})">🗑️ Eliminar préstamo</button>
         </div>
       </div>`;
-  });
+  }));
 
   contenedor.innerHTML = tarjetas.join("");
 }
@@ -287,29 +297,6 @@ async function cargarPrestamosDeCliente(clienteId) {
 // visibles y el resto queda a un toque de distancia.
 function toggleMasOpciones(prestamoId) {
   document.getElementById("mas-opciones-" + prestamoId)?.classList.toggle("oculto");
-}
-
-// Convierte el recargo por mora, hasta ahora solo un estimado en pantalla,
-// en un cargo real: lo suma al saldo pendiente del préstamo (mora_acumulada)
-// y queda registrado (auditable) en Supabase. Requiere conexión: es un
-// cargo de dinero real, no se guarda en cola offline para evitar aplicarlo
-// dos veces por accidente si el celular reintenta el envío.
-async function aplicarRecargoMora(prestamoId, montoEstimado, clienteId) {
-  if (!navigator.onLine) {
-    mostrarAlerta("📴 Necesitas conexión para aplicar un recargo de mora, ya que es un cargo real al saldo del cliente.");
-    return;
-  }
-  const confirmado = await mostrarConfirmacion(
-    `¿Aplicar un recargo de mora de ${formatoPesos(montoEstimado)} al saldo de este préstamo?<br>Se sumará al saldo pendiente y quedará registrado.`
-  );
-  if (!confirmado) return;
-
-  const { error } = await supabaseClient.rpc("aplicar_recargo_mora", {
-    p_prestamo_id: prestamoId, p_monto: montoEstimado
-  });
-  if (error) { mostrarAlerta("No fue posible aplicar el recargo: " + traducirErrorSupabase(error)); return; }
-  mostrarAlerta("✅ Recargo de mora aplicado al saldo.");
-  cargarPrestamosDeCliente(clienteId);
 }
 
 // --- ELIMINAR UN PRÉSTAMO MAL REGISTRADO ---

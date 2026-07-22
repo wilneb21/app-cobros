@@ -1,8 +1,10 @@
-async function registrarPago(prestamoId, monto, estado, clienteId) {
+async function registrarPago(prestamoId, monto, estado, clienteId, sumar = false) {
   const fecha = obtenerFechaLocal();
   if (!["pago", "parcial", "no_pago"].includes(estado) || (estado !== "no_pago" && !validarMontoPositivo(monto, "El pago"))) return;
 
   // Sin conexión: guarda el pago en el celular y lo sincroniza más tarde, sin bloquear al cobrador.
+  // (Los pagos guardados offline siempre reemplazan, nunca suman — "sumar" necesita
+  // ver el valor real que hay hoy en el servidor antes de decidir, y eso requiere señal.)
   if (!navigator.onLine) {
     agregarPagoACola({ prestamoId, monto, estado, fecha, clienteId, guardadoEn: Date.now() });
     marcarSubtarjetaPendienteSync(prestamoId);
@@ -14,21 +16,32 @@ async function registrarPago(prestamoId, monto, estado, clienteId) {
   let pagoExistente = null;
   try {
     const respuesta = await supabaseClient
-      .from("pagos").select("id").eq("prestamo_id", prestamoId).eq("fecha_pago", fecha).maybeSingle();
+      .from("pagos").select("id, monto_pagado").eq("prestamo_id", prestamoId).eq("fecha_pago", fecha).maybeSingle();
     pagoExistente = respuesta.data;
   } catch {
     // Falla de red al verificar duplicado: seguimos, registrar_pago igual protege con upsert.
   }
 
-  if (pagoExistente) {
-    const confirmado = await mostrarConfirmacion("Ya registraste un pago hoy para este cliente.<br>¿Quieres corregirlo con este nuevo valor?");
-    if (!confirmado) return;
+  // Ya hay un pago registrado hoy para este préstamo: se pregunta si el nuevo
+  // valor debe SUMARSE al que ya existía (por ejemplo, el cliente pagó dos
+  // veces en el mismo día) o si es una corrección y debe reemplazarlo.
+  if (pagoExistente && !sumar) {
+    const montoExistente = Number(pagoExistente.monto_pagado);
+    const opcion = await mostrarOpcionesPagoDuplicado(montoExistente, monto);
+    if (opcion === "cancelar" || opcion === null) return;
+    sumar = opcion === "sumar";
+    if (opcion === "sumar") {
+      const confirmado = await mostrarConfirmacion(
+        `Vas a registrar un pago adicional de ${formatoPesos(monto)}, sumado al ya registrado hoy (${formatoPesos(montoExistente)}).<br>Quedará un total de ${formatoPesos(montoExistente + monto)} hoy. ¿Confirmas?`
+      );
+      if (!confirmado) return;
+    }
   }
 
   let error;
   try {
     ({ error } = await supabaseClient.rpc("registrar_pago", {
-      p_prestamo_id: prestamoId, p_monto_pagado: monto, p_estado: estado, p_fecha_pago: fecha
+      p_prestamo_id: prestamoId, p_monto_pagado: monto, p_estado: estado, p_fecha_pago: fecha, p_sumar: sumar
     }));
   } catch (excepcion) {
     error = excepcion;
@@ -46,6 +59,21 @@ async function registrarPago(prestamoId, monto, estado, clienteId) {
   cargarPrestamosDeCliente(clienteId);
 
   if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+}
+
+// Pregunta qué hacer cuando ya existe un pago hoy: sumar el nuevo valor al
+// que ya estaba, reemplazarlo (corregirlo), o cancelar. Se apoya en el modal
+// genérico de confirmación de sí/no, encadenando dos preguntas simples para
+// no tener que construir un modal de 3 botones nuevo.
+async function mostrarOpcionesPagoDuplicado(montoExistente, montoNuevo) {
+  const quiereSumar = await mostrarConfirmacion(
+    `Ya registraste un pago hoy de ${formatoPesos(montoExistente)} para este cliente.<br><br>¿Quieres SUMAR ${formatoPesos(montoNuevo)} más (otro pago el mismo día)?<br>Si eliges "Cancelar" te preguntamos si prefieres corregir el valor en vez de sumarlo.`
+  );
+  if (quiereSumar) return "sumar";
+  const quiereCorregir = await mostrarConfirmacion(
+    `¿Prefieres corregir el pago de hoy y dejarlo en ${formatoPesos(montoNuevo)} (reemplaza el valor anterior)?`
+  );
+  return quiereCorregir ? "reemplazar" : "cancelar";
 }
 
 // --- PAGAR EL SALDO TOTAL DE UN PRÉSTAMO (dar por terminado el crédito) ---

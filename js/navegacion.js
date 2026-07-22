@@ -20,8 +20,6 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   if (nombre === "reportes") {
     pintarCapitalInicial();
     cargarReporteMes();
-    if (!document.getElementById("gasto-fecha").value) document.getElementById("gasto-fecha").value = obtenerFechaLocal();
-    cargarRutasEnSelectorGasto();
   }
   cerrarMenuPrincipal();
 

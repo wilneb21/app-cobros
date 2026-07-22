@@ -2,6 +2,23 @@
 
 Este documento explica cómo funciona la app hoy, qué implementé en esta ronda, una corrección a mi análisis anterior, y qué queda pendiente y por qué.
 
+## -5. Ronda nueva (2026-07-21, noche): simplificar reportes
+
+**📋 Movimientos del día (nuevo, en Inicio).** Dentro de la caja diaria, un enlace "▸ Ver movimientos de hoy" — escondido por defecto — que al tocarlo despliega cada préstamo entregado, cada cobro (con el nombre del cliente) y cada gasto de ese día, uno por uno. Los aportes propios no se repiten ahí porque ya se ven justo arriba, en su propia lista editable.
+
+**📒 Flujo de caja día por día — ahora colapsable y con utilidad acumulada.** En Reportes, esa tabla ahora viene escondida por defecto (botón "📒 Ver flujo de caja día por día"), y se agregó una columna "Utilidad acum." que va sumando la utilidad de cada día dentro del período que se está viendo — para ver cómo se acumula la ganancia real, no solo el número suelto de cada día.
+
+**🔢 Tarjetas de resumen reorganizadas.** Las 7 tarjetas de arriba (Desembolso nuevo, Cobrado, Gastos, Flujo de caja, Ganancia por intereses, Mora cobrada, Ganancia neta) ahora se ven en 2 niveles: "Flujo de caja" y "Ganancia neta" grandes arriba (son las 2 respuestas que más importan), y las otras 5 más pequeñas debajo, como el detalle que arma esos dos números.
+
+**📊 3 exportaciones de Excel separadas (nuevo), en vez de un solo archivo con todo:**
+- **"Resumen general"** — el histórico completo desde que arrancó la cartera hasta hoy: capital inicial, total prestado, cobrado, ganancia por intereses, mora, gastos, ganancia neta y cartera activa. Una sola hoja, para ver "cómo va todo" de un vistazo.
+- **"Reporte diario"** — el día puntual que se esté viendo (o hoy, si no hay un reporte de tipo "día" abierto): base con la que inició, préstamos entregados, cobrado, gastos y con cuánto cerró, más una hoja de todos los clientes de ese día (quién pagó, quién no, y qué le falta).
+- **"Reporte del período"** — para semana/mes/año/rango: el resumen de ese período más el Libro diario completo (con la utilidad acumulada nueva).
+
+El botón anterior **"Exportar todo a Excel"** (con las 8 hojas de detalle: Clientes, Préstamos, Pagos, Gastos, Refinanciamientos, etc.) se mantuvo, pero ahora vive escondido bajo "▸ Exportación completa (avanzada, para contabilidad)", para quien de verdad necesite ese nivel de detalle sin que estorbe a quien solo quiere los 3 reportes simples de arriba.
+
+No se necesita ninguna migración nueva de Supabase para esta ronda — todo se construyó sobre datos que ya existían (pagos, gastos, préstamos, aportes_capital).
+
 ## -4. Ronda nueva (2026-07-21): cartera inicial, libro diario en Reportes y fecha DD/MM/AAAA
 
 **💰 Cartera/capital inicial (nuevo).** Es el monto de una sola vez con el que arrancó el negocio (distinto de la base diaria de la caja, que cambia todos los días). Se configura desde Configuración → "Cartera / capital inicial" (nuevo `js/capital.js`), queda fijo con su fecha, y se muestra como tarjeta destacada arriba de Reportes. Sirve como punto de partida del libro diario cuando el reporte incluye días anteriores a que existiera la caja automática.

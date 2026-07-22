@@ -56,7 +56,8 @@ async function configurarCapitalInicial() {
   // La fecha también se puede corregir cada vez (no solo la primera vez):
   // si te equivocaste al escribirla, aquí se ajusta sin dejar rastros raros.
   // OJO: esto NO reacomoda solos los días de caja que ya se hayan abierto —
-  // ver "Usar capital inicial" en la caja diaria para aplicarlo a un día.
+  // por eso, al guardar, se ofrece "recalcularCajaDesdeCapitalInicial" abajo
+  // para ajustar automáticamente los días no cerrados.
   const fechaTexto = await mostrarPrompt(
     "¿Desde qué fecha? (formato AAAA-MM-DD)",
     actual?.fecha || obtenerFechaLocal()
