@@ -176,8 +176,10 @@
 
           <label class="etiqueta-select">Mora por atraso (deja el % en 0 si este préstamo no debe tener)</label>
           <div id="prestamo-mora-campos">
+            <small class="titulo-campo-mora">Porcentaje de recargo</small>
             <input type="number" id="prestamo-mora-porcentaje" aria-label="Porcentaje de recargo por mora" placeholder="% de recargo por mora (ej: 10)" value="10">
-            <input type="number" id="prestamo-mora-dias" aria-label="Días de atraso antes de aplicar la mora" placeholder="Días de atraso antes de aplicar la mora (ej: 3)" min="0" value="0">
+            <small class="titulo-campo-mora">Días de atraso para que aplique</small>
+            <input type="number" id="prestamo-mora-dias" aria-label="Días de atraso antes de aplicar la mora" placeholder="Días de atraso antes de aplicar la mora (ej: 30)" min="0" value="30">
           </div>
 
           <button type="submit">+ Registrar préstamo</button>

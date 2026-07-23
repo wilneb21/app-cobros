@@ -607,7 +607,7 @@ body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
 .pago-parcial { background: var(--warning); }
 .pago-no { background: var(--danger); }
 
-.btn-historial, .btn-refinanciar {
+.btn-historial, .btn-refinanciar, .btn-aplicar-mora {
   font-size: 11px;
   padding: 7px;
   margin-top: 6px;
@@ -616,6 +616,7 @@ body.modo-oscuro .grupo-ruta-titulo { color: #c7d2fe; border-color: #3a4152; }
 
 .btn-historial { background: #1565c0; }
 .btn-refinanciar { background: #6a1b9a; }
+.btn-aplicar-mora { background: var(--warning); }
 
 .btn-eliminar-prestamo {
   font-size: 11px;
@@ -1067,6 +1068,13 @@ body.modo-oscuro .btn-aporte-propio { background: #252044; color: #ddd6fe; }
   font-size: 11px;
   color: var(--text-muted);
   margin-top: 6px;
+}
+
+.titulo-campo-mora {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 6px 0 2px;
 }
 
 .btn-borrar-gasto {

@@ -241,15 +241,22 @@ async function calcularCuotasEsperadas(prestamo, fechaHoy) {
   return cuotas;
 }
 
-// --- MORA AUTOMÁTICA ---
-// Se dispara una sola vez por sesión (al abrir Inicio), para no llamar la
-// función de Supabase en cada pantalla. Si la migración 20260803 todavía no
-// está instalada, falla en silencio (no interrumpe el uso normal de la app).
-let moraAutomaticaEjecutada = false;
-async function asegurarMoraAutomatica() {
-  if (moraAutomaticaEjecutada) return;
-  moraAutomaticaEjecutada = true;
-  try { await supabaseClient.rpc("aplicar_mora_automatica"); } catch { /* silencioso: probablemente falta la migración */ }
+// --- APLICAR MORA A MANO ---
+// La mora ya NO se cobra sola en segundo plano (eso causaba que se cobrara
+// mora incorrecta a préstamos diarios con "no contar domingos y festivos"
+// activado — ver migración 20260806). Ahora es el cobrador quien la aplica,
+// desde el botón que aparece en la tarjeta del crédito cuando ya pasó el
+// número de días configurado; el monto lo calcula la app con el % y los
+// días que tiene ese préstamo.
+async function aplicarMoraManual(prestamoId, clienteId, montoSugerido) {
+  if (!requiereConexion()) return;
+  const monto = await mostrarPrompt("¿Cuánto de mora quieres aplicar a este crédito?", montoSugerido, true);
+  if (monto === null) return;
+  const montoLimpio = parseFloat(String(monto).replace(/\D/g, ""));
+  if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
+  const { error } = await supabaseClient.rpc("aplicar_mora_manual", { p_prestamo_id: prestamoId, p_monto: montoLimpio });
+  if (error) { mostrarAlerta("No se pudo aplicar la mora: " + error.message); return; }
+  cargarPrestamosDeCliente(clienteId);
 }
 
 // Escapa un texto para poder insertarlo de forma segura dentro de un atributo

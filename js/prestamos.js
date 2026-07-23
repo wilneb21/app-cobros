@@ -190,7 +190,6 @@ function cambiarFiltroCobrar(estado) {
 }
 
 async function cargarPrestamosDeCliente(clienteId) {
-  await asegurarMoraAutomatica();
   const { data: prestamos, error } = await supabaseClient
     .from("prestamos").select("*").eq("cliente_id", clienteId).eq("estado", "activo");
 
@@ -247,11 +246,17 @@ async function cargarPrestamosDeCliente(clienteId) {
       claseMora = diasAtraso >= 30 ? "estado-mora" : "estado-atencion";
       textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)} (${diasAtraso} ${diasAtraso === 1 ? "día" : "días"} de atraso)`;
     }
-    // La mora ya no se aplica a mano: se calcula y se suma sola al saldo cada
-    // mes que el cliente siga atrasado (ver asegurarMoraAutomatica). Aquí solo
-    // se informa cuánto lleva aplicado a este crédito hasta ahora.
+    // La mora se aplica A MANO (ver migración 20260806): este préstamo tiene
+    // su propio % y sus propios días de atraso antes de que corresponda. Si
+    // ya se cumplen esos días, se ofrece el botón con el monto ya calculado
+    // — el cobrador decide si lo aplica o no, nunca se cobra solo.
+    const moraHabilitada = p.interes_mora_habilitado && Number(p.interes_mora_porcentaje) > 0;
+    const diasParaMora = Number(p.interes_mora_dias_gracia) || 30;
+    const puedeAplicarMora = moraHabilitada && diasAtraso >= diasParaMora && montoDebe > 0;
+    const montoMoraSugerido = puedeAplicarMora ? Math.round(montoDebe * (Number(p.interes_mora_porcentaje) / 100)) : 0;
+
     const moraTexto = moraAcumulada > 0
-      ? `<span class="recargo-mora-aplicado">🔁 Mora aplicada automáticamente a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
+      ? `<span class="recargo-mora-aplicado">🔁 Mora aplicada a este crédito: ${formatoPesos(moraAcumulada)}</span>` : "";
 
     // Antes esta tarjeta mostraba hasta 6 cifras de dinero a la vez (saldo,
     // cuota, debe, recargo estimado, mora aplicada, adelantado). Ahora solo
@@ -280,6 +285,7 @@ async function cargarPrestamosDeCliente(clienteId) {
             ${textoRacha}
           </div>
           ${moraTexto}
+          ${puedeAplicarMora ? `<button class="btn-aplicar-mora" onclick="aplicarMoraManual(${p.id}, ${clienteId}, ${montoMoraSugerido})">⚠️ Aplicar mora (${p.interes_mora_porcentaje}%): ${formatoPesos(montoMoraSugerido)}</button>` : ""}
           <button class="btn-historial" onclick="verHistorial(${p.id}, ${clienteId})">Ver historial completo</button>
           <div id="historial-${p.id}" class="historial oculto"></div>
           <button class="btn-refinanciar" onclick="refinanciarPrestamo(${p.id}, ${clienteId}, ${saldoPendiente}, ${p.interes_porcentaje}, '${p.frecuencia}')">🔄 Refinanciar crédito</button>

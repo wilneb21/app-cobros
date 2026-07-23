@@ -35,11 +35,6 @@ async function cargarResumenDia() {
   mostrarCargando("resumen-cartera");
   mostrarCargando("jornada-por-rutas");
 
-  // Se dispara sola, una vez por sesión: pone al día la mora de todos los
-  // préstamos que ya llevan uno o más meses de atraso, sin que el cobrador
-  // tenga que tocar ningún botón.
-  await asegurarMoraAutomatica();
-
   const hoy = obtenerFechaLocal();
   const rango = obtenerRangoPeriodoInicio();
   const titulo = document.getElementById("titulo-resumen-inicio");
