@@ -355,7 +355,7 @@ async function pintarTabInfo(cliente) {
     .from("prestamos").select("*", { count: "exact", head: true }).eq("cliente_id", cliente.id);
   const tieneHistorial = count > 0;
   const { data: activos } = await supabaseClient.from("prestamos")
-    .select("id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, frecuencia, fecha_inicio, numero_cuotas")
+    .select("id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, numero_cuotas")
     .eq("cliente_id", cliente.id).eq("estado", "activo");
   const idsActivos = (activos || []).map(prestamo => prestamo.id);
   const { data: pagosActivos } = idsActivos.length
@@ -460,13 +460,12 @@ async function exportarEstadoCuentaPDF(clienteId) {
     const { data: pagos } = await supabaseClient.from("pagos").select("*").eq("prestamo_id", p.id).order("fecha_pago");
     const totalPagado = (pagos || []).reduce((s, pg) => s + Number(pg.monto_pagado), 0);
     const totalConInteres = calcularTotalConInteres(p.monto_prestado, p.interes_porcentaje);
-    const saldoConMora = calcularSaldoPendiente(p, totalPagado);
-    const moraTexto = Number(p.mora_acumulada) > 0 ? ` (incluye ${formatoPesos(p.mora_acumulada)} de mora aplicada)` : "";
+    const saldoPendiente = calcularSaldoPendiente(p, totalPagado);
 
     filasPrestamos += `
       <h3>Préstamo del ${formatoFecha(p.fecha_inicio)} — ${escaparHtml(p.estado)}</h3>
       <p>Monto: ${formatoPesos(p.monto_prestado)} | Interés: ${p.interes_porcentaje}% | Total a pagar: ${formatoPesos(totalConInteres)}</p>
-      <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(saldoConMora)}${moraTexto}</p>
+      <p>Pagado: ${formatoPesos(totalPagado)} | Saldo: ${formatoPesos(saldoPendiente)}</p>
       <table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px;">
         <tr><th>Fecha</th><th>Estado</th><th>Monto</th></tr>
         ${(pagos || []).map(pg => `<tr><td>${formatoFecha(pg.fecha_pago)}</td><td>${escaparHtml(pg.estado)}</td><td>${formatoPesos(pg.monto_pagado)}</td></tr>`).join("")}
@@ -608,7 +607,7 @@ async function pintarTabPrestamos() {
         <div class="detalle-prestamo-grid">
           <div><small>Monto prestado</small><b>${formatoPesos(p.monto_prestado)}</b></div>
           <div><small>Interés</small><b>${p.interes_porcentaje}%</b></div>
-          <div><small>Total a pagar</small><b>${formatoPesos(totalConInteres + (Number(p.mora_acumulada) || 0))}</b></div>
+          <div><small>Total a pagar</small><b>${formatoPesos(totalConInteres)}</b></div>
           <div><small>Pagado hasta hoy</small><b>${formatoPesos(totalPagado)}</b></div>
           <div class="dato-saldo-restante"><small>Saldo para terminar</small><b>${formatoPesos(saldoRestante)}</b></div>
           <div><small>Cuota</small><b>${formatoPesos(p.cuota)} · ${p.frecuencia}</b></div>

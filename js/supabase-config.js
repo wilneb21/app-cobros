@@ -96,25 +96,21 @@ function escaparHtml(valor) {
 
 // --- CÁLCULO CENTRAL DEL SALDO DE UN PRÉSTAMO ---
 // Antes esta cuenta estaba copiada (con pequeñas diferencias) en 7 lugares
-// distintos del código: algunas pantallas sumaban la mora aplicada al saldo
-// y otras no, así que un mismo crédito con mora podía mostrar dos saldos
-// distintos según en qué pantalla estuvieras. Ahora toda la app pasa por
-// estas dos funciones — es la única fuente de verdad.
+// distintos del código. Ahora toda la app pasa por estas dos funciones — es
+// la única fuente de verdad.
 
-// Total que el cliente debe pagar por un préstamo: capital + interés (sin
-// mora). Interés simple, calculado una sola vez sobre el monto prestado.
+// Total que el cliente debe pagar por un préstamo: capital + interés.
+// Interés simple, calculado una sola vez sobre el monto prestado.
 function calcularTotalConInteres(montoPrestado, interesPorcentaje) {
   return Number(montoPrestado) * (1 + (Number(interesPorcentaje) || 0) / 100);
 }
 
-// Saldo pendiente real de un préstamo: total con interés + mora ya aplicada
-// (columna prestamos.mora_acumulada) menos lo que ya pagó. Nunca baja de $0.
-// "prestamo" puede venir de un select("*") o de un select parcial, siempre
-// que incluya monto_prestado, interes_porcentaje y (opcionalmente) mora_acumulada.
+// Saldo pendiente real de un préstamo: total con interés menos lo que ya
+// pagó. Nunca baja de $0. "prestamo" puede venir de un select("*") o de un
+// select parcial, siempre que incluya monto_prestado e interes_porcentaje.
 function calcularSaldoPendiente(prestamo, totalPagado) {
   const total = calcularTotalConInteres(prestamo.monto_prestado, prestamo.interes_porcentaje);
-  const mora = Number(prestamo.mora_acumulada) || 0;
-  return Math.max(total + mora - Number(totalPagado || 0), 0);
+  return Math.max(total - Number(totalPagado || 0), 0);
 }
 
 // Calcula cuánto efectivo REALMENTE salió de la caja para una lista de préstamos.
@@ -125,7 +121,7 @@ async function calcularDesembolsoReal(prestamos) {
   let total = 0;
   for (const p of prestamos || []) {
     if (!p.prestamo_anterior_id) { total += Number(p.monto_prestado); continue; }
-    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, mora_acumulada").eq("id", p.prestamo_anterior_id).single();
+    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").eq("id", p.prestamo_anterior_id).single();
     if (!viejo) { total += Number(p.monto_prestado); continue; }
     const { data: pagosViejo } = await supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", p.prestamo_anterior_id).lte("fecha_pago", p.fecha_inicio);
     const pagadoViejo = (pagosViejo || []).reduce((s, pg) => s + Number(pg.monto_pagado), 0);
@@ -239,24 +235,6 @@ async function calcularCuotasEsperadas(prestamo, fechaHoy) {
     cursor = sumarDias(cursor, 1);
   }
   return cuotas;
-}
-
-// --- APLICAR MORA A MANO ---
-// La mora ya NO se cobra sola en segundo plano (eso causaba que se cobrara
-// mora incorrecta a préstamos diarios con "no contar domingos y festivos"
-// activado — ver migración 20260806). Ahora es el cobrador quien la aplica,
-// desde el botón que aparece en la tarjeta del crédito cuando ya pasó el
-// número de días configurado; el monto lo calcula la app con el % y los
-// días que tiene ese préstamo.
-async function aplicarMoraManual(prestamoId, clienteId, montoSugerido) {
-  if (!requiereConexion()) return;
-  const monto = await mostrarPrompt("¿Cuánto de mora quieres aplicar a este crédito?", montoSugerido, true);
-  if (monto === null) return;
-  const montoLimpio = parseFloat(String(monto).replace(/\D/g, ""));
-  if (!montoLimpio || montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido"); return; }
-  const { error } = await supabaseClient.rpc("aplicar_mora_manual", { p_prestamo_id: prestamoId, p_monto: montoLimpio });
-  if (error) { mostrarAlerta("No se pudo aplicar la mora: " + error.message); return; }
-  cargarPrestamosDeCliente(clienteId);
 }
 
 // Escapa un texto para poder insertarlo de forma segura dentro de un atributo

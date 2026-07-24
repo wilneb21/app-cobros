@@ -51,24 +51,21 @@ async function cargarGananciaInicio() {
   const rango = obtenerRangoGanancia(periodoGananciaActivo);
   const hoy = obtenerFechaLocal();
 
-  // calcularUtilidadPorPrestamos, calcularMoraCobrada y
-  // calcularUtilidadHistoricaTotal viven en reportes.js: es la misma cuenta
-  // que ya usa la pantalla de Reportes, para no tener dos fórmulas distintas
-  // de "utilidad" en la app.
-  const [utilidadPrestamosPeriodo, moraDelPeriodo, utilidadTotal, carteraHoy, carteraAnterior] = await Promise.all([
+  // calcularUtilidadPorPrestamos y calcularUtilidadHistoricaTotal viven en
+  // reportes.js: es la misma cuenta que ya usa la pantalla de Reportes, para
+  // no tener dos fórmulas distintas de "utilidad" en la app.
+  const [utilidadPeriodo, utilidadTotal, carteraHoy, carteraAnterior] = await Promise.all([
     calcularUtilidadPorPrestamos(rango.inicio, rango.fin),
-    calcularMoraCobrada(rango.inicio, rango.fin),
     calcularUtilidadHistoricaTotal(),
     supabaseClient.rpc("cartera_activa_en_fecha", { p_fecha: hoy }),
     supabaseClient.rpc("cartera_activa_en_fecha", { p_fecha: rango.fechaCarteraAnterior })
   ]);
-  const utilidadPeriodo = utilidadPrestamosPeriodo + moraDelPeriodo;
 
   cajaPeriodo.innerHTML = `
     <div class="resumen-caja tono-primario">
       <span class="numero">${formatoPesos(utilidadPeriodo)}</span>
       <span class="etiqueta">Utilidad · ${rango.etiqueta}</span>
-      <span class="subetiqueta">Interés de lo prestado ${rango.etiqueta} + mora cobrada, sin restar gastos</span>
+      <span class="subetiqueta">Interés de lo prestado ${rango.etiqueta}, sin restar gastos</span>
     </div>`;
 
   cajaAcumulada.innerHTML = `💰 Utilidad total acumulada desde que empezaste: <strong>${formatoPesos(utilidadTotal)}</strong>`;

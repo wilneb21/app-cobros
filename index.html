@@ -174,14 +174,6 @@
           <input type="date" id="prestamo-fecha" aria-label="Fecha de inicio del préstamo" required>
           <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
-          <label class="etiqueta-select">Mora por atraso (deja el % en 0 si este préstamo no debe tener)</label>
-          <div id="prestamo-mora-campos">
-            <small class="titulo-campo-mora">Porcentaje de recargo</small>
-            <input type="number" id="prestamo-mora-porcentaje" aria-label="Porcentaje de recargo por mora" placeholder="% de recargo por mora (ej: 10)" value="10">
-            <small class="titulo-campo-mora">Días de atraso para que aplique</small>
-            <input type="number" id="prestamo-mora-dias" aria-label="Días de atraso antes de aplicar la mora" placeholder="Días de atraso antes de aplicar la mora (ej: 30)" min="0" value="30">
-          </div>
-
           <button type="submit">+ Registrar préstamo</button>
         </form>
       </section>
@@ -239,7 +231,7 @@
 
         <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-libro-diario', this, '📒 Ver flujo de caja día por día', '📒 Ocultar flujo de caja día por día')">📒 Ver flujo de caja día por día</button>
         <div id="bloque-libro-diario" class="oculto">
-          <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés + mora, sin contar el capital que vuelve) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente).</p>
+          <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés, sin contar el capital que vuelve) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente).</p>
           <div class="tabla-libro-diario-envoltura"><div id="libro-diario"></div></div>
           <div id="libro-diario-totales" class="libro-diario-totales"></div>
         </div>

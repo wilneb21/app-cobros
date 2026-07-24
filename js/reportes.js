@@ -126,11 +126,10 @@ async function cargarReporteMes() {
   // se cuenta desde que se entrega (interés sobre el monto prestado), no
   // cuando el cliente lo va pagando poco a poco. Así, al cierre de un mes,
   // "Ganancia neta" suma toda la utilidad generada por los préstamos hechos
-  // ese mes más la mora aplicada, menos los gastos del mes — la ganancia
-  // real de lo que se hizo en el mes, sin mezclarse con el resto de cuentas.
+  // ese mes, menos los gastos del mes — la ganancia real de lo que se hizo
+  // en el mes, sin mezclarse con el resto de cuentas.
   const gananciaBruta = await calcularUtilidadPorPrestamos(inicio, fin);
-  const moraCobrada = await calcularMoraCobrada(inicio, fin);
-  const gananciaNeta = (gananciaBruta + moraCobrada) - totalGastos;
+  const gananciaNeta = gananciaBruta - totalGastos;
   const claseGanancia = gananciaNeta >= 0 ? "tono-exito" : "tono-peligro";
 
   // --- Resumen: UN solo bloque de tarjetas ---
@@ -151,12 +150,12 @@ async function cargarReporteMes() {
     <div class="resumen-banner-periodo">📅 Mostrando: <strong>${etiquetaPeriodo === "el día" ? formatoFecha(inicio) : etiquetaPeriodo}</strong></div>
     <div class="resumen-destacado">
       <div class="resumen-caja ${claseFlujo}"><span class="numero">${flujoNeto >= 0 ? "+" : ""}${formatoPesos(flujoNeto)}</span><span class="etiqueta">Flujo de caja</span><span class="subetiqueta">Cobrado menos gastos en ${etiquetaPeriodo}</span></div>
-      <div class="resumen-caja ${claseGanancia}"><span class="numero">${gananciaNeta >= 0 ? "+" : ""}${formatoPesos(gananciaNeta)}</span><span class="etiqueta">Ganancia neta</span><span class="subetiqueta">Utilidad de lo prestado + mora, menos gastos</span></div>
+      <div class="resumen-caja ${claseGanancia}"><span class="numero">${gananciaNeta >= 0 ? "+" : ""}${formatoPesos(gananciaNeta)}</span><span class="etiqueta">Ganancia neta</span><span class="subetiqueta">Utilidad de lo prestado, menos gastos</span></div>
     </div>
-    <p class="texto-ayuda">💡 <strong>Flujo de caja</strong> es cuánto efectivo entró y salió (incluye tu propio capital regresando). <strong>Ganancia neta</strong> es la utilidad real de los préstamos entregados en ${etiquetaPeriodo} (interés + mora), sin contar el capital que se presta y regresa. Por eso casi siempre son números distintos.</p>
+    <p class="texto-ayuda">💡 <strong>Flujo de caja</strong> es cuánto efectivo entró y salió (incluye tu propio capital regresando). <strong>Ganancia neta</strong> es la utilidad real de los préstamos entregados en ${etiquetaPeriodo} (interés), sin contar el capital que se presta y regresa. Por eso casi siempre son números distintos.</p>
     <p class="texto-ayuda">👇 El detalle de desembolso, cobro, gastos y cierre día por día está en "Flujo de caja día por día" más abajo.</p>`;
 
-  ultimoReporteExportable = { inicio, fin, etiquetaPeriodo, tipo, esDia: tipo === "dia", totalPrestadoNuevo, totalCobrado, totalGastos, flujoNeto, gananciaBruta, moraCobrada, gananciaNeta, pagosPeriodo: pagosPeriodo || [] };
+  ultimoReporteExportable = { inicio, fin, etiquetaPeriodo, tipo, esDia: tipo === "dia", totalPrestadoNuevo, totalCobrado, totalGastos, flujoNeto, gananciaBruta, gananciaNeta, pagosPeriodo: pagosPeriodo || [] };
 
   await cargarRefinanciamientosPeriodo(refinanciados, inicio, fin);
   await cargarLibroDiario(inicio, fin);
@@ -168,7 +167,7 @@ async function cargarReporteMes() {
 // Reconstruye, día por día dentro del período del reporte, el mismo formato
 // que ya llevaba el cliente a mano: cuánta caja tenía al empezar el día
 // (BASE), cuánto prestó, cuánto cobró, cuánto gastó, cuánto fue GANANCIA real
-// (solo intereses + mora aplicada — no el capital que simplemente regresa) y
+// (solo intereses — no el capital que simplemente regresa) y
 // con cuánto cerró el día (que es la BASE del día siguiente). "UTILIDAD %"
 // se calcula como la utilidad del día sobre lo COBRADO ese día (qué porción
 // de lo que entró en efectivo fue ganancia real, no capital recuperado) — es
@@ -183,13 +182,12 @@ async function cargarLibroDiario(inicio, fin) {
   if (!contenedor) return;
   contenedor.innerHTML = '<div class="cargando">⏳ Calculando...</div>';
 
-  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }, { data: cargosMora }, capitalInicial, utilidadHistoricaPrevia, utilidadHistoricaTotal] = await Promise.all([
+  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }, capitalInicial, utilidadHistoricaPrevia, utilidadHistoricaTotal] = await Promise.all([
     supabaseClient.from("caja_diaria").select("fecha, base_inicial").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("pagos").select("fecha_pago, monto_pagado").gte("fecha_pago", inicio).lt("fecha_pago", fin),
     supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin),
     supabaseClient.from("aportes_capital").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
-    supabaseClient.from("cargos_mora").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
     obtenerCapitalInicial(),
     calcularUtilidadHistoricaAntesDe(inicio),
     calcularUtilidadHistoricaTotal()
@@ -207,7 +205,6 @@ async function cargarLibroDiario(inicio, fin) {
     const interesDelPrestamo = Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100;
     utilidadPorDia[p.fecha_inicio] = (utilidadPorDia[p.fecha_inicio] || 0) + interesDelPrestamo;
   });
-  (cargosMora || []).forEach(c => utilidadPorDia[c.fecha] = (utilidadPorDia[c.fecha] || 0) + Number(c.monto));
   const gastoPorDia = {};
   (gastos || []).forEach(g => gastoPorDia[g.fecha] = (gastoPorDia[g.fecha] || 0) + Number(g.monto));
   const aportePorDia = {};
@@ -295,9 +292,9 @@ async function cargarLibroDiario(inicio, fin) {
 // rápido. Solo tiene sentido para UN día puntual — en semana/mes/año/rango
 // se vería una lista enorme mezclando muchos días, así que ahí se oculta y
 // basta con el Libro diario de más abajo.
-// OJO: "Le falta" usa la mora ACTUAL del crédito (no una foto histórica de
-// cómo estaba la mora justo ese día), porque es el dato que de verdad importa
-// al revisar el reporte: cuánto falta HOY, no cuánto faltaba en ese momento.
+// OJO: "Le falta" usa el saldo ACTUAL del crédito (no una foto histórica de
+// cómo estaba ese saldo justo ese día), porque es el dato que de verdad
+// importa al revisar el reporte: cuánto falta HOY, no cuánto faltaba en ese momento.
 async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
   const envoltura = document.getElementById("detalle-clientes-dia-envoltura");
   const contenedor = document.getElementById("detalle-clientes-dia");
@@ -315,7 +312,7 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
 
   const { data: prestamosActivos, error } = await supabaseClient
     .from("prestamos")
-    .select("id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, clientes(id, nombre)")
+    .select("id, monto_prestado, interes_porcentaje, cuota, clientes(id, nombre)")
     .eq("estado", "activo");
   if (error) { contenedor.innerHTML = '<p class="texto-ayuda">No fue posible cargar el detalle de clientes de este día.</p>'; return; }
 
@@ -329,21 +326,16 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
   // Pago (si existe) registrado justo ese día, y cuánto llevaba pagado cada
   // crédito HASTA (e incluyendo) ese día — para "lleva pagado" y "faltante"
   // tal como quedaron al cierre de esa fecha, no el acumulado de hoy si se
-  // está viendo un día pasado. También la mora aplicada justo ese día, para
-  // poder calcular la utilidad real del cobro de cada cliente (igual que en
-  // el Libro diario: interés + mora, sin contar el capital que vuelve).
-  const [{ data: pagosDia }, { data: pagosHastaEseDia }, { data: cargosMoraDia }] = await Promise.all([
+  // está viendo un día pasado.
+  const [{ data: pagosDia }, { data: pagosHastaEseDia }] = await Promise.all([
     supabaseClient.from("pagos").select("id, monto_pagado, estado, prestamo_id").in("prestamo_id", idsPrestamos).gte("fecha_pago", inicio).lt("fecha_pago", fin),
-    supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", idsPrestamos).lt("fecha_pago", fin),
-    supabaseClient.from("cargos_mora").select("prestamo_id, monto").in("prestamo_id", idsPrestamos).gte("fecha", inicio).lt("fecha", fin)
+    supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", idsPrestamos).lt("fecha_pago", fin)
   ]);
 
   const pagoDiaPorPrestamo = {};
   (pagosDia || []).forEach(pg => { pagoDiaPorPrestamo[pg.prestamo_id] = pg; });
   const pagadoAcumulado = {};
   (pagosHastaEseDia || []).forEach(pg => pagadoAcumulado[pg.prestamo_id] = (pagadoAcumulado[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
-  const moraDiaPorPrestamo = {};
-  (cargosMoraDia || []).forEach(c => moraDiaPorPrestamo[c.prestamo_id] = (moraDiaPorPrestamo[c.prestamo_id] || 0) + Number(c.monto));
 
   const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌", pendiente: "Pendiente ⏳" };
   // Mismos colores que ya usa la pantalla de Cobrar: verde = al día, amarillo
@@ -363,10 +355,10 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
     const cobradoHoy = pagoDia ? Number(pagoDia.monto_pagado) : 0;
     // Utilidad real del cobro de HOY para este cliente: solo la fracción de
     // interés de lo cobrado (el resto es capital propio que vuelve, no es
-    // ganancia) más la mora que se le haya aplicado justo este día.
+    // ganancia).
     const interes = Number(prestamo.interes_porcentaje) || 0;
     const fraccionInteres = interes / (100 + interes);
-    const utilidadHoy = cobradoHoy * fraccionInteres + (moraDiaPorPrestamo[prestamo.id] || 0);
+    const utilidadHoy = cobradoHoy * fraccionInteres;
     return {
       nombre: prestamo.clientes?.nombre || "Cliente eliminado",
       clienteId: prestamo.clientes?.id,
@@ -419,14 +411,6 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
     </div>`;
 }
 
-// Mora que se aplicó de verdad al saldo (no el estimado en pantalla) dentro del período.
-async function calcularMoraCobrada(inicio, fin) {
-  const { data, error } = await supabaseClient
-    .from("cargos_mora").select("monto").gte("fecha", inicio).lt("fecha", fin);
-  if (error || !data) return 0; // si la migración 20260720 aún no está instalada, no rompe el reporte
-  return data.reduce((s, c) => s + Number(c.monto), 0);
-}
-
 // --- EXPORTAR REPORTE A CSV ---
 let ultimoReporteExportable = null;
 
@@ -438,7 +422,7 @@ function exportarReporteCSV() {
     ["Desde", formatoFecha(r.inicio)], ["Hasta", formatoFecha(sumarDias(r.fin, -1))],
     ["Desembolso nuevo", r.totalPrestadoNuevo], ["Cobrado", r.totalCobrado],
     ["Gastos", r.totalGastos], ["Flujo de caja", r.flujoNeto],
-    ["Utilidad de préstamos entregados", r.gananciaBruta], ["Mora cobrada", r.moraCobrada],
+    ["Utilidad de préstamos entregados", r.gananciaBruta],
     ["Ganancia neta", r.gananciaNeta], [],
     ["Flujo de caja día por día"],
     ["Fecha", "Base", "Préstamos", "Cobro", "Gasto", "Utilidad", "Utilidad acumulada", "Utilidad %", "Cierre"],
@@ -473,18 +457,12 @@ async function calcularUtilidadPorPrestamos(inicio, fin) {
 }
 
 // Utilidad total acumulada de TODA la vida del negocio (préstamos entregados
-// desde siempre + toda la mora aplicada desde siempre), sin límite de
-// fechas — es el número que va subiendo solo, présta a préstamo, y del que
-// el dueño saca sus ganancias. No se resetea nunca y no tiene nada que ver
-// con cuánto efectivo hay hoy en caja.
+// desde siempre), sin límite de fechas — es el número que va subiendo solo,
+// préstamo a préstamo, y del que el dueño saca sus ganancias. No se resetea
+// nunca y no tiene nada que ver con cuánto efectivo hay hoy en caja.
 async function calcularUtilidadHistoricaTotal() {
-  const [{ data: prestamos }, { data: cargosMora }] = await Promise.all([
-    supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje"),
-    supabaseClient.from("cargos_mora").select("monto")
-  ]);
-  const utilidadPrestamos = (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
-  const utilidadMora = (cargosMora || []).reduce((s, c) => s + Number(c.monto), 0);
-  return utilidadPrestamos + utilidadMora;
+  const { data: prestamos } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje");
+  return (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
 
 // La misma utilidad histórica, pero solo la parte generada ANTES de una
@@ -492,13 +470,8 @@ async function calcularUtilidadHistoricaTotal() {
 // para que "Utilidad acum." sea de verdad el total de siempre y no solo lo
 // que se ve dentro del período que se está mirando en pantalla.
 async function calcularUtilidadHistoricaAntesDe(fecha) {
-  const [{ data: prestamos }, { data: cargosMora }] = await Promise.all([
-    supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").lt("fecha_inicio", fecha),
-    supabaseClient.from("cargos_mora").select("monto").lt("fecha", fecha)
-  ]);
-  const utilidadPrestamos = (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
-  const utilidadMora = (cargosMora || []).reduce((s, c) => s + Number(c.monto), 0);
-  return utilidadPrestamos + utilidadMora;
+  const { data: prestamos } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").lt("fecha_inicio", fecha);
+  return (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
 
 // --- REFINANCIAMIENTOS: separa cuánto es saldo renovado y cuánto es plata adicional nueva ---
@@ -516,7 +489,7 @@ async function cargarRefinanciamientosPeriodo(refinanciados, inicio, fin) {
   let totalRenovado = 0;
   const detalle = [];
   for (const nuevo of filas) {
-    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, mora_acumulada").eq("id", nuevo.prestamo_anterior_id).single();
+    const { data: viejo } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").eq("id", nuevo.prestamo_anterior_id).single();
     if (!viejo) continue;
     const { data: pagosViejo } = await supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", nuevo.prestamo_anterior_id).lte("fecha_pago", nuevo.fecha_inicio);
     const pagadoViejo = (pagosViejo || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
@@ -632,7 +605,7 @@ async function exportarExcel(evento) {
       supabaseClient.from("pagos").select("fecha_pago, monto_pagado, estado, prestamos(interes_porcentaje, clientes(nombre))").gte("fecha_pago", inicio).lt("fecha_pago", fin).order("fecha_pago", { ascending: false }),
       supabaseClient.from("gastos").select("fecha, concepto, monto").gte("fecha", inicio).lt("fecha", fin).order("fecha", { ascending: false }),
       esDia
-        ? supabaseClient.from("pagos").select("monto_pagado, estado, prestamo_id, prestamos(monto_prestado, interes_porcentaje, mora_acumulada, cuota, clientes(nombre))").gte("fecha_pago", inicio).lt("fecha_pago", fin)
+        ? supabaseClient.from("pagos").select("monto_pagado, estado, prestamo_id, prestamos(monto_prestado, interes_porcentaje, cuota, clientes(nombre))").gte("fecha_pago", inicio).lt("fecha_pago", fin)
         : Promise.resolve({ data: [] })
     ]);
     const conError = [clientes, prestamos, pagos, gastos, pagosDia].find(r => r.error);
@@ -778,21 +751,19 @@ async function exportarExcel(evento) {
 
     // --- Hoja "Resumen": totales del período exportado (mismos totales que
     // se ven arriba en Reportes), con la ganancia neta real (solo intereses
-    // cobrados + mora, menos gastos operativos).
+    // cobrados, menos gastos operativos).
     const totalCobradoPeriodo = (pagos.data || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
     const totalGastosPeriodo = (gastos.data || []).reduce((s, g) => s + Number(g.monto), 0);
     const gananciaBrutaPeriodo = ultimoReporteExportable.gananciaBruta || 0;
     const totalDesembolsadoPeriodo = await calcularDesembolsoReal((prestamos.data || []).map(p => ({ monto_prestado: p.monto_prestado, prestamo_anterior_id: p.prestamo_anterior_id, fecha_inicio: p.fecha_inicio })));
     const totalSaldoRenovadoPeriodo = refinanciamientosDetalle.reduce((s, r) => s + r.saldoRenovado, 0);
-    const moraCobradaPeriodo = ultimoReporteExportable.moraCobrada || 0;
 
     const filasResumen = [
       { concepto: "Total desembolsado en efectivo (sin contar saldos renovados)", monto: totalDesembolsadoPeriodo },
       { concepto: "Total cobrado (capital + interés)", monto: totalCobradoPeriodo },
       { concepto: "Utilidad de préstamos entregados (ganancia real)", monto: gananciaBrutaPeriodo },
-      { concepto: "Mora cobrada", monto: moraCobradaPeriodo },
       { concepto: "Gastos operativos", monto: totalGastosPeriodo },
-      { concepto: "Ganancia neta (utilidad + mora - gastos)", monto: (gananciaBrutaPeriodo + moraCobradaPeriodo) - totalGastosPeriodo },
+      { concepto: "Ganancia neta (utilidad - gastos)", monto: gananciaBrutaPeriodo - totalGastosPeriodo },
       { concepto: "Saldo renovado en refinanciamientos (no es plata nueva)", monto: totalSaldoRenovadoPeriodo }
     ];
     const hojaResumen = construirHojaEstilizada(
@@ -841,20 +812,18 @@ async function ejecutarExportacionExcel(boton, funcion) {
 // Reportes arriba.
 async function exportarResumenGeneralExcel(evento) {
   await ejecutarExportacionExcel(evento?.currentTarget, async () => {
-    const [{ data: pagos }, { data: gastos }, { data: prestamos }, { data: cargosMora }, capitalInicial] = await Promise.all([
+    const [{ data: pagos }, { data: gastos }, { data: prestamos }, capitalInicial] = await Promise.all([
       supabaseClient.from("pagos").select("monto_pagado, prestamo_id, prestamos(interes_porcentaje)"),
       supabaseClient.from("gastos").select("monto"),
-      supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, mora_acumulada, prestamo_anterior_id, fecha_inicio, estado"),
-      supabaseClient.from("cargos_mora").select("monto"),
+      supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio, estado"),
       obtenerCapitalInicial()
     ]);
 
     const totalCobrado = (pagos || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
     const totalGastos = (gastos || []).reduce((s, g) => s + Number(g.monto), 0);
     const gananciaBruta = (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
-    const moraCobrada = (cargosMora || []).reduce((s, c) => s + Number(c.monto), 0);
     const totalDesembolsado = await calcularDesembolsoReal(prestamos || []);
-    const gananciaNeta = (gananciaBruta + moraCobrada) - totalGastos;
+    const gananciaNeta = gananciaBruta - totalGastos;
 
     // Cartera activa hoy: suma del saldo pendiente de cada préstamo activo.
     const pagadoPorPrestamo = {};
@@ -868,7 +837,6 @@ async function exportarResumenGeneralExcel(evento) {
       { concepto: "Total prestado (efectivo entregado, histórico)", monto: totalDesembolsado },
       { concepto: "Total cobrado (histórico)", monto: totalCobrado },
       { concepto: "Utilidad total acumulada (de préstamos entregados, histórica)", monto: gananciaBruta },
-      { concepto: "Mora cobrada (histórica)", monto: moraCobrada },
       { concepto: "Gastos operativos (histórico)", monto: totalGastos },
       { concepto: "Ganancia neta (histórica)", monto: gananciaNeta },
       { concepto: "Cartera activa hoy (lo que falta por cobrar)", monto: carteraActiva }
@@ -895,7 +863,7 @@ async function exportarReporteDiarioExcel(evento) {
   await ejecutarExportacionExcel(evento?.currentTarget, async () => {
     const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }] = await Promise.all([
       supabaseClient.from("caja_diaria").select("base_inicial, efectivo_final").eq("fecha", fecha).maybeSingle(),
-      supabaseClient.from("pagos").select("monto_pagado, estado, prestamo_id, prestamos(interes_porcentaje, mora_acumulada, monto_prestado, cuota, clientes(nombre))").eq("fecha_pago", fecha),
+      supabaseClient.from("pagos").select("monto_pagado, estado, prestamo_id, prestamos(interes_porcentaje, monto_prestado, cuota, clientes(nombre))").eq("fecha_pago", fecha),
       supabaseClient.from("gastos").select("concepto, monto").eq("fecha", fecha),
       supabaseClient.from("prestamos").select("cliente_id, monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_inicio", fecha),
       supabaseClient.from("aportes_capital").select("monto, nota").eq("fecha", fecha)
@@ -932,7 +900,7 @@ async function exportarReporteDiarioExcel(evento) {
     // se entrega, igual que en el resto de la app) — no la utilidad que se
     // saca poco a poco de lo cobrado, para no mezclar los dos conceptos.
     const { data: prestamosActivos } = await supabaseClient
-      .from("prestamos").select("id, cuota, monto_prestado, interes_porcentaje, mora_acumulada, clientes(id, nombre)").eq("estado", "activo");
+      .from("prestamos").select("id, cuota, monto_prestado, interes_porcentaje, clientes(id, nombre)").eq("estado", "activo");
     if (prestamosActivos && prestamosActivos.length) {
       const idsPrestamos = prestamosActivos.map(p => p.id);
       const [{ data: pagosDia }, { data: pagosHastaEseDia }] = await Promise.all([
@@ -1041,7 +1009,6 @@ async function exportarReportePeriodoExcel(evento) {
         { concepto: "Gastos", monto: r.totalGastos },
         { concepto: "Flujo de caja", monto: r.flujoNeto },
         { concepto: "Utilidad de préstamos entregados", monto: r.gananciaBruta },
-        { concepto: "Mora cobrada", monto: r.moraCobrada },
         { concepto: "Ganancia neta", monto: r.gananciaNeta }
       ],
       [{ header: `Resumen — ${r.etiquetaPeriodo}`, key: "concepto", ancho: 40 }, { header: "Monto", key: "monto", tipo: "moneda", ancho: 20 }],
@@ -1125,15 +1092,13 @@ async function exportarCsv(tipo) {
     if (error) return mostrarAlerta("No fue posible exportar los gastos.");
     descargarArchivoCsv("gastos", ["Fecha", "Concepto", "Monto"], (data || []).map(g => [g.fecha, g.concepto, g.monto]));
   } else {
-    const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, mora_acumulada, cuota, prestamo_anterior_id, clientes(nombre)").eq("estado", "activo");
+    const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, cuota, prestamo_anterior_id, clientes(nombre)").eq("estado", "activo");
     if (error) return mostrarAlerta("No fue posible exportar la cartera.");
     const ids = (prestamos || []).map(p => p.id);
     const { data: pagos } = ids.length ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids) : { data: [] };
     const abonado = {}; (pagos || []).forEach(p => abonado[p.prestamo_id] = (abonado[p.prestamo_id] || 0) + Number(p.monto_pagado));
-    // Antes este saldo no incluía la mora aplicada, así que un crédito con
-    // mora salía con un número distinto aquí que en la pantalla de Cobrar.
-    descargarArchivoCsv("cartera", ["Cliente", "Monto inicial", "Interés %", "Cuota", "Abonado", "Mora aplicada", "Saldo", "Es refinanciamiento"], (prestamos || []).map(p => {
-      return [p.clientes?.nombre, p.monto_prestado, p.interes_porcentaje, p.cuota, abonado[p.id] || 0, p.mora_acumulada || 0, calcularSaldoPendiente(p, abonado[p.id] || 0), p.prestamo_anterior_id ? "Sí" : "No"];
+    descargarArchivoCsv("cartera", ["Cliente", "Monto inicial", "Interés %", "Cuota", "Abonado", "Saldo", "Es refinanciamiento"], (prestamos || []).map(p => {
+      return [p.clientes?.nombre, p.monto_prestado, p.interes_porcentaje, p.cuota, abonado[p.id] || 0, calcularSaldoPendiente(p, abonado[p.id] || 0), p.prestamo_anterior_id ? "Sí" : "No"];
     }));
   }
 }

@@ -24,8 +24,8 @@ function actualizarEtiquetaModoOscuro(activo) {
 document.addEventListener("DOMContentLoaded", () => actualizarEtiquetaModoOscuro(document.body.classList.contains("modo-oscuro")));
 
 // --- FUNCIONES AVANZADAS ---
-// Ranking de cumplimiento, mora manual y sugerencia de cupo quedan siempre
-// activadas y visibles (ya no hay toggle en Configuración para ocultarlas).
+// Ranking de cumplimiento y sugerencia de cupo quedan siempre activadas y
+// visibles (ya no hay toggle en Configuración para ocultarlas).
 function funcionesAvanzadasActivas() {
   return true;
 }
