@@ -86,5 +86,5 @@ async function cargarGananciaInicio() {
 
   cajaCartera.innerHTML = `
     <span class="${sube ? "tendencia-sube" : "tendencia-baja"}">${sube ? "↗" : "↘"} La cartera ${sube ? "aumentó" : "disminuyó"} ${variacionTexto} ${referencia}</span>
-    <small>Cartera activa hoy: ${formatoPesos(valorCarteraHoy)}</small>`;
+    <small>Por cobrar hoy: ${formatoPesos(valorCarteraHoy)}</small>`;
 }

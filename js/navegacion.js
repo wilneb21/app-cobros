@@ -21,6 +21,7 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
     pintarCapitalInicial();
     cargarReporteMes();
   }
+  if (nombre === "historial") cargarHistorialGlobal();
   cerrarMenuPrincipal();
 
   // Deja registrado el cambio de sección en el historial para que el botón
@@ -55,7 +56,7 @@ document.addEventListener("keydown", (evento) => {
 });
 
 function marcarNavActivo(nombre) {
-  document.querySelectorAll(".nav-btn, .barra-nav-btn, .btn-accion-flotante").forEach(btn => {
+  document.querySelectorAll(".nav-btn, .barra-nav-btn, .btn-accion-flotante, .btn-inicio-rapido, .btn-cobro-rapido").forEach(btn => {
     btn.classList.remove("activo");
     btn.removeAttribute("aria-current");
   });

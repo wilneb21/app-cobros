@@ -220,6 +220,15 @@ function armarNumeroWhatsapp(telefono) {
 }
 
 // --- CREAR CLIENTE DIRECTO (modal desde la pestaña Clientes) ---
+function abrirModalElegirPrestamo() {
+  document.getElementById("modal-elegir-prestamo").classList.remove("oculto");
+  empujarEstadoModal("modal-elegir-prestamo");
+}
+
+function cerrarModalElegirPrestamo() {
+  cerrarModalConHistorial("modal-elegir-prestamo");
+}
+
 async function abrirModalNuevoCliente() {
   document.getElementById("nuevo-cliente-nombre").value = "";
   document.getElementById("nuevo-cliente-tipo-doc").value = "CC";

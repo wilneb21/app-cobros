@@ -68,21 +68,35 @@
     <main id="contenido">
 
       <section id="seccion-inicio" class="seccion">
-        <div class="inicio-hero">
-          <span id="saludo-inicio">Buenos días</span>
-          <h3>Tu jornada de cobro</h3>
-          <p id="fecha-inicio"></p>
+        <div class="header-inicio">
+          <div class="avatar-app">💰</div>
+          <div class="txt">
+            <div class="saludo" id="saludo-inicio">Buenos días</div>
+            <div class="sub" id="fecha-inicio"></div>
+          </div>
         </div>
 
+        <div id="tarjeta-capital-inicio" class="tarjeta-capital oculto">
+          <div class="fila-top"><span class="icono">◧</span> Capital inicial</div>
+          <div class="monto" id="capital-inicio-monto"></div>
+          <div class="fecha-capital-inicio" id="capital-inicio-fecha"></div>
+        </div>
+
+        <div id="grid-resumen-inicio" class="grid-2x2"></div>
+
         <div id="progreso-cobro-principal" class="progreso-cobro-principal"></div>
-        <div id="resumen-dia" class="resumen-dia"></div>
-        <div id="resumen-cartera" class="resumen-dia"></div>
-        <div id="caja-diaria" class="caja-diaria"></div>
-        <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
+
+        <div class="fila-2botones">
+          <button type="button" class="btn-cobrar-grande" onclick="mostrarSeccion('cobrar')">$ Cobrar</button>
+          <button type="button" class="btn-prestar-grande" onclick="abrirModalElegirPrestamo()">+ Prestar</button>
+        </div>
 
         <h4>Pendientes por cobrar hoy</h4>
         <p class="texto-ayuda">Organizados por ruta, con los atrasados primero y los días que llevan vencidos.</p>
         <div id="jornada-por-rutas"></div>
+
+        <div id="caja-diaria" class="caja-diaria"></div>
+        <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
 
         <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver ganancia, gráficos y agenda de vencimientos</button>
 
@@ -171,11 +185,26 @@
             <input type="checkbox" id="prestamo-contar-domingos-festivos" checked>
             Contar domingos y festivos (Colombia) como día de cuota
           </label>
-          <input type="date" id="prestamo-fecha" aria-label="Fecha de inicio del préstamo" required>
+          <label for="prestamo-fecha" style="font-weight:600;font-size:13px;display:block;margin-top:6px">📆 Primera cuota</label>
+          <input type="date" id="prestamo-fecha" aria-label="Fecha de la primera cuota" required onchange="actualizarAyudaFechaPrestamo()">
+          <p id="ayuda-fecha-prestamo" class="texto-ayuda" style="margin-top:2px"></p>
           <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
           <button type="submit">+ Registrar préstamo</button>
         </form>
+      </section>
+
+      <section id="seccion-historial" class="seccion oculto">
+        <h3>Historial</h3>
+        <input type="text" id="buscador-historial-global" placeholder="🔎 Buscar por nombre, cédula o celular..." oninput="filtrarHistorialGlobalTexto()" style="margin-bottom:10px">
+        <div class="chips-hist">
+          <button type="button" class="chip-hist activa" onclick="cambiarFiltroHistorialGlobal('todos', this)">Todos</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('hoy', this)">Hoy</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('semana', this)">Semana</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('mes', this)">Mes</button>
+        </div>
+        <p id="conteo-historial-global" class="texto-ayuda" style="margin:10px 2px 6px"></p>
+        <div id="lista-historial-global"></div>
       </section>
 
       <section id="seccion-rutas" class="seccion oculto">
@@ -290,12 +319,22 @@
 
     </main>
 
+    <div id="menu-fondo" class="menu-fondo oculto" onclick="cerrarMenuPrincipal()"></div>
+
     <nav class="menu-inferior" id="menu-inferior" aria-label="Navegación principal">
       <button onclick="mostrarSeccion('inicio')" class="barra-nav-btn" data-nav="inicio"><span aria-hidden="true">⌂</span><small>Inicio</small></button>
       <button onclick="mostrarSeccion('clientes')" class="barra-nav-btn" data-nav="clientes"><span aria-hidden="true">♙</span><small>Clientes</small></button>
-      <button onclick="mostrarSeccion('prestamos')" class="barra-nav-btn" data-nav="prestamos"><span aria-hidden="true">¤</span><small>Préstamos</small></button>
-      <button onclick="mostrarSeccion('cobrar')" class="barra-nav-btn" data-nav="cobrar"><span aria-hidden="true">✓</span><small>Cobrar</small></button>
-      <button onclick="mostrarSeccion('configuracion')" class="barra-nav-btn" data-nav="configuracion"><span aria-hidden="true">⚙</span><small>Config.</small></button>
+      <button onclick="mostrarSeccion('historial')" class="barra-nav-btn" data-nav="historial"><span aria-hidden="true">🕘</span><small>Historial</small></button>
+      <button type="button" onclick="toggleMenuPrincipal()" class="barra-nav-btn" data-nav="mas" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">⋯</span><small>Más</small></button>
+
+      <div class="nav-links">
+        <p class="nav-titulo">Más opciones</p>
+        <button type="button" class="nav-btn" data-nav="prestamos" onclick="mostrarSeccion('prestamos')"><span class="nav-icon" aria-hidden="true">¤</span><span class="nav-label">Préstamos<br><small>Créditos activos</small></span></button>
+        <button type="button" class="nav-btn" data-nav="cuentas" onclick="mostrarSeccion('cuentas')"><span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">Cuentas<br><small>Por cobrar</small></span></button>
+        <button type="button" class="nav-btn" data-nav="rutas" onclick="mostrarSeccion('rutas')"><span class="nav-icon" aria-hidden="true">🗺️</span><span class="nav-label">Rutas<br><small>Orden de visita</small></span></button>
+        <button type="button" class="nav-btn" data-nav="reportes" onclick="mostrarSeccion('reportes')"><span class="nav-icon" aria-hidden="true">📊</span><span class="nav-label">Reportes<br><small>Caja y ganancia</small></span></button>
+        <button type="button" class="nav-btn" data-nav="configuracion" onclick="mostrarSeccion('configuracion')"><span class="nav-icon" aria-hidden="true">⚙</span><span class="nav-label">Configuración<br><small>Cuenta y ajustes</small></span></button>
+      </div>
     </nav>
 
   </div>
@@ -306,6 +345,24 @@
 
   <div id="modal-recibo" class="modal-overlay oculto">
     <div class="modal-caja" id="contenido-recibo"></div>
+  </div>
+
+  <div id="modal-elegir-prestamo" class="modal-overlay oculto">
+    <div class="modal-caja">
+      <div class="icono-modal-prestar">💳➕</div>
+      <h3>¿A quién vas a prestar?</h3>
+      <button type="button" class="opcion-modal-prestar nueva" onclick="cerrarModalElegirPrestamo(); abrirModalNuevoCliente()">
+        <span class="chip-opcion-prestar">➕👤</span>
+        <span class="txt-opcion-prestar"><strong>Nuevo cliente</strong><small>Registrar cliente y crear préstamo</small></span>
+        <span class="flecha-opcion">›</span>
+      </button>
+      <button type="button" class="opcion-modal-prestar existente" onclick="cerrarModalElegirPrestamo(); mostrarSeccion('prestamos')">
+        <span class="chip-opcion-prestar">👥</span>
+        <span class="txt-opcion-prestar"><strong>Cliente existente</strong><small>Buscar cliente y crear préstamo</small></span>
+        <span class="flecha-opcion">›</span>
+      </button>
+      <button type="button" class="btn-cerrar-detalle" onclick="cerrarModalElegirPrestamo()" style="margin-top:10px">Cancelar</button>
+    </div>
   </div>
 
   <div id="modal-detalle" class="modal-overlay oculto">
@@ -428,6 +485,7 @@
   <script src="js/rutas.js"></script>
   <script src="js/clientes.js"></script>
   <script src="js/prestamos.js"></script>
+  <script src="js/historial.js"></script>
   <script src="js/pagos.js"></script>
   <script src="js/capital.js"></script>
   <script src="js/reportes.js"></script>

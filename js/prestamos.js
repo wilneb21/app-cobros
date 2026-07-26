@@ -1,3 +1,15 @@
+// El día que se elige aquí es el que el sistema usa como "cuota #1 vence
+// este día" — por eso, por defecto, apunta a mañana (no a hoy): si registras
+// a alguien hoy, lo normal es que empiece a pagar mañana, no el mismo día.
+function actualizarAyudaFechaPrestamo() {
+  const valor = document.getElementById("prestamo-fecha")?.value;
+  const ayuda = document.getElementById("ayuda-fecha-prestamo");
+  if (!ayuda || !valor) return;
+  const dia = new Date(valor + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long" });
+  const esManana = valor === sumarDias(obtenerFechaLocal(), 1);
+  ayuda.textContent = `${dia.charAt(0).toUpperCase()}${dia.slice(1)}${esManana ? " — a partir de mañana, todos los días" : ""}`;
+}
+
 function actualizarVistaPreviaPrestamo() {
   const monto = obtenerValorNumerico(document.getElementById("prestamo-monto"));
   const interes = parseFloat(document.getElementById("prestamo-interes").value) || 0;
@@ -18,7 +30,8 @@ async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
   const selector = document.getElementById("prestamo-cliente");
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
   data.forEach(c => selector.innerHTML += `<option value="${c.id}">${escaparHtml(c.nombre)}</option>`);
-  if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = obtenerFechaLocal();
+  if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = sumarDias(obtenerFechaLocal(), 1);
+  actualizarAyudaFechaPrestamo();
   if (clienteSeleccionadoId) selector.value = String(clienteSeleccionadoId);
 }
 

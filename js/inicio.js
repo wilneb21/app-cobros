@@ -31,8 +31,7 @@ function obtenerRangoPeriodoInicio() {
 
 // --- DASHBOARD (Inicio) ---
 async function cargarResumenDia() {
-  mostrarCargando("resumen-dia");
-  mostrarCargando("resumen-cartera");
+  mostrarCargando("grid-resumen-inicio");
   mostrarCargando("jornada-por-rutas");
 
   const hoy = obtenerFechaLocal();
@@ -58,11 +57,7 @@ async function cargarResumenDia() {
   const idsConPagoHoy = (pagosDelDia || []).map(p => p.prestamo_id);
   const pendientes = prestamos.filter(p => !idsConPagoHoy.includes(p.id));
 
-  document.getElementById("resumen-dia").innerHTML = `
-    <div class="resumen-caja"><span class="numero">${formatoPesos(totalCobradoHoy)}</span><span class="etiqueta">Cobrado ${rango.etiqueta}</span></div>
-    <div class="resumen-caja"><span class="numero">${visitadosHoy}</span><span class="etiqueta">Pagos registrados</span></div>
-    <div class="resumen-caja"><span class="numero">${pendientes.length}</span><span class="etiqueta">Pendientes hoy</span></div>
-  `;
+  pintarCapitalInicioHero();
 
   const metaJornada = totalCobradoHoy + pendientes.reduce((s, p) => s + Number(p.cuota || 0), 0);
   const pctCobrado = metaJornada ? Math.min((totalCobradoHoy / metaJornada) * 100, 100) : 0;
@@ -124,12 +119,30 @@ async function cargarResumenDia() {
     });
   }
 
-  document.getElementById("resumen-cartera").innerHTML = `
-    <div class="resumen-caja"><span class="numero">${formatoPesos(carteraActiva)}</span><span class="etiqueta">Cartera activa</span></div>
-    <div class="resumen-caja"><span class="numero">${clientesEnMora}</span><span class="etiqueta">Préstamos en mora</span></div>
+  const inicioMes = hoy.substring(0, 7) + "-01";
+  const gananciaMes = await calcularUtilidadPorPrestamos(inicioMes, sumarDias(hoy, 1));
+
+  document.getElementById("grid-resumen-inicio").innerHTML = `
+    <div class="mini-card"><span class="chip morado">▤</span><div class="txt"><div class="label">Por cobrar</div><div class="valor">${formatoPesos(carteraActiva)}</div></div></div>
+    <div class="mini-card"><span class="chip azul">↓</span><div class="txt"><div class="label">Cobrado hoy</div><div class="valor">${formatoPesos(totalCobradoHoy)}</div></div></div>
+    <div class="mini-card"><span class="chip verde">↑</span><div class="txt"><div class="label">Ganancia del mes</div><div class="valor">${formatoPesos(gananciaMes)}</div></div></div>
+    <div class="mini-card"><span class="chip rojo">⚠</span><div class="txt"><div class="label">Préstamos en mora</div><div class="valor">${clientesEnMora}</div></div></div>
   `;
 
   pintarJornadaPorRutas(jornada);
+}
+
+// Tarjeta de Capital inicial en Inicio — reutiliza el mismo dato de
+// capital.js (preferencias_usuario.capital_inicial). Se queda oculta si el
+// negocio todavía no lo ha configurado, para no mostrar un $0 engañoso.
+async function pintarCapitalInicioHero() {
+  const tarjeta = document.getElementById("tarjeta-capital-inicio");
+  if (!tarjeta) return;
+  const capital = await obtenerCapitalInicial();
+  if (!capital) { tarjeta.classList.add("oculto"); return; }
+  tarjeta.classList.remove("oculto");
+  document.getElementById("capital-inicio-monto").textContent = formatoPesos(capital.monto);
+  document.getElementById("capital-inicio-fecha").textContent = capital.fecha ? `desde el ${formatoFecha(capital.fecha)}` : "";
 }
 
 let jornadaPorRutaCache = {};
@@ -152,9 +165,17 @@ function pintarJornadaPorRutas(jornada) {
     return `<div class="jornada-ruta">
       <div class="jornada-ruta-cabecera"><div><b>${escaparHtml(ruta)}</b><small>${clientes.length} por visitar${vencidos ? ` · ${vencidos} vencido${vencidos > 1 ? "s" : ""}` : ""}</small></div><span>${formatoPesos(clientes.reduce((total, cliente) => total + cliente.cuota, 0))}</span></div>
       <button type="button" class="btn-mapa-jornada" onclick="abrirMapaJornadaRuta(${idx})">🗺️ Ver ruta de hoy en el mapa</button>
-      ${ordenados.map(cliente => `<button type="button" class="jornada-cliente ${cliente.atrasado ? "jornada-vencida" : ""}" onclick="abrirCobroCliente(${cliente.clienteId})"><span>${cliente.atrasado ? `${cliente.diasAtraso >= 30 ? "En mora" : "Vencido"} · ${cliente.diasAtraso} ${cliente.diasAtraso === 1 ? "día" : "días"}` : "Pendiente"}</span><b>${escaparHtml(cliente.cliente)}</b><small>${cliente.atrasado ? `Debe ${formatoPesos(cliente.deudaVencida)} · ` : ""}Cuota ${formatoPesos(cliente.cuota)}</small><i>›</i></button>`).join("")}
+      ${ordenados.map(cliente => `<button type="button" class="jornada-cliente ${cliente.atrasado ? "jornada-vencida" : ""}" onclick="abrirCobroCliente(${cliente.clienteId})"><span class="avatar-jornada">${obtenerIniciales(cliente.cliente)}</span><b>${escaparHtml(cliente.cliente)}</b><small>${cliente.atrasado ? `${cliente.diasAtraso >= 30 ? "En mora" : "Vencido"} · ${cliente.diasAtraso} ${cliente.diasAtraso === 1 ? "día" : "días"} · Debe ${formatoPesos(cliente.deudaVencida)}` : `Pendiente · Cuota ${formatoPesos(cliente.cuota)}`}</small><i>›</i></button>`).join("")}
     </div>`;
   }).join("");
+}
+
+// Saca las iniciales de un nombre (máx. 2 letras) para el avatar circular de la jornada.
+function obtenerIniciales(nombre) {
+  if (!nombre) return "?";
+  const partes = nombre.trim().split(/\s+/);
+  const iniciales = partes.length > 1 ? partes[0][0] + partes[1][0] : partes[0].slice(0, 2);
+  return iniciales.toUpperCase();
 }
 
 // Abre el mapa con los clientes pendientes de HOY de esa ruta, en el orden manual
