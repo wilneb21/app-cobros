@@ -16,7 +16,7 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   if (nombre === "cobrar") cargarClientesParaCobrar();
   if (nombre === "cuentas") cargarCuentasPorCobrar();
   if (nombre === "rutas") cargarRutas();
-  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); }
+  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarPerfilConfig(); }
   if (nombre === "reportes") {
     pintarCapitalInicial();
     cargarReporteMes();

@@ -2,6 +2,21 @@
 // Ajustes simples que se guardan en este celular (localStorage).
 
 // --- MODO OSCURO ---
+// Tarjeta con el correo de la cuenta que inició sesión, arriba de Configuración.
+async function pintarPerfilConfig() {
+  const contenedor = document.getElementById("perfil-config");
+  if (!contenedor) return;
+  try {
+    const user = await obtenerUsuarioActual();
+    const correo = user.email || "Tu cuenta";
+    contenedor.innerHTML = `
+      <div class="perfil-config">
+        <span class="avatar-perfil-config">${correo.charAt(0).toUpperCase()}</span>
+        <div><strong>${escaparHtml(correo)}</strong><small>Cuenta principal</small></div>
+      </div>`;
+  } catch { /* si la sesión expiró, obtenerUsuarioActual ya redirige al login */ }
+}
+
 function toggleModoOscuro() {
   document.body.classList.toggle("modo-oscuro");
   const activo = document.body.classList.contains("modo-oscuro");
