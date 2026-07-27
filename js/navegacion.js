@@ -12,10 +12,8 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
 
   if (nombre === "inicio") { cargarResumenDia(); cargarGraficoSemana(); cargarCajaDiaria(obtenerFechaLocal()); cargarTendenciaCobro(); cargarAgendaVencimientos(); cargarGananciaInicio(); }
   if (nombre === "clientes") cargarClientes();
-  if (nombre === "prestamos") cargarClientesEnSelector(opciones.clienteId || "");
+  if (nombre === "prestamos") { cargarCuentasPorCobrar(); cargarRutas(); }
   if (nombre === "cobrar") cargarClientesParaCobrar();
-  if (nombre === "cuentas") cargarCuentasPorCobrar();
-  if (nombre === "rutas") cargarRutas();
   if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarPerfilConfig(); }
   if (nombre === "reportes") {
     pintarCapitalInicial();

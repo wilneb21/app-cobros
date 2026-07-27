@@ -926,7 +926,10 @@ body.modo-oscuro .grupo-ruta-titulo { color: #9ce5d8; border-color: #3a4152; }
 .caja-metricas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #e2e8f0; }.caja-metricas span { background: var(--card); padding: 9px 12px; font-size: 11px; color: var(--text-muted); }.caja-metricas b { display: block; color: var(--text); font-size: 13px; }
 .caja-total { background: var(--card); padding: 11px 12px; border-radius: 0 0 14px 14px; font-size: 12px; color: var(--text-muted); }.caja-total strong { color: var(--success); }.caja-aviso { background: #fff9e6; padding: 10px; border-radius: 10px; font-size: 12px; color: #6b5a00; }
 
-.tarjeta-cuenta { display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary); }.cuenta-saldo { text-align: right; }.cuenta-saldo small, .cuenta-saldo span { display: block; font-size: 10px; color: var(--text-muted); }.cuenta-saldo b { display: block; color: var(--primary-dark); font-size: 15px; }
+.tarjeta-cuenta { display: flex; align-items: center; gap: 8px; border-left: 4px solid var(--primary); position: relative; }.tarjeta-cuenta-contenido { display: flex; flex: 1; min-width: 0; justify-content: space-between; align-items: center; cursor: pointer; }.cuenta-saldo { text-align: right; }.cuenta-saldo small, .cuenta-saldo span { display: block; font-size: 10px; color: var(--text-muted); }.cuenta-saldo b { display: block; color: var(--primary-dark); font-size: 15px; }
+.asa-arrastre { flex: none; width: 28px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #9aa0b4; cursor: grab; touch-action: none; user-select: none; }
+.tarjeta-cuenta.arrastrando { z-index: 5; box-shadow: 0 10px 24px rgba(18,93,83,.18); cursor: grabbing; }
+body.modo-oscuro .asa-arrastre { color: #6b7280; }
 .fila-finalizada { display: flex; align-items: center; gap: 10px; background: var(--card); margin-bottom: 8px; padding: 11px; border-radius: 12px; cursor: pointer; }.fila-finalizada > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #dcfce7; color: var(--success); font-weight: 800; }.fila-finalizada div { flex: 1; }.fila-finalizada strong, .fila-finalizada small { display: block; font-size: 12px; }.fila-finalizada small { color: var(--text-muted); }.fila-finalizada b { color: var(--primary); font-size: 11px; }
 .tendencia-cobro { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin: 8px 2px 2px; font-size: 12px; }.tendencia-cobro small { color: var(--text-muted); text-align: right; }.tendencia-sube { color: var(--success); font-weight: 700; }.tendencia-baja { color: var(--danger); font-weight: 700; }
 
@@ -1647,7 +1650,9 @@ body.modo-oscuro .fila-festivo, body.modo-oscuro .fila-checkbox { background: #2
 /* --- Barra inferior simplificada a 4 accesos (Inicio, Clientes, Cobrar, Más) ---
    El resto de secciones (Préstamos, Cuentas, Rutas, Reportes, Configuración)
    se movió al menú "Más" para que la barra no se sienta recargada. */
-.menu-inferior { grid-template-columns: repeat(4, 1fr); }
+.menu-inferior { grid-template-columns: repeat(5, 1fr); }
+.barra-nav-btn small { font-size: 9px; }
+.barra-nav-btn > span { font-size: 25px; line-height: 25px; }
 .menu-inferior .btn-inicio-rapido, .menu-inferior .btn-cobro-rapido, .menu-inferior .btn-menu-principal { min-height: 54px; }
 .btn-inicio-rapido.activo { color: #08776d; font-weight: 700; }
 .btn-cobro-rapido.activo { box-shadow: 0 0 0 2px #08776d inset; }

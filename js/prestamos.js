@@ -24,6 +24,16 @@ function actualizarVistaPreviaPrestamo() {
   vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
 }
 
+async function abrirModalNuevoPrestamo(clienteSeleccionadoId = "") {
+  await cargarClientesEnSelector(clienteSeleccionadoId);
+  document.getElementById("modal-nuevo-prestamo").classList.remove("oculto");
+  empujarEstadoModal("modal-nuevo-prestamo");
+}
+
+function cerrarModalNuevoPrestamo() {
+  cerrarModalConHistorial("modal-nuevo-prestamo");
+}
+
 async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
   const { data, error } = await supabaseClient.from("clientes").select("id, nombre").eq("archivado", false).order("nombre");
   if (error) { console.error(error); return; }
@@ -87,8 +97,9 @@ async function crearPrestamo(event) {
   document.getElementById("prestamo-fecha").value = "";
   document.getElementById("prestamo-contar-domingos-festivos").checked = true;
   document.getElementById("prestamo-cliente").value = "";
-  cargarClientesEnSelector();
+  cerrarModalNuevoPrestamo();
   cargarClientes();
+  if (!document.getElementById("seccion-prestamos").classList.contains("oculto")) cargarCuentasPorCobrar();
   mostrarAlerta("✅ Préstamo registrado con éxito");
 }
 
@@ -112,23 +123,52 @@ async function cargarClientesParaCobrar() {
   filtrarClientesCobrar();
 }
 
+let listaCuentasActivasCache = [];
+let columnaOrdenPrestamosDisponible = true;
+
 async function cargarCuentasPorCobrar() {
   const activas = document.getElementById("lista-cuentas-activas");
   const pagados = document.getElementById("lista-clientes-pagados");
   activas.innerHTML = '<div class="cargando">Cargando cuentas...</div>';
-  const { data: prestamos, error } = await supabaseClient
-    .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
+
+  const columnasCliente = columnaOrdenPrestamosDisponible
+    ? "id, nombre, telefono, orden_prestamos, rutas(nombre)"
+    : "id, nombre, telefono, rutas(nombre)";
+  let { data: prestamos, error } = await supabaseClient
+    .from("prestamos").select(`id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(${columnasCliente})`)
     .eq("estado", "activo").order("fecha_inicio");
+
+  // Si la columna orden_prestamos todavía no existe (falta correr la
+  // migración), Supabase devuelve error — reintentamos sin pedirla para que
+  // la lista de préstamos activos siga funcionando igual; solo se pierde,
+  // por ahora, la posibilidad de arrastrar para reordenar.
+  if (error && columnaOrdenPrestamosDisponible) {
+    columnaOrdenPrestamosDisponible = false;
+    ({ data: prestamos, error } = await supabaseClient
+      .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
+      .eq("estado", "activo").order("fecha_inicio"));
+  }
   if (error) { activas.textContent = "No fue posible cargar las cuentas por cobrar."; return; }
   const ids = (prestamos || []).map(p => p.id);
   const { data: pagos } = ids.length ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids) : { data: [] };
   const acumulados = {};
   (pagos || []).forEach(p => acumulados[p.prestamo_id] = (acumulados[p.prestamo_id] || 0) + Number(p.monto_pagado));
 
-  activas.innerHTML = !prestamos?.length ? '<div class="estado-vacio">🎉 No tienes cuentas activas por cobrar.</div>' : prestamos.map(p => {
-    const saldo = calcularSaldoPendiente(p, acumulados[p.id] || 0);
-    return `<div class="tarjeta tarjeta-cuenta" role="button" tabindex="0" onclick="abrirDetalleCliente(${p.cliente_id})"><div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div><div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div></div>`;
-  }).join("");
+  // Orden manual (independiente del orden de rutas): los que ya tienen
+  // orden_prestamos asignado van primero en ese orden; el resto, al final
+  // en el orden en que llegaron (por fecha de inicio).
+  const conOrden = (prestamos || []).map((p, i) => ({ ...p, saldo: calcularSaldoPendiente(p, acumulados[p.id] || 0), _indiceOriginal: i }));
+  conOrden.sort((a, b) => {
+    const oa = a.clientes?.orden_prestamos, ob = b.clientes?.orden_prestamos;
+    if (oa != null && ob != null) return oa - ob;
+    if (oa != null) return -1;
+    if (ob != null) return 1;
+    return a._indiceOriginal - b._indiceOriginal;
+  });
+
+  listaCuentasActivasCache = conOrden;
+  pintarCuentasActivas();
+
 
   const { data: finalizados, error: errorFinalizados } = await supabaseClient
     .from("prestamos").select("cliente_id, clientes(id, nombre, telefono, rutas(nombre))").eq("estado", "pagado");
@@ -137,6 +177,90 @@ async function cargarCuentasPorCobrar() {
   pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" role="button" tabindex="0" onclick="abrirDetalleCliente(${c.id})"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
 }
 
+function pintarCuentasActivas() {
+  const activas = document.getElementById("lista-cuentas-activas");
+  const lista = listaCuentasActivasCache;
+  if (!lista.length) { activas.innerHTML = '<div class="estado-vacio">🎉 No tienes cuentas activas por cobrar.</div>'; return; }
+  activas.innerHTML = lista.map(p => `
+    <div class="tarjeta tarjeta-cuenta" data-cliente-id="${p.cliente_id}">
+      <span class="asa-arrastre" aria-label="Mantén presionado y arrastra para reordenar">⠿</span>
+      <div role="button" tabindex="0" class="tarjeta-cuenta-contenido" onclick="abrirDetalleCliente(${p.cliente_id})">
+        <div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div>
+        <div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(p.saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div>
+      </div>
+    </div>`).join("");
+  activarArrastreCuentasActivas();
+}
+
+// --- Arrastrar y soltar para reordenar "Préstamos activos" ---
+// Usa Pointer Events (una sola API que funciona igual con el dedo en el
+// celular y con el mouse en escritorio), en vez de la API nativa de
+// drag-and-drop de HTML5, que no funciona bien en navegadores móviles.
+// Mientras arrastras, solo se mueve visualmente la tarjeta que agarraste;
+// al soltar, se calcula su posición final comparando dónde quedó tu dedo
+// contra el centro de las demás tarjetas (que no se movieron), y ahí sí se
+// reordena — así se evitan los saltos raros de reordenar en vivo.
+function activarArrastreCuentasActivas() {
+  document.querySelectorAll("#lista-cuentas-activas .asa-arrastre").forEach(asa => {
+    asa.onpointerdown = iniciarArrastreCuenta;
+  });
+}
+
+function iniciarArrastreCuenta(evento) {
+  const fila = evento.target.closest(".tarjeta-cuenta");
+  const contenedor = document.getElementById("lista-cuentas-activas");
+  if (!fila || !contenedor) return;
+  evento.preventDefault();
+
+  const yInicial = evento.clientY;
+  fila.classList.add("arrastrando");
+
+  function alMover(e) {
+    fila.style.transform = `translateY(${e.clientY - yInicial}px)`;
+  }
+
+  function alSoltar(e) {
+    document.removeEventListener("pointermove", alMover);
+    document.removeEventListener("pointerup", alSoltar);
+    fila.classList.remove("arrastrando");
+    fila.style.transform = "";
+
+    const otras = Array.from(contenedor.querySelectorAll(".tarjeta-cuenta")).filter(el => el !== fila);
+    const yFinal = e.clientY;
+    let destino = null, insertarAntes = true;
+    for (const otra of otras) {
+      const rect = otra.getBoundingClientRect();
+      const centro = rect.top + rect.height / 2;
+      destino = otra;
+      insertarAntes = yFinal < centro;
+      if (insertarAntes) break;
+    }
+    if (destino) contenedor.insertBefore(fila, insertarAntes ? destino : destino.nextSibling);
+
+    guardarNuevoOrdenCuentasActivas();
+  }
+
+  document.addEventListener("pointermove", alMover);
+  document.addEventListener("pointerup", alSoltar, { once: true });
+}
+
+// Guarda el orden manual en clientes.orden_prestamos. Si la columna todavía
+// no existe (falta correr la migración), avisa una sola vez.
+let migracionOrdenPrestamosFaltante = false;
+async function guardarNuevoOrdenCuentasActivas() {
+  if (migracionOrdenPrestamosFaltante) return;
+  const idsEnOrden = Array.from(document.querySelectorAll("#lista-cuentas-activas .tarjeta-cuenta")).map(el => Number(el.dataset.clienteId));
+  listaCuentasActivasCache.sort((a, b) => idsEnOrden.indexOf(a.cliente_id) - idsEnOrden.indexOf(b.cliente_id));
+
+  if (!navigator.onLine) { mostrarAlerta("📴 Necesitas conexión para guardar el nuevo orden."); return; }
+  const resultados = await Promise.all(idsEnOrden.map((clienteId, i) =>
+    supabaseClient.from("clientes").update({ orden_prestamos: i + 1 }).eq("id", clienteId)
+  ));
+  if (resultados.find(r => r.error)) {
+    migracionOrdenPrestamosFaltante = true;
+    mostrarAlerta("No se pudo guardar el orden — falta ejecutar la migración de la columna orden_prestamos en Supabase.");
+  }
+}
 // Llena el selector de "filtrar por ruta" con las rutas que realmente tienen clientes
 function actualizarSelectorFiltroRuta(clientes) {
   const selector = document.getElementById("filtro-ruta-cobrar");

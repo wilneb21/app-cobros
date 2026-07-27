@@ -160,38 +160,24 @@
         <div id="lista-clientes"></div>
       </section>
 
-      <section id="seccion-cuentas" class="seccion oculto">
-        <h3>Cuentas por cobrar</h3>
+      <section id="seccion-prestamos" class="seccion oculto">
+        <h3>Préstamos activos</h3>
         <p class="texto-ayuda">Créditos activos ordenados para tu jornada de cobro.</p>
         <div id="lista-cuentas-activas"></div>
-        <h4>Clientes que ya terminaron de pagar</h4>
-        <div id="lista-clientes-pagados"></div>
-      </section>
+        <details>
+          <summary>Clientes que ya terminaron de pagar</summary>
+          <div id="lista-clientes-pagados"></div>
+        </details>
 
-      <section id="seccion-prestamos" class="seccion oculto">
-        <h3>Nuevo préstamo</h3>
-        <p class="texto-ayuda">Elige el cliente para crear su préstamo. Si aún no existe, créalo primero desde la pestaña Clientes.</p>
-        <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
-          <select id="prestamo-cliente" aria-label="Cliente del préstamo" required><option value="">Selecciona un cliente</option></select>
-          <input type="text" id="prestamo-monto" aria-label="Monto prestado" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
-          <input type="number" id="prestamo-interes" aria-label="Interés en porcentaje" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
-          <input type="number" id="prestamo-cuotas" aria-label="Número de cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
-          <select id="prestamo-frecuencia" aria-label="Frecuencia de pago" required onchange="actualizarVisibilidadDomingosFestivos()">
-            <option value="">Frecuencia de pago</option>
-            <option value="diario">Diario</option>
-            <option value="semanal">Semanal</option>
-          </select>
-          <label id="fila-contar-domingos-festivos" class="fila-checkbox oculto">
-            <input type="checkbox" id="prestamo-contar-domingos-festivos" checked>
-            Contar domingos y festivos (Colombia) como día de cuota
-          </label>
-          <label for="prestamo-fecha" style="font-weight:600;font-size:13px;display:block;margin-top:6px">📆 Primera cuota</label>
-          <input type="date" id="prestamo-fecha" aria-label="Fecha de la primera cuota" required onchange="actualizarAyudaFechaPrestamo()">
-          <p id="ayuda-fecha-prestamo" class="texto-ayuda" style="margin-top:2px"></p>
-          <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
-
-          <button type="submit">+ Registrar préstamo</button>
-        </form>
+        <details style="margin-top:14px">
+          <summary>🗺️ Organizar rutas</summary>
+          <form onsubmit="crearRuta(event)" class="tarjeta-form">
+            <input type="text" id="ruta-nombre" aria-label="Nombre de la ruta" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
+            <input type="text" id="ruta-descripcion" aria-label="Descripción de la ruta" placeholder="Descripción (opcional)">
+            <button type="submit">+ Agregar ruta</button>
+          </form>
+          <div id="lista-rutas"></div>
+        </details>
       </section>
 
       <section id="seccion-historial" class="seccion oculto">
@@ -205,16 +191,6 @@
         </div>
         <p id="conteo-historial-global" class="texto-ayuda" style="margin:10px 2px 6px"></p>
         <div id="lista-historial-global"></div>
-      </section>
-
-      <section id="seccion-rutas" class="seccion oculto">
-        <h3>Rutas</h3>
-        <form onsubmit="crearRuta(event)" class="tarjeta-form">
-          <input type="text" id="ruta-nombre" aria-label="Nombre de la ruta" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
-          <input type="text" id="ruta-descripcion" aria-label="Descripción de la ruta" placeholder="Descripción (opcional)">
-          <button type="submit">+ Agregar ruta</button>
-        </form>
-        <div id="lista-rutas"></div>
       </section>
 
       <section id="seccion-reportes" class="seccion oculto">
@@ -309,8 +285,8 @@
         </div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Gestión</p>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('cuentas')"><span class="config-icono">▤</span><span><b>Cuentas por cobrar</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('rutas')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">▤</span><span><b>Préstamos activos</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono">💰</span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
@@ -325,14 +301,12 @@
     <nav class="menu-inferior" id="menu-inferior" aria-label="Navegación principal">
       <button onclick="mostrarSeccion('inicio')" class="barra-nav-btn" data-nav="inicio"><span aria-hidden="true">⌂</span><small>Inicio</small></button>
       <button onclick="mostrarSeccion('clientes')" class="barra-nav-btn" data-nav="clientes"><span aria-hidden="true">♙</span><small>Clientes</small></button>
+      <button onclick="mostrarSeccion('prestamos')" class="barra-nav-btn" data-nav="prestamos"><span aria-hidden="true">¤</span><small>Préstamos</small></button>
       <button onclick="mostrarSeccion('historial')" class="barra-nav-btn" data-nav="historial"><span aria-hidden="true">🕘</span><small>Historial</small></button>
       <button type="button" onclick="toggleMenuPrincipal()" class="barra-nav-btn" data-nav="mas" aria-haspopup="true" aria-expanded="false"><span aria-hidden="true">⋯</span><small>Más</small></button>
 
       <div class="nav-links">
         <p class="nav-titulo">Más opciones</p>
-        <button type="button" class="nav-btn" data-nav="prestamos" onclick="mostrarSeccion('prestamos')"><span class="nav-icon" aria-hidden="true">¤</span><span class="nav-label">Préstamos<br><small>Créditos activos</small></span></button>
-        <button type="button" class="nav-btn" data-nav="cuentas" onclick="mostrarSeccion('cuentas')"><span class="nav-icon" aria-hidden="true">📋</span><span class="nav-label">Cuentas<br><small>Por cobrar</small></span></button>
-        <button type="button" class="nav-btn" data-nav="rutas" onclick="mostrarSeccion('rutas')"><span class="nav-icon" aria-hidden="true">🗺️</span><span class="nav-label">Rutas<br><small>Orden de visita</small></span></button>
         <button type="button" class="nav-btn" data-nav="reportes" onclick="mostrarSeccion('reportes')"><span class="nav-icon" aria-hidden="true">📊</span><span class="nav-label">Reportes<br><small>Caja y ganancia</small></span></button>
         <button type="button" class="nav-btn" data-nav="configuracion" onclick="mostrarSeccion('configuracion')"><span class="nav-icon" aria-hidden="true">⚙</span><span class="nav-label">Configuración<br><small>Cuenta y ajustes</small></span></button>
       </div>
@@ -348,16 +322,47 @@
     <div class="modal-caja" id="contenido-recibo"></div>
   </div>
 
+  <div id="modal-nuevo-prestamo" class="modal-overlay oculto">
+    <div class="modal-caja modal-grande">
+      <div class="detalle-header">
+        <h3>Nuevo préstamo</h3>
+        <button class="btn-cerrar-detalle" onclick="cerrarModalNuevoPrestamo()" aria-label="Cerrar formulario de nuevo préstamo">✕</button>
+      </div>
+      <p class="texto-ayuda">Elige el cliente para crear su préstamo. Si aún no existe, créalo primero como "Nuevo cliente".</p>
+      <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
+        <select id="prestamo-cliente" aria-label="Cliente del préstamo" required><option value="">Selecciona un cliente</option></select>
+        <input type="text" id="prestamo-monto" aria-label="Monto prestado" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
+        <input type="number" id="prestamo-interes" aria-label="Interés en porcentaje" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
+        <input type="number" id="prestamo-cuotas" aria-label="Número de cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
+        <select id="prestamo-frecuencia" aria-label="Frecuencia de pago" required onchange="actualizarVisibilidadDomingosFestivos()">
+          <option value="">Frecuencia de pago</option>
+          <option value="diario">Diario</option>
+          <option value="semanal">Semanal</option>
+        </select>
+        <label id="fila-contar-domingos-festivos" class="fila-checkbox oculto">
+          <input type="checkbox" id="prestamo-contar-domingos-festivos" checked>
+          Contar domingos y festivos (Colombia) como día de cuota
+        </label>
+        <label for="prestamo-fecha" style="font-weight:600;font-size:13px;display:block;margin-top:6px">📆 Primera cuota</label>
+        <input type="date" id="prestamo-fecha" aria-label="Fecha de la primera cuota" required onchange="actualizarAyudaFechaPrestamo()">
+        <p id="ayuda-fecha-prestamo" class="texto-ayuda" style="margin-top:2px"></p>
+        <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
+
+        <button type="submit">+ Registrar préstamo</button>
+      </form>
+    </div>
+  </div>
+
   <div id="modal-elegir-prestamo" class="modal-overlay oculto">
     <div class="modal-caja">
       <div class="icono-modal-prestar">💳➕</div>
       <h3>¿A quién vas a prestar?</h3>
-      <button type="button" class="opcion-modal-prestar nueva" onclick="cerrarModalElegirPrestamo(); abrirModalNuevoCliente()">
+      <button type="button" class="opcion-modal-prestar nueva" onclick="cerrarModalElegirPrestamo(); abrirModalNuevoCliente(true)">
         <span class="chip-opcion-prestar">➕👤</span>
         <span class="txt-opcion-prestar"><strong>Nuevo cliente</strong><small>Registrar cliente y crear préstamo</small></span>
         <span class="flecha-opcion">›</span>
       </button>
-      <button type="button" class="opcion-modal-prestar existente" onclick="cerrarModalElegirPrestamo(); mostrarSeccion('prestamos')">
+      <button type="button" class="opcion-modal-prestar existente" onclick="cerrarModalElegirPrestamo(); abrirModalNuevoPrestamo()">
         <span class="chip-opcion-prestar">👥</span>
         <span class="txt-opcion-prestar"><strong>Cliente existente</strong><small>Buscar cliente y crear préstamo</small></span>
         <span class="flecha-opcion">›</span>

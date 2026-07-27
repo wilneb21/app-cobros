@@ -229,7 +229,14 @@ function cerrarModalElegirPrestamo() {
   cerrarModalConHistorial("modal-elegir-prestamo");
 }
 
-async function abrirModalNuevoCliente() {
+// true cuando "Nuevo cliente" se abrió desde el flujo de Prestar (Inicio) —
+// en ese caso, al crear el cliente encadenamos directo al formulario de
+// préstamo, en vez de solo cerrar el modal como cuando se crea un cliente
+// suelto desde la pestaña Clientes.
+let nuevoClienteEsParaPrestamo = false;
+
+async function abrirModalNuevoCliente(paraPrestamo = false) {
+  nuevoClienteEsParaPrestamo = paraPrestamo;
   document.getElementById("nuevo-cliente-nombre").value = "";
   document.getElementById("nuevo-cliente-tipo-doc").value = "CC";
   document.getElementById("nuevo-cliente-cedula").value = "";
@@ -270,6 +277,7 @@ async function manejarSeleccionRutaNuevoCliente() {
 }
 
 function cerrarModalNuevoCliente() {
+  nuevoClienteEsParaPrestamo = false;
   cerrarModalConHistorial("modal-nuevo-cliente");
 }
 
@@ -317,14 +325,20 @@ async function crearClienteNuevo(event) {
   }
 
   const user = await obtenerUsuarioActual();
-  const { error } = await supabaseClient.from("clientes").insert({
+  const { data: clienteCreado, error } = await supabaseClient.from("clientes").insert({
     nombre, cedula, tipo_documento: tipoDocumento, telefono, direccion, notas, riesgo: "bueno", ruta_id: rutaId || null, user_id: user.id, archivado: false
-  });
+  }).select("id").single();
   if (error) { mostrarAlerta("No fue posible crear el cliente: " + traducirErrorSupabase(error)); return; }
 
+  const eraParaPrestamo = nuevoClienteEsParaPrestamo;
   cerrarModalNuevoCliente();
-  mostrarAlerta("✅ Cliente creado");
   cargarClientes();
+  if (eraParaPrestamo) {
+    mostrarAlerta("✅ Cliente creado — ahora arma su préstamo");
+    abrirModalNuevoPrestamo(clienteCreado.id);
+  } else {
+    mostrarAlerta("✅ Cliente creado");
+  }
 }
 
 // --- DETALLE DE CLIENTE (modal con pestañas) ---
@@ -436,7 +450,7 @@ async function abrirMapaCliente(clienteId) {
 
 function abrirPrestamoParaCliente(clienteId) {
   cerrarDetalleCliente();
-  mostrarSeccion("prestamos", false, { clienteId });
+  abrirModalNuevoPrestamo(clienteId);
 }
 
 async function guardarEdicionCliente(event, clienteId) {
