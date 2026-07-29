@@ -161,14 +161,17 @@ async function cargarCajaDiaria(fecha) {
 
   const listaAportesHtml = listaAportes.length === 0 ? "" : `
     <div class="caja-lista-aportes">
-      ${listaAportes.map(a => `
+      ${listaAportes.map(a => {
+        const esRetiro = Number(a.monto) < 0;
+        return `
         <div class="fila-aporte">
-          <span>+${formatoPesos(a.monto)}${a.nota ? ` · ${escaparHtml(a.nota)}` : ""}</span>
+          <span class="${esRetiro ? "tono-peligro-texto" : ""}">${esRetiro ? "🔻 Retiro " : "+"}${formatoPesos(Math.abs(a.monto))}${a.nota ? ` · ${escaparHtml(a.nota)}` : ""}</span>
           ${esHoy ? `<span class="acciones-aporte">
             <span onclick="editarAportePropio(${a.id})" title="Editar" role="button" tabindex="0" aria-label="Editar aporte">✏️</span>
             <span onclick="eliminarAportePropio(${a.id})" title="Eliminar" role="button" tabindex="0" aria-label="Eliminar aporte">🗑️</span>
           </span>` : ""}
-        </div>`).join("")}
+        </div>`;
+      }).join("")}
     </div>`;
 
   contenedor.innerHTML = `
@@ -176,7 +179,7 @@ async function cargarCajaDiaria(fecha) {
     <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}</div>
     ${avisoOffline}
     ${avisoRacha}
-    <div class="caja-metricas"><span>Base <b>${formatoPesos(esperado)}</b></span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
+    <div class="caja-metricas"><span>Base <b>${formatoPesos(esperado)}</b></span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia !== 0 ? `<span>Aporte propio <b class="${aportesDia < 0 ? "tono-peligro-texto" : ""}">${aportesDia < 0 ? "-" : "+"}${formatoPesos(Math.abs(aportesDia))}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
     ${hayConteo ? `<div class="caja-total">Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}</div>` : ""}
     ${hayConteo ? `
       <div class="caja-descuadre ${descuadre === 0 ? "cuadrada" : descuadre > 0 ? "sobrante" : "faltante"}">
@@ -184,7 +187,11 @@ async function cargarCajaDiaria(fecha) {
       </div>` : ""}
     ${movimientosHtml}
     ${listaAportesHtml}
-    ${esHoy && caja.data && (automatica || !hayConteo) ? `<button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>` : ""}`;
+    ${esHoy && caja.data && (automatica || !hayConteo) ? `
+      <div class="fila-botones-aporte">
+        <button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>
+        <button type="button" class="btn-aporte-propio btn-retiro-aporte" onclick="retirarAportePropio()">🔻 Retirar efectivo propio</button>
+      </div>` : ""}`;
 }
 
 function verCajaDeOtroDia() {
@@ -442,24 +449,52 @@ async function agregarAportePropio() {
   cargarCajaDiaria(obtenerFechaLocal());
 }
 
+// Saca efectivo propio de la caja SIN tocar ni borrar el aporte original que
+// se metió otro día — por ejemplo, si ayer metiste plata propia para
+// completar un préstamo y hoy quieres devolverte esa plata. Se registra como
+// un movimiento nuevo (monto negativo, fechado hoy), así el aporte de ayer
+// queda intacto en el historial y solo se resta a partir de hoy.
+async function retirarAportePropio() {
+  if (!requiereConexion()) return;
+  const monto = await mostrarPrompt("¿Cuánto efectivo PROPIO vas a sacar de la caja de hoy? (por ejemplo, para devolverte un aporte que metiste otro día)", "0", true);
+  if (monto === null) return;
+  const montoLimpio = Number(String(monto).replace(/\D/g, "")) || 0;
+  if (montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido."); return; }
+  const nota = await mostrarPrompt("¿Para qué fue este retiro? (opcional)", "");
+
+  const user = await obtenerUsuarioActual();
+  const { error } = await supabaseClient.from("aportes_capital").insert({
+    user_id: user.id, fecha: obtenerFechaLocal(), monto: -montoLimpio, nota: nota || null
+  });
+  if (error) { mostrarAlerta("No fue posible registrar el retiro: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("✅ Retiro registrado. Ya se restó del efectivo esperado de hoy.");
+  cargarCajaDiaria(obtenerFechaLocal());
+}
+
 async function editarAportePropio(aporteId) {
   if (!requiereConexion()) return;
   const { data: aporte } = await supabaseClient.from("aportes_capital").select("*").eq("id", aporteId).maybeSingle();
   if (!aporte) { mostrarAlerta("Ese aporte ya no existe."); cargarCajaDiaria(obtenerFechaLocal()); return; }
-  const monto = await mostrarPrompt("Corrige el monto del aporte:", Math.round(Number(aporte.monto)), true);
+  // Un retiro se guarda como monto negativo — al corregirlo, se mantiene como
+  // retiro (no se convierte en aporte sin querer al editar solo el número).
+  const esRetiro = Number(aporte.monto) < 0;
+  const monto = await mostrarPrompt(`Corrige el monto del ${esRetiro ? "retiro" : "aporte"}:`, Math.round(Math.abs(Number(aporte.monto))), true);
   if (monto === null) return;
   const montoLimpio = Number(String(monto).replace(/\D/g, "")) || 0;
   if (montoLimpio <= 0) { mostrarAlerta("Ingresa un monto válido."); return; }
-  const nota = await mostrarPrompt("¿Para qué fue este aporte? (opcional)", aporte.nota || "");
-  const { error } = await supabaseClient.from("aportes_capital").update({ monto: montoLimpio, nota: nota || null }).eq("id", aporteId);
-  if (error) { mostrarAlerta("No fue posible corregir el aporte: " + traducirErrorSupabase(error)); return; }
+  const nota = await mostrarPrompt(`¿Para qué fue este ${esRetiro ? "retiro" : "aporte"}? (opcional)`, aporte.nota || "");
+  const { error } = await supabaseClient.from("aportes_capital").update({ monto: esRetiro ? -montoLimpio : montoLimpio, nota: nota || null }).eq("id", aporteId);
+  if (error) { mostrarAlerta("No fue posible corregir el movimiento: " + traducirErrorSupabase(error)); return; }
   cargarCajaDiaria(obtenerFechaLocal());
 }
 
 async function eliminarAportePropio(aporteId) {
-  const confirmado = await mostrarConfirmacion("¿Eliminar este aporte propio? Se restará del efectivo esperado de hoy.");
+  const { data: aporte } = await supabaseClient.from("aportes_capital").select("monto").eq("id", aporteId).maybeSingle();
+  const esRetiro = aporte && Number(aporte.monto) < 0;
+  const confirmado = await mostrarConfirmacion(`¿Eliminar este ${esRetiro ? "retiro" : "aporte"}? Se ajustará el efectivo esperado de hoy.`);
   if (!confirmado) return;
   const { error } = await supabaseClient.from("aportes_capital").delete().eq("id", aporteId);
-  if (error) { mostrarAlerta("No fue posible eliminar el aporte: " + traducirErrorSupabase(error)); return; }
+  if (error) { mostrarAlerta("No fue posible eliminar el movimiento: " + traducirErrorSupabase(error)); return; }
   cargarCajaDiaria(obtenerFechaLocal());
 }

@@ -1046,6 +1046,11 @@ body.modo-oscuro .vista-previa-prestamo { background: #292550; color: #8fe0d0; }
 }
 body.modo-oscuro .btn-aporte-propio { background: #1e302e; color: #8fe0d0; }
 
+.fila-botones-aporte { display: flex; gap: 8px; margin-top: 8px; }
+.fila-botones-aporte .btn-aporte-propio { margin-top: 0; }
+.btn-retiro-aporte { background: #fdf2f2; color: #b3261e; }
+body.modo-oscuro .btn-retiro-aporte { background: #332020; color: #ff9d94; }
+
 .comparacion-mes {
   text-align: center;
   font-size: 13px;

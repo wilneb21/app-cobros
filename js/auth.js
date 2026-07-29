@@ -207,6 +207,13 @@ function prepararNavegacionMovil() {
   // OJO: debe ser pushState (no replaceState). Así queda un "colchón" en el
   // historial debajo de nuestro estado; si no, con una sola entrada el botón
   // atrás sale directo de la app sin darle chance a este código de actuar.
+  // Se empuja DOS veces (no una) porque algunos navegadores/PWA instaladas
+  // como standalone en Android no disparan "popstate" al volver a la primera
+  // entrada real del historial (la de antes de que la app tomara control) —
+  // con un solo colchón, ese primer toque de "atrás" podía salir de la app
+  // sin pasar por el diálogo de confirmación. Con dos, siempre hay una
+  // entrada intermedia donde sí se dispara popstate.
+  window.history.pushState(estadoNavActual, "");
   window.history.pushState(estadoNavActual, "");
   navegacionMovilPreparada = true;
 
