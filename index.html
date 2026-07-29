@@ -100,23 +100,9 @@
         <div id="caja-diaria" class="caja-diaria"></div>
         <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver ganancia, gráficos y agenda de vencimientos</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver gráficos y agenda de vencimientos</button>
 
         <div id="inicio-mas-estadisticas" class="oculto">
-          <div class="tarjeta-ganancia">
-            <div class="ganancia-cabecera">
-              <h4>💰 Utilidad</h4>
-              <div class="filtros-periodo filtros-ganancia" role="group" aria-label="Periodo de la ganancia">
-                <button type="button" class="pildora-periodo activa" data-periodo-ganancia="diaria" onclick="cambiarPeriodoGanancia('diaria')">Diaria</button>
-                <button type="button" class="pildora-periodo" data-periodo-ganancia="semanal" onclick="cambiarPeriodoGanancia('semanal')">Semanal</button>
-                <button type="button" class="pildora-periodo" data-periodo-ganancia="mensual" onclick="cambiarPeriodoGanancia('mensual')">Mensual</button>
-              </div>
-            </div>
-            <div id="ganancia-periodo-caja"></div>
-            <div id="ganancia-acumulada" class="ganancia-acumulada"></div>
-            <div id="cartera-tendencia-periodo" class="cartera-tendencia-periodo"></div>
-          </div>
-
           <div class="filtros-periodo" role="group" aria-label="Periodo del resumen">
             <button type="button" class="pildora-periodo activa" data-periodo="hoy" onclick="cambiarPeriodoInicio('hoy')">Hoy</button>
             <button type="button" class="pildora-periodo" data-periodo="ayer" onclick="cambiarPeriodoInicio('ayer')">Ayer</button>
@@ -130,7 +116,7 @@
           <div id="tendencia-cobro" class="tendencia-cobro"></div>
 
           <h4>Agenda de vencimientos</h4>
-          <p class="texto-ayuda">Próximas cuotas esperadas durante los siguientes 7 días.</p>
+          <p class="texto-ayuda">Cuotas vencidas o que vencen hoy.</p>
           <p id="link-activar-recordatorios" class="link-olvide oculto" role="button" tabindex="0" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
           <div id="agenda-vencimientos"></div>
         </div>
@@ -501,7 +487,6 @@
   <script src="js/pagos.js"></script>
   <script src="js/capital.js"></script>
   <script src="js/reportes.js"></script>
-  <script src="js/ganancia.js"></script>
   <script src="js/gastos.js"></script>
 
   <script>

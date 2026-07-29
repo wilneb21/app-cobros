@@ -261,7 +261,6 @@ async function cargarAgendaVencimientos() {
   if (!contenedor) return;
   contenedor.innerHTML = '<div class="cargando">Cargando agenda...</div>';
   const hoy = obtenerFechaLocal();
-  const limite = sumarDias(hoy, 6);
   const { data: prestamos, error } = await supabaseClient
     .from("prestamos").select("id, cuota, frecuencia, fecha_inicio, clientes(nombre, telefono)").eq("estado", "activo");
   if (error) { contenedor.textContent = "No fue posible cargar la agenda."; return; }
@@ -271,23 +270,22 @@ async function cargarAgendaVencimientos() {
     : { data: [] };
   const totalPagado = {};
   (pagos || []).forEach(p => totalPagado[p.prestamo_id] = (totalPagado[p.prestamo_id] || 0) + Number(p.monto_pagado));
-  const manana = sumarDias(hoy, 1);
+  // Solo se muestra lo que ya está vencido o vence hoy — antes mostraba los
+  // próximos 7 días, pero para créditos diarios eso terminaba siendo casi
+  // todos los clientes, duplicando lo que ya se ve en la pestaña Cobrar.
   const agenda = (prestamos || []).map(p => {
     const cuotasPagadas = Math.floor((totalPagado[p.id] || 0) / Number(p.cuota));
     return { ...p, proximaFecha: sumarDias(p.fecha_inicio, cuotasPagadas * (p.frecuencia === "semanal" ? 7 : 1)) };
-  }).filter(p => p.proximaFecha <= limite).sort((a, b) => a.proximaFecha.localeCompare(b.proximaFecha));
+  }).filter(p => p.proximaFecha <= hoy).sort((a, b) => a.proximaFecha.localeCompare(b.proximaFecha));
   contenedor.innerHTML = !agenda.length
-    ? '<div class="estado-vacio">No hay cuotas próximas para los siguientes 7 días.</div>'
+    ? '<div class="estado-vacio">No hay cuotas vencidas ni pendientes por hoy. 🎉</div>'
     : agenda.map(p => {
-      const etiqueta = p.proximaFecha < hoy ? "Vencida" : p.proximaFecha === hoy ? "Hoy" : p.proximaFecha;
-      const telefonoLimpio = (p.clientes?.telefono || "").replace(/\D/g, "");
-      const puedeRecordar = p.proximaFecha === manana && telefonoLimpio;
-      return `<div class="fila-agenda ${p.proximaFecha <= hoy ? "agenda-hoy" : ""}"><span>${etiqueta}</span><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><b>${formatoPesos(p.cuota)}</b>${puedeRecordar ? `<button type="button" class="btn-recordar-whatsapp" onclick="enviarRecordatorioWhatsapp('${escaparAtributoJs(p.clientes.nombre)}', '${telefonoLimpio}', ${p.cuota})">💬 Recordar</button>` : ""}</div>`;
+      const etiqueta = p.proximaFecha < hoy ? "Vencida" : "Hoy";
+      return `<div class="fila-agenda agenda-hoy"><span>${etiqueta}</span><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><b>${formatoPesos(p.cuota)}</b></div>`;
     }).join("");
 
-  const pendientesHoy = agenda.filter(p => p.proximaFecha <= hoy).length;
-  mostrarLinkRecordatorios(pendientesHoy);
-  dispararRecordatorioLocal(pendientesHoy);
+  mostrarLinkRecordatorios(agenda.length);
+  dispararRecordatorioLocal(agenda.length);
 }
 
 // --- RECORDATORIOS LOCALES DE VENCIMIENTOS ---
@@ -309,14 +307,6 @@ async function activarRecordatoriosLocales() {
   const permiso = await Notification.requestPermission();
   document.getElementById("link-activar-recordatorios").classList.add("oculto");
   if (permiso === "granted") mostrarAlerta("🔔 Listo. Te avisaremos aquí cuando haya cuotas vencidas u hoy, mientras tengas la app abierta.");
-}
-
-// --- RECORDATORIO POR WHATSAPP (un día antes de que venza la cuota) ---
-// Abre WhatsApp con un mensaje ya redactado; el cobrador solo revisa y envía.
-// Usa la misma lógica de armarNumeroWhatsapp() de clientes.js para el indicativo.
-function enviarRecordatorioWhatsapp(nombreCliente, telefonoLimpio, montoCuota) {
-  const mensaje = `Hola ${nombreCliente}, te recuerdo que mañana vence tu cuota de ${formatoPesos(montoCuota)}. ¡Gracias por tu pago puntual! 🙏`;
-  window.open(`https://wa.me/${armarNumeroWhatsapp(telefonoLimpio)}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener");
 }
 
 function dispararRecordatorioLocal(pendientesHoy) {

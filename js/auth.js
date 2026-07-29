@@ -213,7 +213,7 @@ function prepararNavegacionMovil() {
   // OJO: debe ser pushState (no replaceState). Así queda un "colchón" en el
   // historial debajo de nuestro estado; si no, con una sola entrada el botón
   // atrás sale directo de la app sin darle chance a este código de actuar.
-  // Se pone un "#nav1"/"#nav2" real en la URL (no solo un estado invisible)
+// Se pone un "#nav1"/"#nav2" real en la URL (no solo un estado invisible)
   // porque algunos navegadores/PWA instaladas como standalone en Android NO
   // disparan "popstate" cuando la URL no cambia en absoluto — con solo el
   // estado, el botón atrás podía saltarse todo este código y cerrar la app
