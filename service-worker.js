@@ -1,9 +1,13 @@
 // Nombre de la "versión" de caché. Súbelo (v2, v3...) cada vez que cambies archivos
 // para forzar que los celulares descarguen la versión nueva.
-const CACHE_NOMBRE = "app-cobros-v21";
+const CACHE_NOMBRE = "app-cobros-v25";
 
 // Archivos que se guardan para que la app cargue rápido y funcione con mala señal.
 // (Los datos reales de clientes/pagos siempre vienen de Supabase, no de aquí.)
+// OJO: esta lista debe reflejar los archivos .js reales del proyecto — "js/main.js"
+// ya no existe y quedó huérfano en versiones anteriores, lo que podía romper el
+// "install" completo del service worker (cache.addAll falla entero si UN solo
+// archivo de la lista da 404) y dejar a los celulares atascados en una versión vieja.
 const ARCHIVOS_CACHE = [
   "./",
   "./index.html",
@@ -14,13 +18,18 @@ const ARCHIVOS_CACHE = [
   "./js/bloqueo.js",
   "./js/push.js",
   "./js/auth.js",
-  "./js/main.js",
+  "./js/navegacion.js",
+  "./js/inicio.js",
+  "./js/caja.js",
+  "./js/capital.js",
+  "./js/historial.js",
+  "./js/busqueda.js",
+  "./js/preferencias.js",
   "./js/rutas.js",
   "./js/clientes.js",
   "./js/prestamos.js",
   "./js/pagos.js",
   "./js/reportes.js",
-  "./js/ganancia.js",
   "./js/gastos.js",
   "./manifest.json",
   "./iconos/icon-192.png",
