@@ -172,7 +172,6 @@ async function crearPrestamo(event) {
     cliente_id: clienteId, monto_prestado: monto, interes_porcentaje: interes,
     cuota, numero_cuotas: numeroCuotas, frecuencia, fecha_inicio: fechaInicio, fecha_desembolso: fechaDesembolso,
     estado: "activo", user_id: user.id,
-    interes_mora_habilitado: false, interes_mora_porcentaje: 0, interes_mora_dias_gracia: 0,
     contar_domingos_festivos: contarDomingosFestivos
   });
 
@@ -516,18 +515,16 @@ function toggleMasOpciones(prestamoId) {
 // --- ELIMINAR UN PRÉSTAMO MAL REGISTRADO ---
 // Igual que eliminarPago pero para el crédito completo: por ejemplo si se
 // creó por error (cliente equivocado, monto equivocado, duplicado). Borra
-// primero los pagos y cargos de mora asociados (para no dejar historial
-// huérfano ni chocar con la relación en la base de datos) y al final el
-// préstamo. Esto no se puede deshacer.
+// primero los pagos asociados (para no dejar historial huérfano ni chocar
+// con la relación en la base de datos) y al final el préstamo. Esto no se
+// puede deshacer.
 async function eliminarPrestamo(prestamoId, clienteId) {
   if (!requiereConexion()) return;
-  const confirmado = await mostrarConfirmacion("⚠️ ¿Seguro que quieres eliminar este préstamo? Se borrará también todo su historial de pagos y recargos de mora. Esto no se puede deshacer.");
+  const confirmado = await mostrarConfirmacion("⚠️ ¿Seguro que quieres eliminar este préstamo? Se borrará también todo su historial de pagos. Esto no se puede deshacer.");
   if (!confirmado) return;
 
   const { error: errorPagos } = await supabaseClient.from("pagos").delete().eq("prestamo_id", prestamoId);
   if (errorPagos) { mostrarAlerta("No fue posible borrar el historial de pagos del préstamo: " + traducirErrorSupabase(errorPagos)); return; }
-
-  await supabaseClient.from("cargos_mora").delete().eq("prestamo_id", prestamoId);
 
   const { error } = await supabaseClient.from("prestamos").delete().eq("id", prestamoId);
   if (error) { mostrarAlerta("No fue posible eliminar el préstamo: " + traducirErrorSupabase(error)); return; }
