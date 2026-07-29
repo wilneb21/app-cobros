@@ -81,7 +81,6 @@ function mostrarAppPrincipal() {
   cargarCajaDiaria(obtenerFechaLocal());
   cargarTendenciaCobro();
   cargarAgendaVencimientos();
-  cargarGananciaInicio();
   prepararInicio();
   prepararNavegacionMovil();
   marcarNavActivo("inicio");
@@ -200,6 +199,13 @@ let estadoNavActual = { seccion: "inicio", modal: null };
 // ninguno de esos toques adicionales saque de la app sin preguntar.
 let mostrandoDialogoSalida = false;
 let colchonesExtra = 0;
+let contadorColchon = 0;
+// Repone un paso en el historial con una URL (#nav-N) realmente distinta a
+// la anterior — necesario por la misma razón explicada en prepararNavegacionMovil.
+function reponerColchon() {
+  contadorColchon++;
+  window.history.pushState(estadoNavActual, "", "#nav-" + contadorColchon);
+}
 
 function prepararNavegacionMovil() {
   if (navegacionMovilPreparada) return;
@@ -207,7 +213,14 @@ function prepararNavegacionMovil() {
   // OJO: debe ser pushState (no replaceState). Así queda un "colchón" en el
   // historial debajo de nuestro estado; si no, con una sola entrada el botón
   // atrás sale directo de la app sin darle chance a este código de actuar.
-  window.history.pushState(estadoNavActual, "");
+  // Se pone un "#nav1"/"#nav2" real en la URL (no solo un estado invisible)
+  // porque algunos navegadores/PWA instaladas como standalone en Android NO
+  // disparan "popstate" cuando la URL no cambia en absoluto — con solo el
+  // estado, el botón atrás podía saltarse todo este código y cerrar la app
+  // directamente. Con la URL cambiando de verdad, el navegador sí lo trata
+  // como una navegación real y dispara el evento como corresponde.
+  window.history.pushState(estadoNavActual, "", "#nav1");
+  window.history.pushState(estadoNavActual, "", "#nav2");
   navegacionMovilPreparada = true;
 
   window.addEventListener("popstate", async (evento) => {
@@ -221,7 +234,7 @@ function prepararNavegacionMovil() {
         // Toque repetido mientras el diálogo ya estaba abierto: se repone el
         // colchón y no se abre un segundo diálogo encima del primero.
         colchonesExtra++;
-        window.history.pushState(estadoNavActual, "");
+        reponerColchon();
         return;
       }
 
@@ -235,7 +248,7 @@ function prepararNavegacionMovil() {
         // mientras el usuario dudaba, para que salir funcione en un solo intento.
         for (let i = 0; i <= colchonesExtra; i++) window.history.back();
       } else if (colchonesExtra === 0) {
-        window.history.pushState(estadoNavActual, "");
+        reponerColchon();
       }
       colchonesExtra = 0;
       return;
@@ -259,7 +272,7 @@ function prepararNavegacionMovil() {
 function empujarEstadoModal(idModal) {
   if (!navegacionMovilPreparada) return;
   estadoNavActual = { seccion: estadoNavActual.seccion, modal: idModal };
-  window.history.pushState(estadoNavActual, "");
+  window.history.pushState(estadoNavActual, "", "#" + idModal);
 }
 
 // Cierra un modal registrado con empujarEstadoModal, manteniendo el
@@ -268,6 +281,6 @@ function cerrarModalConHistorial(idModal) {
   document.getElementById(idModal)?.classList.add("oculto");
   if (navegacionMovilPreparada && estadoNavActual.modal === idModal) {
     estadoNavActual = { seccion: estadoNavActual.seccion, modal: null };
-    window.history.replaceState(estadoNavActual, "");
+    window.history.replaceState(estadoNavActual, "", "#" + estadoNavActual.seccion);
   }
 }
