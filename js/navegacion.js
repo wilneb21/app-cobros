@@ -10,7 +10,7 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   document.getElementById("seccion-" + nombre).classList.remove("oculto");
   marcarNavActivo(nombre);
 
-  if (nombre === "inicio") { cargarResumenDia(); cargarGraficoSemana(); cargarCajaDiaria(obtenerFechaLocal()); cargarTendenciaCobro(); cargarAgendaVencimientos(); cargarGananciaInicio(); }
+  if (nombre === "inicio") { cargarResumenDia(); cargarGraficoSemana(); cargarCajaDiaria(obtenerFechaLocal()); cargarTendenciaCobro(); cargarAgendaVencimientos(); }
   if (nombre === "clientes") cargarClientes();
   if (nombre === "prestamos") { cargarCuentasPorCobrar(); cargarRutas(); }
   if (nombre === "cobrar") cargarClientesParaCobrar();
