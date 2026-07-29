@@ -1,13 +1,19 @@
 // El día que se elige aquí es el que el sistema usa como "cuota #1 vence
-// este día" — por eso, por defecto, apunta a mañana (no a hoy): si registras
-// a alguien hoy, lo normal es que empiece a pagar mañana, no el mismo día.
-function actualizarAyudaFechaPrestamo() {
+// este día" — por defecto apunta a mañana para créditos diarios (si
+// registras a alguien hoy, lo normal es que empiece a pagar mañana, no el
+// mismo día) y en una semana para créditos semanales (ver
+// actualizarVisibilidadDomingosFestivos, que ajusta esta fecha según la
+// frecuencia elegida).
+function actualizarAyudaFechaPrestamo(editadaManualmente = false) {
+  if (editadaManualmente) fechaPrestamoEditadaManualmente = true;
   const valor = document.getElementById("prestamo-fecha")?.value;
   const ayuda = document.getElementById("ayuda-fecha-prestamo");
   if (!ayuda || !valor) return;
   const dia = new Date(valor + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long" });
   const esManana = valor === sumarDias(obtenerFechaLocal(), 1);
-  ayuda.textContent = `${dia.charAt(0).toUpperCase()}${dia.slice(1)}${esManana ? " — a partir de mañana, todos los días" : ""}`;
+  const esEnUnaSemana = valor === sumarDias(obtenerFechaLocal(), 7);
+  const nota = esManana ? " — a partir de mañana, todos los días" : (esEnUnaSemana ? " — la primera cuota vence en una semana" : "");
+  ayuda.textContent = `${dia.charAt(0).toUpperCase()}${dia.slice(1)}${nota}`;
 }
 
 function actualizarVistaPreviaPrestamo() {
@@ -17,17 +23,58 @@ function actualizarVistaPreviaPrestamo() {
   const vista = document.getElementById("vista-previa-prestamo");
   if (!monto || !cuotas || cuotas <= 0 || interes < 0) {
     vista.textContent = "Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.";
+  } else {
+    const total = calcularTotalConInteres(monto, interes);
+    const cuota = total / cuotas;
+    const fechaInicio = document.getElementById("prestamo-fecha")?.value;
+    const frecuencia = document.getElementById("prestamo-frecuencia")?.value;
+    const contarDomingosFestivos = document.getElementById("prestamo-contar-domingos-festivos")?.checked;
+    const fechaFin = fechaInicio && frecuencia ? calcularFechaFinPrestamo(fechaInicio, cuotas, frecuencia, contarDomingosFestivos) : null;
+    vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>${fechaFin ? `<span>📅 Terminaría de pagar el ${formatoFecha(fechaFin)}</span>` : ""}`;
+  }
+  actualizarInfoCajaPrestamo(monto);
+}
+
+// Efectivo esperado de HOY, calculado una vez al abrir el modal (no cambia
+// mientras el formulario está abierto). Sirve de punto de partida para
+// mostrar, en vivo, cuánto queda en caja después de este préstamo.
+let efectivoDisponibleHoyCache = null;
+
+// Muestra, debajo del campo de monto, cuánto efectivo hay disponible hoy y
+// cuánto quedaría después de entregar este préstamo — para que el cobrador
+// vea de una vez si le alcanza, sin tener que ir a la pestaña de Caja. Si la
+// fecha de desembolso elegida NO es hoy, no tiene sentido restarlo de la
+// caja de hoy (el efectivo saldrá otro día), así que solo se avisa.
+function actualizarInfoCajaPrestamo(monto) {
+  const info = document.getElementById("info-caja-prestamo");
+  if (!info) return;
+  if (efectivoDisponibleHoyCache === null) { info.textContent = ""; return; }
+  const fechaDesembolso = document.getElementById("prestamo-fecha-desembolso")?.value;
+  const esHoy = !fechaDesembolso || fechaDesembolso === obtenerFechaLocal();
+  if (!esHoy) {
+    info.innerHTML = `💵 Caja disponible hoy: <strong>${formatoPesos(efectivoDisponibleHoyCache)}</strong> · Este préstamo se restará de la caja del <strong>${formatoFecha(fechaDesembolso)}</strong>, no de la de hoy.`;
     return;
   }
-  const total = calcularTotalConInteres(monto, interes);
-  const cuota = total / cuotas;
-  vista.innerHTML = `<strong>Total a cobrar: ${formatoPesos(total)}</strong><span>${cuotas} cuotas aproximadas de ${formatoPesos(cuota)}</span>`;
+  const despues = efectivoDisponibleHoyCache - (monto || 0);
+  const claseDespues = despues < 0 ? "tono-peligro-texto" : "tono-exito-texto";
+  info.innerHTML = `💵 Caja disponible hoy: <strong>${formatoPesos(efectivoDisponibleHoyCache)}</strong>`
+    + (monto > 0 ? ` · Después de este préstamo: <strong class="${claseDespues}">${formatoPesos(despues)}</strong>${despues < 0 ? " ⚠️ no te alcanza el efectivo" : ""}` : "");
 }
 
 async function abrirModalNuevoPrestamo(clienteSeleccionadoId = "") {
+  fechaPrestamoEditadaManualmente = false;
   await cargarClientesEnSelector(clienteSeleccionadoId);
   document.getElementById("modal-nuevo-prestamo").classList.remove("oculto");
   empujarEstadoModal("modal-nuevo-prestamo");
+  // Si la frecuencia quedó seleccionada de una vez anterior (no se limpia
+  // al cerrar, para agilizar registros seguidos de la misma frecuencia),
+  // esto asegura que la fecha de primera cuota que se ve sea la correcta
+  // para esa frecuencia, y no el "mañana" genérico de cargarClientesEnSelector.
+  actualizarVisibilidadDomingosFestivos();
+  efectivoDisponibleHoyCache = null;
+  actualizarInfoCajaPrestamo(0);
+  efectivoDisponibleHoyCache = await obtenerEfectivoEsperadoHoy();
+  actualizarInfoCajaPrestamo(obtenerValorNumerico(document.getElementById("prestamo-monto")));
 }
 
 function cerrarModalNuevoPrestamo() {
@@ -41,6 +88,7 @@ async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
   selector.innerHTML = '<option value="">Selecciona un cliente</option>';
   data.forEach(c => selector.innerHTML += `<option value="${c.id}">${escaparHtml(c.nombre)}</option>`);
   if (!document.getElementById("prestamo-fecha").value) document.getElementById("prestamo-fecha").value = sumarDias(obtenerFechaLocal(), 1);
+  if (!document.getElementById("prestamo-fecha-desembolso").value) document.getElementById("prestamo-fecha-desembolso").value = obtenerFechaLocal();
   actualizarAyudaFechaPrestamo();
   if (clienteSeleccionadoId) selector.value = String(clienteSeleccionadoId);
 }
@@ -48,9 +96,22 @@ async function cargarClientesEnSelector(clienteSeleccionadoId = "") {
 // El checkbox "contar domingos y festivos" solo tiene sentido para cuotas
 // DIARIAS (en semanales cada cuota ya cae una vez por semana). Se muestra
 // u oculta según la frecuencia elegida en el formulario de nuevo préstamo.
+// Cuando cambia la frecuencia, la fecha sugerida de primera cuota cambia con
+// ella: para diario, mañana (el día siguiente); para semanal, en una semana
+// (7 días), que es cuándo vence de verdad la primera cuota semanal — antes
+// siempre sugería "mañana" sin importar la frecuencia, lo cual no tenía
+// sentido para un crédito semanal. Si el cobrador ya tocó la fecha a mano,
+// no se le pisa: solo se ajusta la sugerencia automática.
+let fechaPrestamoEditadaManualmente = false;
 function actualizarVisibilidadDomingosFestivos() {
   const frecuencia = document.getElementById("prestamo-frecuencia")?.value;
   document.getElementById("fila-contar-domingos-festivos")?.classList.toggle("oculto", frecuencia !== "diario");
+  const campoFecha = document.getElementById("prestamo-fecha");
+  if (campoFecha && !fechaPrestamoEditadaManualmente && frecuencia) {
+    campoFecha.value = sumarDias(obtenerFechaLocal(), frecuencia === "semanal" ? 7 : 1);
+    actualizarAyudaFechaPrestamo();
+  }
+  actualizarVistaPreviaPrestamo();
 }
 
 async function crearPrestamo(event) {
@@ -65,9 +126,10 @@ async function crearPrestamo(event) {
   const numeroCuotas = parseInt(document.getElementById("prestamo-cuotas").value);
   const frecuencia = document.getElementById("prestamo-frecuencia").value;
   const fechaInicio = document.getElementById("prestamo-fecha").value;
+  const fechaDesembolso = document.getElementById("prestamo-fecha-desembolso").value;
   // Solo aplica de verdad a cuotas diarias; en semanales el checkbox se ignora.
   const contarDomingosFestivos = document.getElementById("prestamo-contar-domingos-festivos").checked;
-  if (!fechaInicio || !validarMontoPositivo(monto, "El monto prestado") || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0 || interes < 0) {
+  if (!fechaInicio || !fechaDesembolso || !validarMontoPositivo(monto, "El monto prestado") || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0 || interes < 0) {
     mostrarAlerta("Revisa los valores del préstamo: cuotas enteras y porcentajes no negativos.");
     return;
   }
@@ -78,9 +140,37 @@ async function crearPrestamo(event) {
 
   if (!clienteId) { mostrarAlerta("Selecciona un cliente. Si aún no existe, créalo primero desde la pestaña Clientes."); return; }
 
+  // Si el efectivo de hoy no alcanza para este préstamo, se le ofrece al
+  // cobrador agregar esa plata de su bolsillo ahí mismo (como "aporte
+  // propio"), en vez de dejar que la caja quede en números rojos sin avisar.
+  // Esto solo aplica si el desembolso es HOY — si se programó para otro
+  // día, la caja de hoy no se ve afectada y no hay nada que verificar aquí.
+  if (fechaDesembolso === obtenerFechaLocal() && efectivoDisponibleHoyCache !== null && monto > efectivoDisponibleHoyCache) {
+    const faltante = monto - efectivoDisponibleHoyCache;
+    const quiereAgregar = await mostrarConfirmacion(`⚠️ No te alcanza el efectivo en caja para este préstamo — te faltan ${formatoPesos(faltante)}.\n\n¿Quieres agregar ese efectivo de tu bolsillo ahora, para completarlo?`);
+    if (quiereAgregar) {
+      const montoTexto = await mostrarPrompt("¿Cuánto efectivo PROPIO vas a meter a la caja de hoy para completar este préstamo?", faltante, true);
+      if (montoTexto !== null) {
+        const montoAporte = Number(String(montoTexto).replace(/\D/g, "")) || 0;
+        if (montoAporte > 0) {
+          const { error: errorAporte } = await supabaseClient.from("aportes_capital").insert({
+            user_id: user.id, fecha: obtenerFechaLocal(), monto: montoAporte, nota: "Para completar préstamo"
+          });
+          if (errorAporte) { mostrarAlerta("No fue posible registrar el aporte: " + traducirErrorSupabase(errorAporte)); return; }
+          efectivoDisponibleHoyCache += montoAporte;
+          actualizarInfoCajaPrestamo(monto);
+        }
+      }
+    }
+    if (efectivoDisponibleHoyCache < monto) {
+      const continuarIgual = await mostrarConfirmacion(`Aun así seguirías faltando ${formatoPesos(monto - efectivoDisponibleHoyCache)} en caja. ¿Registrar el préstamo de todas formas?`);
+      if (!continuarIgual) return;
+    }
+  }
+
   const { error } = await supabaseClient.from("prestamos").insert({
     cliente_id: clienteId, monto_prestado: monto, interes_porcentaje: interes,
-    cuota, numero_cuotas: numeroCuotas, frecuencia, fecha_inicio: fechaInicio,
+    cuota, numero_cuotas: numeroCuotas, frecuencia, fecha_inicio: fechaInicio, fecha_desembolso: fechaDesembolso,
     estado: "activo", user_id: user.id,
     interes_mora_habilitado: false, interes_mora_porcentaje: 0, interes_mora_dias_gracia: 0,
     contar_domingos_festivos: contarDomingosFestivos
@@ -95,8 +185,12 @@ async function crearPrestamo(event) {
   document.getElementById("prestamo-interes").value = "";
   document.getElementById("prestamo-cuotas").value = "";
   document.getElementById("prestamo-fecha").value = "";
+  document.getElementById("prestamo-fecha-desembolso").value = "";
+  fechaPrestamoEditadaManualmente = false;
   document.getElementById("prestamo-contar-domingos-festivos").checked = true;
   document.getElementById("prestamo-cliente").value = "";
+  efectivoDisponibleHoyCache = null;
+  actualizarInfoCajaPrestamo(0);
   cerrarModalNuevoPrestamo();
   cargarClientes();
   if (!document.getElementById("seccion-prestamos").classList.contains("oculto")) cargarCuentasPorCobrar();
@@ -359,21 +453,20 @@ async function cargarPrestamosDeCliente(clienteId) {
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const diferencia = totalPagado - montoEsperado;
 
-    let claseMora, textoMora, montoDebe = 0, diasAtraso = 0;
+    let claseMora, textoMora, montoDebe = 0;
     if (diferencia >= 0) {
       claseMora = "estado-al-dia";
       textoMora = diferencia > 0 ? `🟢 Al día (adelantado ${formatoPesos(diferencia)})` : "🟢 Al día";
     } else {
       montoDebe = Math.round(Math.abs(diferencia));
-      const diasPorCuota = p.frecuencia === "diario" ? 1 : 7;
-      diasAtraso = Math.max(Math.round((montoDebe / Number(p.cuota)) * diasPorCuota), 1);
-      // "En mora" (rojo) solo cuando el atraso ya lleva un mes (30 días) o
-      // más. Antes bastaba con deber 2 cuotas para pasar a rojo, así que un
-      // cliente diario con apenas 2 días de atraso ya aparecía "en mora".
-      // Antes de ese mes, se muestra en amarillo como "Atrasado", que es lo
-      // que de verdad está pasando.
-      claseMora = diasAtraso >= 30 ? "estado-mora" : "estado-atencion";
-      textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)} (${diasAtraso} ${diasAtraso === 1 ? "día" : "días"} de atraso)`;
+      const infoAtraso = calcularTextoAtraso(montoDebe, p.cuota, p.frecuencia);
+      // "En mora" (rojo) solo cuando el atraso ya lleva ~1 mes o más. Antes
+      // bastaba con deber 2 cuotas para pasar a rojo, así que un cliente
+      // diario con apenas 2 días de atraso ya aparecía "en mora". Antes de
+      // eso, se muestra en amarillo como "Atrasado", que es lo que de
+      // verdad está pasando.
+      claseMora = infoAtraso.enMora ? "estado-mora" : "estado-atencion";
+      textoMora = `${claseMora === "estado-atencion" ? "🟡" : "🔴"} Debe ${formatoPesos(montoDebe)} (${infoAtraso.texto})`;
     }
     // Antes esta tarjeta mostraba hasta 6 cifras de dinero a la vez (saldo,
     // cuota, debe, recargo estimado, mora aplicada, adelantado). Ahora solo

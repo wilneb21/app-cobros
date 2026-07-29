@@ -214,7 +214,22 @@ function esDomingo(fechaTexto) {
   return new Date(a, m - 1, d).getDay() === 0;
 }
 
-// --- CUÁNTAS CUOTAS DEBERÍA LLEVAR PAGADAS UN PRÉSTAMO A UNA FECHA DADA ---
+// Convierte la deuda vencida de un préstamo en un texto de atraso legible,
+// respetando la frecuencia: para créditos diarios se cuenta en DÍAS, para
+// semanales se cuenta en SEMANAS (no en días). Antes, un cliente semanal que
+// apenas debía 1 cuota (recién vencida) aparecía como "7 días de atraso",
+// que suena a mucho más de lo que realmente es. "En mora" (el aviso más
+// serio, en rojo) equivale a aproximadamente un mes sin pagar en ambos
+// casos: 30 días para diario, o 4 semanas para semanal.
+function calcularTextoAtraso(deudaVencida, cuota, frecuencia) {
+  const esDiario = frecuencia === "diario";
+  const cantidad = Math.max(Math.round(Number(deudaVencida) / Number(cuota)), 1);
+  const enMora = esDiario ? cantidad >= 30 : cantidad >= 4;
+  const unidad = esDiario ? (cantidad === 1 ? "día" : "días") : (cantidad === 1 ? "semana" : "semanas");
+  return { enMora, cantidad, texto: `${cantidad} ${unidad} de atraso` };
+}
+
+
 // Antes esta cuenta (duplicada en 3 archivos) era simplemente "días
 // transcurridos + 1" para cuotas diarias. Ahora, si el préstamo tiene
 // contar_domingos_festivos = false, los domingos y los días que estén en la
@@ -235,6 +250,35 @@ async function calcularCuotasEsperadas(prestamo, fechaHoy) {
     cursor = sumarDias(cursor, 1);
   }
   return cuotas;
+}
+
+// Calcula en qué fecha caería la ÚLTIMA cuota de un préstamo (con qué fecha
+// terminaría de pagarse), usando la misma lógica que calcularCuotasEsperadas
+// pero hacia adelante: para semanal, una cuota cada 7 días; para diario,
+// una cuota cada día (o, si no se cuentan domingos/festivos, saltando esos
+// días igual que se hace para calcular el atraso). Se usa en el formulario
+// de "Nuevo préstamo" para mostrarle al cobrador, de una vez, cuándo
+// terminaría el cliente de pagar.
+function calcularFechaFinPrestamo(fechaInicio, numeroCuotas, frecuencia, contarDomingosFestivos) {
+  if (!fechaInicio || !Number.isInteger(numeroCuotas) || numeroCuotas <= 0) return null;
+  if (frecuencia !== "diario") {
+    return sumarDias(fechaInicio, (numeroCuotas - 1) * 7);
+  }
+  if (contarDomingosFestivos !== false) {
+    return sumarDias(fechaInicio, numeroCuotas - 1);
+  }
+  let cuotasContadas = 0;
+  let cursor = fechaInicio;
+  let fechaUltimaCuota = fechaInicio;
+  while (cuotasContadas < numeroCuotas) {
+    if (!esDomingo(cursor) && !esFestivoColombia(cursor)) {
+      cuotasContadas++;
+      fechaUltimaCuota = cursor;
+    }
+    if (cuotasContadas >= numeroCuotas) break;
+    cursor = sumarDias(cursor, 1);
+  }
+  return fechaUltimaCuota;
 }
 
 // Escapa un texto para poder insertarlo de forma segura dentro de un atributo

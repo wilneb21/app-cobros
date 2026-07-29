@@ -97,14 +97,15 @@ async function cargarResumenDia() {
     const montoEsperado = cuotasEsperadas * Number(p.cuota);
     const atrasado = totalPagado < montoEsperado;
     const deudaVencida = Math.max(montoEsperado - totalPagado, 0);
-    let diasAtraso = 0;
+    let textoAtraso = "", enMora = false;
     if (atrasado) {
-      const diasPorCuota = p.frecuencia === "diario" ? 1 : 7;
-      diasAtraso = Math.max(Math.round((deudaVencida / Number(p.cuota)) * diasPorCuota), 1);
+      const infoAtraso = calcularTextoAtraso(deudaVencida, p.cuota, p.frecuencia);
+      textoAtraso = infoAtraso.texto;
+      enMora = infoAtraso.enMora;
       // "Préstamos en mora" (el contador de arriba) solo cuenta a quien
-      // lleva 30 días o más — es una alerta de mora seria, más estricta que
-      // simplemente estar atrasado.
-      if (diasAtraso >= 30) clientesEnMora++;
+      // lleva ~1 mes o más sin pagar — es una alerta de mora seria, más
+      // estricta que simplemente estar atrasado.
+      if (enMora) clientesEnMora++;
     }
     if (!idsConPagoHoy.includes(p.id)) jornada.push({
       clienteId: p.cliente_id,
@@ -115,7 +116,8 @@ async function cargarResumenDia() {
       cuota: Number(p.cuota),
       atrasado,
       deudaVencida,
-      diasAtraso
+      textoAtraso,
+      enMora
     });
   }
 
@@ -151,6 +153,8 @@ let jornadaRutasOrdenNombres = [];
 function pintarJornadaPorRutas(jornada) {
   const contenedor = document.getElementById("jornada-por-rutas");
   if (!contenedor) return;
+  const resumen = document.getElementById("resumen-pendientes-hoy");
+  if (resumen) resumen.textContent = `▸ Pendientes por cobrar hoy (${jornada.length})`;
   if (!jornada.length) { contenedor.innerHTML = '<div class="estado-vacio">🎉 Ya registraste la visita de todos tus clientes activos hoy.</div>'; return; }
   const porRuta = jornada.reduce((grupos, item) => {
     (grupos[item.ruta] ||= []).push(item);
@@ -165,7 +169,7 @@ function pintarJornadaPorRutas(jornada) {
     return `<div class="jornada-ruta">
       <div class="jornada-ruta-cabecera"><div><b>${escaparHtml(ruta)}</b><small>${clientes.length} por visitar${vencidos ? ` · ${vencidos} vencido${vencidos > 1 ? "s" : ""}` : ""}</small></div><span>${formatoPesos(clientes.reduce((total, cliente) => total + cliente.cuota, 0))}</span></div>
       <button type="button" class="btn-mapa-jornada" onclick="abrirMapaJornadaRuta(${idx})">🗺️ Ver ruta de hoy en el mapa</button>
-      ${ordenados.map(cliente => `<button type="button" class="jornada-cliente ${cliente.atrasado ? "jornada-vencida" : ""}" onclick="abrirCobroCliente(${cliente.clienteId})"><span class="avatar-jornada">${obtenerIniciales(cliente.cliente)}</span><b>${escaparHtml(cliente.cliente)}</b><small>${cliente.atrasado ? `${cliente.diasAtraso >= 30 ? "En mora" : "Vencido"} · ${cliente.diasAtraso} ${cliente.diasAtraso === 1 ? "día" : "días"} · Debe ${formatoPesos(cliente.deudaVencida)}` : `Pendiente · Cuota ${formatoPesos(cliente.cuota)}`}</small><i>›</i></button>`).join("")}
+      ${ordenados.map(cliente => `<button type="button" class="jornada-cliente ${cliente.atrasado ? "jornada-vencida" : ""}" onclick="abrirCobroCliente(${cliente.clienteId})"><span class="avatar-jornada">${obtenerIniciales(cliente.cliente)}</span><b>${escaparHtml(cliente.cliente)}</b><small>${cliente.atrasado ? `${cliente.enMora ? "En mora" : "Vencido"} · ${cliente.textoAtraso} · Debe ${formatoPesos(cliente.deudaVencida)}` : `Pendiente · Cuota ${formatoPesos(cliente.cuota)}`}</small><i>›</i></button>`).join("")}
     </div>`;
   }).join("");
 }

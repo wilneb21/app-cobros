@@ -111,7 +111,7 @@ async function cargarReporteMes() {
   }
 
   const { data: prestamosPeriodo } = await supabaseClient
-    .from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin);
+    .from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin);
   const refinanciados = (prestamosPeriodo || []).filter(p => p.prestamo_anterior_id);
   const totalPrestadoNuevo = await calcularDesembolsoReal(prestamosPeriodo);
 
@@ -182,11 +182,12 @@ async function cargarLibroDiario(inicio, fin) {
   if (!contenedor) return;
   contenedor.innerHTML = '<div class="cargando">⏳ Calculando...</div>';
 
-  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }, capitalInicial, utilidadHistoricaPrevia, utilidadHistoricaTotal] = await Promise.all([
+  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamosParaUtilidad }, { data: prestamosParaCaja }, { data: aportes }, capitalInicial, utilidadHistoricaPrevia, utilidadHistoricaTotal] = await Promise.all([
     supabaseClient.from("caja_diaria").select("fecha, base_inicial").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("pagos").select("fecha_pago, monto_pagado").gte("fecha_pago", inicio).lt("fecha_pago", fin),
     supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin),
     supabaseClient.from("aportes_capital").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
     obtenerCapitalInicial(),
     calcularUtilidadHistoricaAntesDe(inicio),
@@ -201,7 +202,7 @@ async function cargarLibroDiario(inicio, fin) {
   // préstamo (interés sobre lo prestado), no el día que se cobra — por eso
   // aquí no se usa cobroPorDia para la utilidad, solo para la columna Cobro.
   const utilidadPorDia = {};
-  (prestamos || []).forEach(p => {
+  (prestamosParaUtilidad || []).forEach(p => {
     const interesDelPrestamo = Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100;
     utilidadPorDia[p.fecha_inicio] = (utilidadPorDia[p.fecha_inicio] || 0) + interesDelPrestamo;
   });
@@ -209,8 +210,11 @@ async function cargarLibroDiario(inicio, fin) {
   (gastos || []).forEach(g => gastoPorDia[g.fecha] = (gastoPorDia[g.fecha] || 0) + Number(g.monto));
   const aportePorDia = {};
   (aportes || []).forEach(a => aportePorDia[a.fecha] = (aportePorDia[a.fecha] || 0) + Number(a.monto));
+  // El efectivo prestado (columna "Préstamos" y lo que resta del "Cierre")
+  // sí se agrupa por fecha_desembolso — el día en que de verdad salió el
+  // billete de la caja — no por la fecha de primera cuota.
   const prestamosPorDia = {};
-  (prestamos || []).forEach(p => (prestamosPorDia[p.fecha_inicio] ||= []).push(p));
+  (prestamosParaCaja || []).forEach(p => (prestamosPorDia[p.fecha_desembolso] ||= []).push(p));
 
   // Base del primer día del período: si ese día ya tiene caja_diaria guardada,
   // se usa esa; si no, y el período empieza justo en (o después de) la fecha
@@ -755,7 +759,7 @@ async function exportarExcel(evento) {
     const totalCobradoPeriodo = (pagos.data || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
     const totalGastosPeriodo = (gastos.data || []).reduce((s, g) => s + Number(g.monto), 0);
     const gananciaBrutaPeriodo = ultimoReporteExportable.gananciaBruta || 0;
-    const totalDesembolsadoPeriodo = await calcularDesembolsoReal((prestamos.data || []).map(p => ({ monto_prestado: p.monto_prestado, prestamo_anterior_id: p.prestamo_anterior_id, fecha_inicio: p.fecha_inicio })));
+    const totalDesembolsadoPeriodo = (ultimoLibroDiario?.filas || []).reduce((s, f) => s + f.prestado, 0);
     const totalSaldoRenovadoPeriodo = refinanciamientosDetalle.reduce((s, r) => s + r.saldoRenovado, 0);
 
     const filasResumen = [
@@ -865,7 +869,7 @@ async function exportarReporteDiarioExcel(evento) {
       supabaseClient.from("caja_diaria").select("base_inicial, efectivo_final").eq("fecha", fecha).maybeSingle(),
       supabaseClient.from("pagos").select("monto_pagado, estado, prestamo_id, prestamos(interes_porcentaje, monto_prestado, cuota, clientes(nombre))").eq("fecha_pago", fecha),
       supabaseClient.from("gastos").select("concepto, monto").eq("fecha", fecha),
-      supabaseClient.from("prestamos").select("cliente_id, monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_inicio", fecha),
+      supabaseClient.from("prestamos").select("cliente_id, monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_desembolso", fecha),
       supabaseClient.from("aportes_capital").select("monto, nota").eq("fecha", fecha)
     ]);
 

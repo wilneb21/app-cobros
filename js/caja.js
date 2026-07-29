@@ -13,6 +13,31 @@ async function obtenerPreferenciaCajaAutomatica() {
   return true;
 }
 
+// Calcula el efectivo esperado de HOY con la misma fórmula que usa la caja
+// diaria (base + cobros + aportes − gastos − prestado), pero sin tocar la
+// pantalla. Se usa para mostrar en vivo, dentro del formulario de "Nuevo
+// préstamo", cuánto efectivo queda disponible antes y después de entregarlo
+// — así el cobrador ve de una vez si le alcanza, sin tener que ir a Caja.
+// Si la caja de hoy todavía no se ha abierto (por ejemplo, si nunca se pasó
+// por Inicio), se usa la base sugerida como respaldo, en silencio.
+async function obtenerEfectivoEsperadoHoy() {
+  const hoy = obtenerFechaLocal();
+  const [caja, pagos, gastos, prestamos, aportes] = await Promise.all([
+    supabaseClient.from("caja_diaria").select("base_inicial").eq("fecha", hoy).maybeSingle(),
+    supabaseClient.from("pagos").select("monto_pagado").eq("fecha_pago", hoy),
+    supabaseClient.from("gastos").select("monto").eq("fecha", hoy),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_desembolso", hoy),
+    supabaseClient.from("aportes_capital").select("monto").eq("fecha", hoy)
+  ]);
+  if (caja.error) return null;
+  const cobros = (pagos.data || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
+  const gastosDia = (gastos.data || []).reduce((s, g) => s + Number(g.monto), 0);
+  const aportesDia = (aportes.data || []).reduce((s, a) => s + Number(a.monto), 0);
+  const prestado = await calcularDesembolsoReal(prestamos.data);
+  const base = caja.data ? Number(caja.data.base_inicial || 0) : await calcularBaseSugerida();
+  return base + cobros + aportesDia - gastosDia - prestado;
+}
+
 
 // fechaCajaMostrada indica qué día se está viendo en el widget de Inicio.
 // Por defecto es siempre HOY (con todos los botones activos); si el cobrador
@@ -47,7 +72,7 @@ async function cargarCajaDiaria(fecha) {
     supabaseClient.from("caja_diaria").select("*").eq("fecha", fechaVista).maybeSingle(),
     supabaseClient.from("pagos").select("id, monto_pagado, estado, prestamos(clientes(nombre))").eq("fecha_pago", fechaVista),
     supabaseClient.from("gastos").select("id, concepto, monto").eq("fecha", fechaVista),
-    supabaseClient.from("prestamos").select("id, monto_prestado, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_inicio", fechaVista),
+    supabaseClient.from("prestamos").select("id, monto_prestado, prestamo_anterior_id, fecha_inicio, clientes(nombre)").eq("fecha_desembolso", fechaVista),
     supabaseClient.from("aportes_capital").select("*").eq("fecha", fechaVista).order("creado_en")
   ]);
 
@@ -97,8 +122,9 @@ async function cargarCajaDiaria(fecha) {
     ? `<button type="button" class="btn-contar-caja-auto" onclick="gestionarCajaDiaria(true)">🧮 Contar caja física</button>`
     : `<button onclick="gestionarCajaDiaria(${caja.data ? "true" : "false"})">${caja.data ? "Cerrar caja" : "Abrir caja"}</button>`;
 
-  const editarBase = esHoy && caja.data
-    ? ` <button type="button" class="link-editar-base" onclick="editarBaseCaja()" title="Corregir base inicial">✏️</button>` : "";
+  // El lápiz para corregir la base de hoy vivía aquí mismo, junto al monto.
+  // Se movió a Configuración → "Corregir base de caja de hoy", para no
+  // llenar de botones la vista principal de caja (ver editarBaseCaja()).
 
   // Antes, una vez cerrabas la caja de hoy (contabas el efectivo final), no
   // había forma de deshacerlo: el botón seguía diciendo "Cerrar caja" y solo
@@ -150,14 +176,14 @@ async function cargarCajaDiaria(fecha) {
     <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}</div>
     ${avisoOffline}
     ${avisoRacha}
-    <div class="caja-metricas"><span>Base <b>${formatoPesos(base)}</b>${editarBase}</span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
-    ${movimientosHtml}
-    ${listaAportesHtml}
-    <div class="caja-total">Efectivo esperado: <strong>${formatoPesos(esperado)}</strong>${hayConteo ? ` · Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}` : ""}</div>
+    <div class="caja-metricas"><span>Base <b>${formatoPesos(esperado)}</b></span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia > 0 ? `<span>Aporte propio <b>+${formatoPesos(aportesDia)}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
+    ${hayConteo ? `<div class="caja-total">Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}</div>` : ""}
     ${hayConteo ? `
       <div class="caja-descuadre ${descuadre === 0 ? "cuadrada" : descuadre > 0 ? "sobrante" : "faltante"}">
         ${descuadre === 0 ? "✅ Caja cuadrada — el conteo físico coincide con lo esperado" : descuadre > 0 ? `🔵 Sobrante de ${formatoPesos(descuadre)} — contaste más efectivo del esperado` : `🔴 Faltante de ${formatoPesos(Math.abs(descuadre))} — contaste menos efectivo del esperado`}
       </div>` : ""}
+    ${movimientosHtml}
+    ${listaAportesHtml}
     ${esHoy && caja.data && (automatica || !hayConteo) ? `<button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>` : ""}`;
 }
 
@@ -224,7 +250,7 @@ async function calcularBaseSugerida() {
   const [pagos, gastos, prestamos, aportes] = await Promise.all([
     supabaseClient.from("pagos").select("monto_pagado").eq("fecha_pago", ayer),
     supabaseClient.from("gastos").select("monto").eq("fecha", ayer),
-    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_inicio", ayer),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_desembolso", ayer),
     supabaseClient.from("aportes_capital").select("monto").eq("fecha", ayer)
   ]);
   const cobros = (pagos.data || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
@@ -338,7 +364,7 @@ async function recalcularCajaDesdeCapitalInicial(pedirConfirmacion = true) {
     supabaseClient.from("caja_diaria").select("*").gte("fecha", capital.fecha).lte("fecha", hoy),
     supabaseClient.from("pagos").select("monto_pagado, fecha_pago").gte("fecha_pago", capital.fecha).lte("fecha_pago", hoy),
     supabaseClient.from("gastos").select("monto, fecha").gte("fecha", capital.fecha).lte("fecha", hoy),
-    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", capital.fecha).lte("fecha_inicio", hoy),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", capital.fecha).lte("fecha_desembolso", hoy),
     supabaseClient.from("aportes_capital").select("monto, fecha").gte("fecha", capital.fecha).lte("fecha", hoy)
   ]);
 
@@ -351,7 +377,7 @@ async function recalcularCajaDesdeCapitalInicial(pedirConfirmacion = true) {
   const aportesPorFecha = {};
   (aportesRango || []).forEach(a => aportesPorFecha[a.fecha] = (aportesPorFecha[a.fecha] || 0) + Number(a.monto));
   const prestamosPorFecha = {};
-  (prestamosRango || []).forEach(p => (prestamosPorFecha[p.fecha_inicio] = prestamosPorFecha[p.fecha_inicio] || []).push(p));
+  (prestamosRango || []).forEach(p => (prestamosPorFecha[p.fecha_desembolso] = prestamosPorFecha[p.fecha_desembolso] || []).push(p));
 
   const user = await obtenerUsuarioActual();
   let diasActualizados = 0;

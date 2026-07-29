@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="Cobros">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -91,9 +91,11 @@
           <button type="button" class="btn-prestar-grande" onclick="abrirModalElegirPrestamo()">+ Prestar</button>
         </div>
 
-        <h4>Pendientes por cobrar hoy</h4>
-        <p class="texto-ayuda">Organizados por ruta, con los atrasados primero y los días que llevan vencidos.</p>
-        <div id="jornada-por-rutas"></div>
+        <details class="detalle-movimientos-dia" id="detalle-pendientes-hoy">
+          <summary id="resumen-pendientes-hoy">▸ Pendientes por cobrar hoy</summary>
+          <p class="texto-ayuda">Organizados por ruta, con los atrasados primero y los días que llevan vencidos.</p>
+          <div id="jornada-por-rutas"></div>
+        </details>
 
         <div id="caja-diaria" class="caja-diaria"></div>
         <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
@@ -288,6 +290,7 @@
           <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">▤</span><span><b>Préstamos activos</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono">🧮</span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono">💰</span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
         </div>
@@ -332,6 +335,7 @@
       <form onsubmit="crearPrestamo(event)" class="tarjeta-form">
         <select id="prestamo-cliente" aria-label="Cliente del préstamo" required><option value="">Selecciona un cliente</option></select>
         <input type="text" id="prestamo-monto" aria-label="Monto prestado" inputmode="numeric" placeholder="Monto prestado (ej: 1.000.000)" required>
+        <div id="info-caja-prestamo" class="texto-ayuda"></div>
         <input type="number" id="prestamo-interes" aria-label="Interés en porcentaje" placeholder="Interés % (opcional, ej: 20)" oninput="actualizarVistaPreviaPrestamo()">
         <input type="number" id="prestamo-cuotas" aria-label="Número de cuotas" placeholder="Número de cuotas (ej: 20)" required oninput="actualizarVistaPreviaPrestamo()">
         <select id="prestamo-frecuencia" aria-label="Frecuencia de pago" required onchange="actualizarVisibilidadDomingosFestivos()">
@@ -340,11 +344,13 @@
           <option value="semanal">Semanal</option>
         </select>
         <label id="fila-contar-domingos-festivos" class="fila-checkbox oculto">
-          <input type="checkbox" id="prestamo-contar-domingos-festivos" checked>
+          <input type="checkbox" id="prestamo-contar-domingos-festivos" checked onchange="actualizarVistaPreviaPrestamo()">
           Contar domingos y festivos (Colombia) como día de cuota
         </label>
+        <label for="prestamo-fecha-desembolso" style="font-weight:600;font-size:13px;display:block;margin-top:6px">💵 Fecha en que sale el efectivo</label>
+        <input type="date" id="prestamo-fecha-desembolso" aria-label="Fecha en que se entrega el efectivo" required onchange="actualizarInfoCajaPrestamo(obtenerValorNumerico(document.getElementById('prestamo-monto')))">
         <label for="prestamo-fecha" style="font-weight:600;font-size:13px;display:block;margin-top:6px">📆 Primera cuota</label>
-        <input type="date" id="prestamo-fecha" aria-label="Fecha de la primera cuota" required onchange="actualizarAyudaFechaPrestamo()">
+        <input type="date" id="prestamo-fecha" aria-label="Fecha de la primera cuota" required onchange="actualizarAyudaFechaPrestamo(true); actualizarVistaPreviaPrestamo()">
         <p id="ayuda-fecha-prestamo" class="texto-ayuda" style="margin-top:2px"></p>
         <div id="vista-previa-prestamo" class="vista-previa-prestamo">Ingresa monto, interés y cuotas para ver el valor aproximado de cada cuota.</div>
 
