@@ -451,8 +451,7 @@ function exportarReporteCSV() {
 // termine de pagar. Es la forma en que ya se llevaba a mano: cada préstamo
 // nuevo suma su interés al total de utilidad del negocio, sin mezclarse con
 // el resto de las cuentas (caja, gastos del día a día, etc.) hasta el
-// cierre de mes. La usan tanto Reportes (Libro diario) como la tarjeta de
-// Utilidad diaria/semanal/mensual de Inicio (ver ganancia.js).
+// cierre de mes. La usa Reportes (Libro diario y las tarjetas de resumen).
 async function calcularUtilidadPorPrestamos(inicio, fin) {
   const { data, error } = await supabaseClient
     .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_inicio", inicio).lt("fecha_inicio", fin);
