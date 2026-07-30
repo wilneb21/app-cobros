@@ -6,7 +6,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Clave pública VAPID para notificaciones push (ver js/push.js). La privada
 // NUNCA va en el frontend — vive solo como secreto en la Edge Function.
 // ⚠️ Genera tu propio par de llaves para producción (ver SUPABASE_SETUP.md).
-const VAPID_PUBLIC_KEY = "BNnJdT6j_rHGlHZTJV1e3kPfEQ9LfxN-ccUfqdN1jFeqhXZwIj2vAkzONBCBsHPw1eaAwz79VXq0RXpjJrg7KNk";
+const VAPID_PUBLIC_KEY = "BHGIxObd6WFIdF22slW8gSKtU_9mnBDRvMekMtmTEwWPk-Fh0eZ0QFcANEC_Jv0kWADjDhDVW70OFB6ISQlWMso";
 
 // --- TRADUCTOR DE ERRORES ---
 // Supabase/Postgres siempre devuelven sus mensajes de error en inglés. Esta
