@@ -1,18 +1,28 @@
 -- ============================================================================
--- ACTUALIZACIÓN CONSOLIDADA — reemplaza a las 12 migraciones sueltas de abajo
+-- ACTUALIZACIÓN CONSOLIDADA — reemplaza a las migraciones sueltas de abajo
 -- ============================================================================
--- Antes había que copiar y pegar 12 archivos, uno por uno y en orden exacto,
--- en el SQL Editor de Supabase. Ahora es un solo paso: copia y pega TODO este
--- archivo una sola vez.
+-- Antes había que copiar y pegar un archivo por uno, en orden exacto, en el
+-- SQL Editor de Supabase. Ahora es un solo paso: copia y pega TODO este
+-- archivo una sola vez. Cubre todas las migraciones desde 20260717 hasta
+-- 20260810 (zona horaria + retiros de aporte propio incluidos).
 --
--- Es seguro de ejecutar aunque ya hayas aplicado antes algunas de estas 12
+-- Es seguro de ejecutar aunque ya hayas aplicado antes algunas de estas
 -- migraciones: cada 'create table'/'add column' usa 'if not exists' y cada
 -- 'create policy' va precedida de 'drop policy if exists', así que no falla
 -- ni duplica nada si una parte ya estaba aplicada.
 --
+-- NOTA SOBRE LA MORA: en algún punto se construyó (y se probó) un sistema de
+-- recargo por mora/atraso — tabla cargos_mora, columnas interes_mora_*,
+-- mora_acumulada, mora_meses_aplicados, funciones aplicar_mora_automatica /
+-- aplicar_mora_manual / aplicar_recargo_mora. Se decidió que no se usaba y se
+-- quitó todo por completo. Este archivo consolidado YA NO incluye nada de eso
+-- (ni lo crea para después borrarlo) — si ves esas migraciones sueltas en la
+-- carpeta con "mora" en el nombre, ya están reflejadas aquí como si nunca
+-- hubieran existido.
+--
 -- IMPORTANTE — lo único que este archivo NO incluye es el esquema base del
 -- proyecto (las tablas clientes, prestamos, pagos, gastos, rutas, caja_diaria
--- tal como existían ANTES de estas 12 rondas de mejoras). Ese esquema base no
+-- tal como existían ANTES de estas rondas de mejoras). Ese esquema base no
 -- venía incluido en este proyecto, así que no puedo reconstruirlo sin
 -- inventar columnas — si vas a levantar un proyecto de Supabase desde cero,
 -- dime y lo armamos juntos a partir de lo que la app espera encontrar.
@@ -136,8 +146,14 @@ begin
   v_monto := round(v_saldo + p_monto_adicional, 0);
   if v_monto <= 0 then raise exception 'No hay saldo para refinanciar'; end if;
   update public.prestamos set estado = 'refinanciado' where id = p_prestamo_id;
-  insert into public.prestamos (cliente_id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, estado, prestamo_anterior_id, user_id, interes_mora_habilitado, interes_mora_porcentaje)
-  values (v_anterior.cliente_id, v_monto, p_interes_porcentaje, round(v_monto * (1 + p_interes_porcentaje / 100) / p_numero_cuotas, 0), p_numero_cuotas, v_anterior.frecuencia, p_fecha_inicio, 'activo', p_prestamo_id, auth.uid(), v_anterior.interes_mora_habilitado, v_anterior.interes_mora_porcentaje);
+  -- Nota: esta es la versión MÁS VIEJA de esta función, conservada aquí solo
+  -- para que el historial de este archivo sea fiel a como evolucionó. Queda
+  -- reemplazada más abajo por la versión final (sin columnas de mora, que ya
+  -- no existen — ver nota al principio del archivo). Esta versión intermedia
+  -- ya no referencia esas columnas para que el script no falle si se corre
+  -- contra la base de datos actual (donde esas columnas ya se borraron).
+  insert into public.prestamos (cliente_id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, estado, prestamo_anterior_id, user_id)
+  values (v_anterior.cliente_id, v_monto, p_interes_porcentaje, round(v_monto * (1 + p_interes_porcentaje / 100) / p_numero_cuotas, 0), p_numero_cuotas, v_anterior.frecuencia, p_fecha_inicio, 'activo', p_prestamo_id, auth.uid());
 end;
 $$;
 
@@ -193,53 +209,14 @@ create index if not exists clientes_ruta_orden_idx on public.clientes (ruta_id, 
 -- De: 20260720_mejoras_negocio.sql
 -- ---------------------------------------------------------------------------
 -- Ejecutar en Supabase SQL Editor, después de las 3 migraciones anteriores.
--- Agrega: mora real (aplicable con un botón, no automática/silenciosa),
--- historial de reordenamientos de ruta.
+-- Agrega: historial de reordenamientos de ruta.
 -- No toca las políticas de RLS existentes (siguen siendo user_id = auth.uid()).
-
--- --- 1) MORA REAL -----------------------------------------------------
--- Antes el recargo por mora solo se mostraba en pantalla como estimado.
--- Ahora, si el cobrador decide aplicarlo, se suma de verdad al saldo que
--- debe el cliente y queda guardado (auditable vía operaciones_auditoria,
--- que ya cubre updates de "prestamos").
-alter table public.prestamos add column if not exists mora_acumulada numeric not null default 0 check (mora_acumulada >= 0);
-
--- Registro fechado de cada recargo aplicado (mora_acumulada en "prestamos" es
--- solo el total acumulado para el cálculo rápido del saldo; esta tabla es la
--- que permite reportar cuánta mora se cobró en un período específico).
-create table if not exists public.cargos_mora (
-  id bigint generated always as identity primary key,
-  prestamo_id bigint not null references public.prestamos(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  monto numeric not null check (monto > 0),
-  fecha date not null default current_date,
-  creado_en timestamptz not null default now()
-);
-alter table public.cargos_mora enable row level security;
-drop policy if exists "Usuarios ven sus cargos de mora" on public.cargos_mora;
-create policy "Usuarios ven sus cargos de mora" on public.cargos_mora for select using (user_id = auth.uid());
-drop policy if exists "Usuarios crean sus cargos de mora" on public.cargos_mora;
-create policy "Usuarios crean sus cargos de mora" on public.cargos_mora for insert with check (user_id = auth.uid());
-
-create or replace function public.aplicar_recargo_mora(p_prestamo_id bigint, p_monto numeric)
-returns void language plpgsql security invoker set search_path = public as $$
-declare v_prestamo public.prestamos;
-begin
-  if auth.uid() is null then raise exception 'Sesión no válida'; end if;
-  if p_monto <= 0 then raise exception 'El recargo debe ser mayor a cero'; end if;
-  select * into v_prestamo from public.prestamos where id = p_prestamo_id and user_id = auth.uid() for update;
-  if not found or v_prestamo.estado <> 'activo' then raise exception 'Préstamo activo no encontrado'; end if;
-  if not v_prestamo.interes_mora_habilitado then raise exception 'Este préstamo no tiene mora habilitada'; end if;
-  update public.prestamos set mora_acumulada = mora_acumulada + p_monto where id = p_prestamo_id;
-  insert into public.cargos_mora (prestamo_id, user_id, monto) values (p_prestamo_id, auth.uid(), p_monto);
-end;
-$$;
-grant execute on function public.aplicar_recargo_mora(bigint, numeric) to authenticated;
-
--- Nota de diseño: la mora aplicada se contabiliza como ganancia en el
--- momento en que se aplica (es un cargo, no capital propio que regresa),
--- separada de la fórmula de interés normal. Si prefieres contabilizarla
--- solo cuando el cliente efectivamente la paga, avísame y lo ajustamos.
+--
+-- (Esta migración original también incluía un primer intento de "mora real"
+-- — columna mora_acumulada, tabla cargos_mora, función aplicar_recargo_mora —
+-- que quedó completamente reemplazado por intentos posteriores y al final
+-- se quitó todo del producto. Se omite aquí; ver la nota al principio del
+-- archivo.)
 
 -- --- 2) HISTORIAL DE REORDENAMIENTOS DE RUTA --------------------------
 -- Guarda una copia de cada vez que el cobrador reordena una ruta, para
@@ -522,3 +499,140 @@ drop policy if exists "Usuarios editan sus gastos" on public.gastos;
 create policy "Usuarios editan sus gastos" on public.gastos for update
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
+
+-- ---------------------------------------------------------------------------
+-- De: 20260803_mejoras_operativas.sql (solo la parte que sigue vigente)
+-- ---------------------------------------------------------------------------
+-- Ejecutar en Supabase SQL Editor, después de las migraciones anteriores.
+--
+-- Cada préstamo decide si sus cuotas DIARIAS cuentan domingos y festivos como
+-- día de cuota (comportamiento de siempre, valor por defecto) o si esos días
+-- se saltan al calcular cuántas cuotas debería llevar pagadas a hoy.
+alter table public.prestamos add column if not exists contar_domingos_festivos boolean not null default true;
+
+-- Nota: la migración original de esta fecha también agregó una tabla
+-- "dias_festivos" para cargarlos a mano, pero eso se reemplazó casi enseguida
+-- (ver 20260804_festivos_automaticos.sql) por un calendario que la app calcula
+-- sola (festivos de Colombia + Semana Santa + Ley Emiliani), así que esa
+-- tabla ya no se crea aquí — nunca llegó a hacer falta en la versión final.
+
+-- ---------------------------------------------------------------------------
+-- De: 20260809_fecha_desembolso.sql
+-- ---------------------------------------------------------------------------
+-- Ejecutar en Supabase SQL Editor, después de las migraciones anteriores.
+--
+-- Hasta ahora, la caja diaria usaba fecha_inicio (la fecha de la PRIMERA
+-- CUOTA, que en el formulario viene puesta en "mañana" por defecto) para
+-- decidir en qué día restar el efectivo prestado. Eso hacía que un préstamo
+-- entregado HOY apareciera restado en la caja de MAÑANA, sin que nadie lo
+-- notara.
+--
+-- Esta columna representa el día en que REALMENTE sale el efectivo de la
+-- mano del cobrador. La app la usa para todo lo relacionado con caja y
+-- reportes de efectivo prestado, dejando fecha_inicio únicamente para el
+-- cronograma de cuotas (cuándo debe pagar el cliente).
+alter table public.prestamos add column if not exists fecha_desembolso date;
+
+update public.prestamos
+set fecha_desembolso = fecha_inicio
+where fecha_desembolso is null;
+
+alter table public.prestamos
+  alter column fecha_desembolso set default current_date,
+  alter column fecha_desembolso set not null;
+
+-- ---------------------------------------------------------------------------
+-- De: 20260810_zona_horaria_y_retiro_aporte.sql
+-- ---------------------------------------------------------------------------
+-- Ejecutar en Supabase SQL Editor, después de las migraciones anteriores.
+--
+-- ZONA HORARIA: Supabase corre la base de datos en UTC por defecto. La app YA
+-- calcula bien "hoy" en el navegador (obtenerFechaLocal() usa America/Bogota),
+-- pero varias funciones y columnas del lado del servidor usan current_date/
+-- now() como valor por defecto. Como Bogotá es UTC-5, a las 7pm en Colombia ya
+-- es medianoche en UTC — por eso un préstamo creado después de las 7pm podía
+-- terminar fechado "mañana" en vez de "hoy". Esto pone en hora de Colombia
+-- toda la base de datos.
+alter database postgres set timezone to 'America/Bogota';
+
+-- RETIROS DE APORTE PROPIO: permite montos NEGATIVOS en aportes_capital. Un
+-- retiro (el cobrador mete plata propia un día y al otro día quiere sacarla
+-- de nuevo) se guarda como un aporte con monto negativo, fechado el día en
+-- que se retira — sin tocar ni borrar el aporte original de otro día.
+alter table public.aportes_capital drop constraint if exists aportes_capital_monto_check;
+alter table public.aportes_capital add constraint aportes_capital_monto_check check (monto <> 0);
+
+-- ---------------------------------------------------------------------------
+-- registrar_pago y refinanciar_prestamo — VERSIÓN FINAL (reemplaza a todas
+-- las versiones anteriores de estas dos funciones definidas más arriba en
+-- este mismo archivo; solo la de aquí abajo queda instalada al final).
+-- ---------------------------------------------------------------------------
+-- registrar_pago: ya sin mora (se quitó del todo, ver nota al principio del
+-- archivo) y con soporte para pagos múltiples el mismo día (p_sumar=true
+-- suma al pago que ya existía ese día en vez de reemplazarlo).
+--
+-- OJO: se borra primero la versión con 4 parámetros definida más arriba en
+-- este archivo — Postgres no la reemplaza sola porque esta versión final
+-- tiene un parámetro nuevo (p_sumar); sin este "drop", quedarían las dos
+-- funciones instaladas a la vez en vez de una sola.
+drop function if exists public.registrar_pago(bigint, numeric, text, date);
+create or replace function public.registrar_pago(p_prestamo_id bigint, p_monto_pagado numeric, p_estado text, p_fecha_pago date default current_date, p_sumar boolean default false)
+returns void language plpgsql security invoker set search_path = public as $$
+declare v_prestamo public.prestamos; v_total numeric; v_existente public.pagos; v_monto_final numeric; v_estado_final text;
+begin
+  if auth.uid() is null then raise exception 'Sesión no válida'; end if;
+  if p_estado not in ('pago', 'parcial', 'no_pago') or p_monto_pagado < 0 or (p_estado <> 'no_pago' and p_monto_pagado <= 0) then raise exception 'Pago inválido'; end if;
+  select * into v_prestamo from public.prestamos where id = p_prestamo_id and user_id = auth.uid() for update;
+  if not found or v_prestamo.estado <> 'activo' then raise exception 'Préstamo activo no encontrado'; end if;
+
+  select * into v_existente from public.pagos where prestamo_id = p_prestamo_id and fecha_pago = p_fecha_pago;
+
+  if p_sumar and found then
+    v_monto_final := v_existente.monto_pagado + p_monto_pagado;
+    v_estado_final := case when p_estado = 'pago' or v_existente.estado = 'pago' then 'pago' else p_estado end;
+  else
+    v_monto_final := p_monto_pagado;
+    v_estado_final := p_estado;
+  end if;
+
+  insert into public.pagos (prestamo_id, fecha_pago, monto_pagado, estado, user_id)
+  values (p_prestamo_id, p_fecha_pago, v_monto_final, v_estado_final, auth.uid())
+  on conflict (prestamo_id, fecha_pago) do update set monto_pagado = excluded.monto_pagado, estado = excluded.estado;
+
+  select coalesce(sum(monto_pagado), 0) into v_total from public.pagos where prestamo_id = p_prestamo_id;
+  if v_total >= (v_prestamo.monto_prestado * (1 + v_prestamo.interes_porcentaje / 100)) then
+    update public.prestamos set estado = 'pagado' where id = p_prestamo_id;
+  end if;
+end;
+$$;
+
+grant execute on function public.registrar_pago(bigint, numeric, text, date, boolean) to authenticated;
+
+-- refinanciar_prestamo: ya sin mora, con fecha_desembolso propia, y
+-- corrigiendo un detalle que se quedó suelto en el camino — el crédito nuevo
+-- debe seguir respetando si el anterior contaba o no domingos/festivos en sus
+-- cuotas diarias (una migración de hace unos días dejó de copiar ese dato al
+-- refinanciar; esta versión ya lo vuelve a copiar).
+--
+-- OJO: mismo motivo que arriba — se borra la versión con 5 parámetros
+-- definida más arriba en este archivo, porque esta versión final agrega uno
+-- nuevo (p_fecha_desembolso).
+drop function if exists public.refinanciar_prestamo(bigint, numeric, integer, numeric, date);
+create or replace function public.refinanciar_prestamo(p_prestamo_id bigint, p_monto_adicional numeric, p_numero_cuotas integer, p_interes_porcentaje numeric, p_fecha_inicio date default current_date, p_fecha_desembolso date default current_date)
+returns void language plpgsql security invoker set search_path = public as $$
+declare v_anterior public.prestamos; v_pagado numeric; v_saldo numeric; v_monto numeric;
+begin
+  if auth.uid() is null or p_monto_adicional < 0 or p_numero_cuotas <= 0 or p_interes_porcentaje < 0 then raise exception 'Datos inválidos'; end if;
+  select * into v_anterior from public.prestamos where id = p_prestamo_id and user_id = auth.uid() for update;
+  if not found or v_anterior.estado <> 'activo' then raise exception 'Préstamo activo no encontrado'; end if;
+  select coalesce(sum(monto_pagado), 0) into v_pagado from public.pagos where prestamo_id = p_prestamo_id;
+  v_saldo := greatest(v_anterior.monto_prestado * (1 + v_anterior.interes_porcentaje / 100) - v_pagado, 0);
+  v_monto := round(v_saldo + p_monto_adicional, 0);
+  if v_monto <= 0 then raise exception 'No hay saldo para refinanciar'; end if;
+  update public.prestamos set estado = 'refinanciado' where id = p_prestamo_id;
+  insert into public.prestamos (cliente_id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, fecha_desembolso, estado, prestamo_anterior_id, user_id, contar_domingos_festivos)
+  values (v_anterior.cliente_id, v_monto, p_interes_porcentaje, round(v_monto * (1 + p_interes_porcentaje / 100) / p_numero_cuotas, 0), p_numero_cuotas, v_anterior.frecuencia, p_fecha_inicio, p_fecha_desembolso, 'activo', p_prestamo_id, auth.uid(), coalesce(v_anterior.contar_domingos_festivos, true));
+end;
+$$;
+
+grant execute on function public.refinanciar_prestamo(bigint, numeric, integer, numeric, date, date) to authenticated;

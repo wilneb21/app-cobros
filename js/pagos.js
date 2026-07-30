@@ -9,7 +9,7 @@ async function registrarPago(prestamoId, monto, estado, clienteId, sumar = false
     agregarPagoACola({ prestamoId, monto, estado, fecha, clienteId, guardadoEn: Date.now() });
     marcarSubtarjetaPendienteSync(prestamoId);
     mostrarAlerta("📴 Sin conexión. El pago quedó guardado en tu celular y se enviará solo cuando vuelva la señal.");
-    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado, prestamoId);
     return;
   }
 
@@ -52,13 +52,13 @@ async function registrarPago(prestamoId, monto, estado, clienteId, sumar = false
     agregarPagoACola({ prestamoId, monto, estado, fecha, clienteId, guardadoEn: Date.now() });
     marcarSubtarjetaPendienteSync(prestamoId);
     mostrarAlerta("⚠️ No fue posible conectar con el servidor. El pago quedó guardado y se reintentará automáticamente.");
-    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+    if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado, prestamoId);
     return;
   }
 
   cargarPrestamosDeCliente(clienteId);
 
-  if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado);
+  if (estado === "pago" || estado === "parcial") mostrarRecibo(clienteId, monto, fecha, estado, prestamoId);
 }
 
 // Pregunta qué hacer cuando ya existe un pago hoy: sumar el nuevo valor al
@@ -163,29 +163,78 @@ async function eliminarPago(pagoId, prestamoId, clienteId) {
   cargarPrestamosDeCliente(clienteId);
 }
 
-async function mostrarRecibo(clienteId, monto, fecha, estado) {
-  const { data: cliente } = await supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single();
+// Genera un número de comprobante corto y estable a partir del préstamo y la
+// fecha del pago. No es un consecutivo real guardado en la base de datos —
+// es solo para que el recibo se vea profesional y sea fácil de referenciar
+// (ej. "P45-20260730"), no para llevar una numeración fiscal formal.
+function numeroComprobante(prestamoId, fecha) {
+  return `P${prestamoId}-${String(fecha).replace(/-/g, "")}`;
+}
+
+async function mostrarRecibo(clienteId, monto, fecha, estado, prestamoId) {
+  const [{ data: cliente }, { data: prestamo }, { data: pagos }] = await Promise.all([
+    supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single(),
+    supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, cuota, numero_cuotas").eq("id", prestamoId).single(),
+    supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", prestamoId),
+  ]);
+
   const etiqueta = estado === "pago" ? "Pago completo de cuota" : "Abono parcial";
+  let filaSaldo = "";
+  if (prestamo) {
+    const totalPagado = (pagos || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
+    const saldoPendiente = calcularSaldoPendiente(prestamo, totalPagado);
+    const cuotasPagadas = Math.min(Math.floor(totalPagado / Number(prestamo.cuota)), prestamo.numero_cuotas);
+    filaSaldo = `
+    <div class="recibo-linea"><span>Saldo pendiente</span><span>${formatoPesos(saldoPendiente)}</span></div>
+    <div class="recibo-linea"><span>Cuotas pagadas</span><span>${cuotasPagadas} de ${prestamo.numero_cuotas}</span></div>`;
+  }
 
   document.getElementById("contenido-recibo").innerHTML = `
-    <div class="recibo-titulo">🧾 Comprobante de pago</div>
+    <div class="recibo-encabezado"><span class="recibo-titulo">🧾 Comprobante de pago</span><span class="recibo-numero">N.° ${numeroComprobante(prestamoId, fecha)}</span></div>
     <div class="recibo-monto">${formatoPesos(monto)}</div>
     <div class="recibo-linea"><span>Cliente</span><span>${escaparHtml(cliente ? cliente.nombre : "")}</span></div>
     <div class="recibo-linea"><span>Fecha</span><span>${formatoFecha(fecha)}</span></div>
-    <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>
-    <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}')">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
+    <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>${filaSaldo}
+    <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}', ${prestamoId})">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
   document.getElementById("modal-recibo").classList.remove("oculto");
   empujarEstadoModal("modal-recibo");
 }
 
-async function compartirRecibo(clienteId, monto, fecha, estado) {
-  const { data: cliente } = await supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single();
-  const texto = `Comprobante de pago\nCliente: ${cliente?.nombre || "Cliente"}\nMonto: ${formatoPesos(monto)}\nFecha: ${formatoFecha(fecha)}\nTipo: ${estado === "pago" ? "Pago de cuota" : "Abono parcial"}`;
+// Convierte el recibo visible en pantalla a una imagen (PNG) y la comparte
+// directamente por WhatsApp/etc. La imagen se genera solo en el momento, en
+// el propio celular — nunca se sube ni se guarda en Supabase, así que
+// compartir recibos así no gasta espacio de almacenamiento.
+async function compartirRecibo(clienteId, monto, fecha, estado, prestamoId) {
+  const nodo = document.getElementById("contenido-recibo");
+  const nombreArchivo = `comprobante-${numeroComprobante(prestamoId, fecha)}.png`;
+
   try {
-    if (navigator.share) await navigator.share({ title: "Comprobante de pago", text: texto });
-    else { await navigator.clipboard.writeText(texto); mostrarAlerta("Comprobante copiado. Ya puedes pegarlo en WhatsApp."); }
+    const canvas = await html2canvas(nodo, {
+      backgroundColor: "#ffffff",
+      scale: 2, // más nítido en pantallas de celular
+      ignoreElements: (el) => el.classList && el.classList.contains("acciones-recibo"),
+    });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("No se pudo generar la imagen");
+    const archivo = new File([blob], nombreArchivo, { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+      await navigator.share({ files: [archivo], title: "Comprobante de pago" });
+      return;
+    }
+
+    // El navegador no soporta compartir archivos (poco común en celulares
+    // modernos): se descarga la imagen para que la envíes manualmente.
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = nombreArchivo;
+    enlace.click();
+    URL.revokeObjectURL(url);
+    mostrarAlerta("Tu navegador no permite compartir imágenes directamente. Se descargó el comprobante para que lo envíes manualmente.");
   } catch (error) {
-    if (error.name !== "AbortError") mostrarAlerta("No fue posible compartir el comprobante.");
+    if (error.name === "AbortError") return; // el usuario cerró el panel de compartir, no es un error
+    mostrarAlerta("No fue posible generar la imagen del comprobante.");
   }
 }
 

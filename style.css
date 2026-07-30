@@ -686,11 +686,22 @@ body.modo-oscuro .grupo-ruta-titulo { color: #8fe0d0; border-color: #3a4152; }
   text-align: center;
 }
 
+.recibo-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
 .recibo-titulo {
   font-size: 20px;
   font-weight: 700;
   color: var(--primary-dark);
-  margin-bottom: 4px;
+}
+
+.recibo-numero {
+  font-size: 11px;
+  color: #999;
 }
 
 .recibo-linea {
