@@ -191,6 +191,7 @@
           <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('pago', this)">Pagos</button>
           <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('prestamo', this)">Préstamos</button>
           <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('gasto', this)">Gastos</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('aporteRetiro', this)">Aportes/Retiros</button>
         </div>
         <p id="conteo-historial-global" class="texto-ayuda" style="margin:10px 2px 6px"></p>
         <div id="lista-historial-global"></div>
@@ -241,6 +242,7 @@
         <div id="bloque-libro-diario" class="oculto">
           <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés, sin contar el capital que vuelve) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente).</p>
           <div class="tabla-libro-diario-envoltura"><div id="libro-diario"></div></div>
+          <div id="notas-aportes-periodo"></div>
           <div id="libro-diario-totales" class="libro-diario-totales"></div>
         </div>
 

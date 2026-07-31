@@ -188,7 +188,7 @@ async function cargarLibroDiario(inicio, fin) {
     supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin),
     supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin),
-    supabaseClient.from("aportes_capital").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
+    supabaseClient.from("aportes_capital").select("fecha, monto, nota").gte("fecha", inicio).lt("fecha", fin),
     obtenerCapitalInicial(),
     calcularUtilidadHistoricaAntesDe(inicio),
     calcularUtilidadHistoricaTotal()
@@ -244,7 +244,7 @@ async function cargarLibroDiario(inicio, fin) {
     const utilidadPct = prestado > 0 ? (utilidad / prestado) * 100 : 0;
     utilidadAcumulada += utilidad;
 
-    filas.push({ fecha: fechaCursor, base, prestado, cobro, gasto, utilidad, utilidadPct, utilidadAcumulada, cierre });
+    filas.push({ fecha: fechaCursor, base, prestado, cobro, gasto, aporte, utilidad, utilidadPct, utilidadAcumulada, cierre });
     totales.prestado += prestado; totales.cobro += cobro; totales.gasto += gasto; totales.utilidad += utilidad;
 
     baseCorriente = cierre;
@@ -261,7 +261,7 @@ async function cargarLibroDiario(inicio, fin) {
 
   contenedor.innerHTML = `
     <div class="fila-libro-diario fila-libro-diario-cabecera">
-      <span>Fecha</span><span>Base</span><span>Préstamos</span><span>Cobro</span><span>Gasto</span><span>Utilidad</span><span>Utilidad acum.</span><span>Utilidad %</span><span>Cierre</span>
+      <span>Fecha</span><span>Base</span><span>Préstamos</span><span>Cobro</span><span>Gasto</span><span>Aportes</span><span>Utilidad</span><span>Utilidad acum.</span><span>Utilidad %</span><span>Cierre</span>
     </div>
     ${filas.map(f => `
       <div class="fila-libro-diario">
@@ -270,11 +270,27 @@ async function cargarLibroDiario(inicio, fin) {
         <span>${f.prestado > 0 ? "-" + formatoPesos(f.prestado) : formatoPesos(0)}</span>
         <span>${formatoPesos(f.cobro)}</span>
         <span>${f.gasto > 0 ? "-" + formatoPesos(f.gasto) : formatoPesos(0)}</span>
+        <span class="${f.aporte > 0 ? "tono-exito-texto" : f.aporte < 0 ? "tono-peligro-texto" : ""}">${f.aporte === 0 ? formatoPesos(0) : (f.aporte > 0 ? "+" : "") + formatoPesos(f.aporte)}</span>
         <span class="${f.utilidad >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidad)}</span>
         <span class="${f.utilidadAcumulada >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidadAcumulada)}</span>
         <span>${f.utilidadPct.toFixed(1)}%</span>
         <span><b>${formatoPesos(f.cierre)}</b></span>
       </div>`).join("")}`;
+
+  // Lista de "¿para qué fue?" de cada aporte/retiro del período — la tabla de
+  // arriba solo muestra el monto por día, aquí se ve el detalle con su nota.
+  const notasAportes = (aportes || []).filter(a => a.nota).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const contenedorNotas = document.getElementById("notas-aportes-periodo");
+  if (contenedorNotas) {
+    contenedorNotas.innerHTML = !notasAportes.length ? "" : `
+      <p class="texto-ayuda" style="margin:14px 2px 6px"><strong>Aportes y retiros con nota en este período:</strong></p>
+      ${notasAportes.map(a => `
+        <div class="fila-libro-diario" style="grid-template-columns: 88px 1fr 90px;">
+          <span>${formatoFecha(a.fecha)}</span>
+          <span style="white-space:normal">${escaparHtml(a.nota)}</span>
+          <span class="${Number(a.monto) >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${Number(a.monto) >= 0 ? "+" : ""}${formatoPesos(a.monto)}</span>
+        </div>`).join("")}`;
+  }
 
   const utilidadPctTotal = totales.prestado > 0 ? (totales.utilidad / totales.prestado) * 100 : 0;
   totalesEl.innerHTML = `

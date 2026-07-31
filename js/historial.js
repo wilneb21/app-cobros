@@ -54,14 +54,17 @@ async function cargarHistorialGlobal(filtro = "todos") {
   let consultaGastos = supabaseClient.from("gastos")
     .select("id, concepto, monto, fecha")
     .order("fecha", { ascending: false }).limit(100);
+  let consultaAportes = supabaseClient.from("aportes_capital")
+    .select("id, monto, fecha, nota")
+    .order("fecha", { ascending: false }).limit(100);
 
-  if (desde) { consultaPagos = consultaPagos.gte("fecha_pago", desde); consultaPrestamos = consultaPrestamos.gte("fecha_desembolso", desde); consultaGastos = consultaGastos.gte("fecha", desde); }
-  if (hasta) { consultaPagos = consultaPagos.lte("fecha_pago", hasta); consultaPrestamos = consultaPrestamos.lte("fecha_desembolso", hasta); consultaGastos = consultaGastos.lte("fecha", hasta); }
+  if (desde) { consultaPagos = consultaPagos.gte("fecha_pago", desde); consultaPrestamos = consultaPrestamos.gte("fecha_desembolso", desde); consultaGastos = consultaGastos.gte("fecha", desde); consultaAportes = consultaAportes.gte("fecha", desde); }
+  if (hasta) { consultaPagos = consultaPagos.lte("fecha_pago", hasta); consultaPrestamos = consultaPrestamos.lte("fecha_desembolso", hasta); consultaGastos = consultaGastos.lte("fecha", hasta); consultaAportes = consultaAportes.lte("fecha", hasta); }
 
-  const [{ data: pagos, error: errorPagos }, { data: prestamos, error: errorPrestamos }, { data: gastos, error: errorGastos }] =
-    await Promise.all([consultaPagos, consultaPrestamos, consultaGastos]);
+  const [{ data: pagos, error: errorPagos }, { data: prestamos, error: errorPrestamos }, { data: gastos, error: errorGastos }, { data: aportes, error: errorAportes }] =
+    await Promise.all([consultaPagos, consultaPrestamos, consultaGastos, consultaAportes]);
 
-  if (errorPagos || errorPrestamos || errorGastos) {
+  if (errorPagos || errorPrestamos || errorGastos || errorAportes) {
     document.getElementById("lista-historial-global").textContent = "No fue posible cargar el historial.";
     return;
   }
@@ -88,6 +91,7 @@ async function cargarHistorialGlobal(filtro = "todos") {
     ...(pagos || []).map(p => ({ tipoMov: "pago", fecha: p.fecha_pago, ...p })),
     ...(prestamos || []).map(p => ({ tipoMov: "prestamo", fecha: p.fecha_desembolso, ...p })),
     ...(gastos || []).map(g => ({ tipoMov: "gasto", fecha: g.fecha, ...g })),
+    ...(aportes || []).map(a => ({ tipoMov: Number(a.monto) >= 0 ? "aporte" : "retiro", fecha: a.fecha, ...a })),
   ].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
 
   historialGlobalCache = movimientos;
@@ -97,6 +101,7 @@ async function cargarHistorialGlobal(filtro = "todos") {
 
 function aplicarFiltroTipoHistorial(lista) {
   if (historialFiltroTipoActual === "todos") return lista;
+  if (historialFiltroTipoActual === "aporteRetiro") return lista.filter(m => m.tipoMov === "aporte" || m.tipoMov === "retiro");
   return lista.filter(m => m.tipoMov === historialFiltroTipoActual);
 }
 
@@ -149,6 +154,20 @@ function pintarHistorialGlobal(lista) {
         </div>
       </div>`;
     }
+    if (m.tipoMov === "aporte" || m.tipoMov === "retiro") {
+      const esRetiro = m.tipoMov === "retiro";
+      return `<div class="fila-mov">
+        <span class="icono-mov ${esRetiro ? "mov-retiro" : "mov-aporte"}">${esRetiro ? "🔻" : "🔺"}</span>
+        <div class="info-mov">
+          <div class="nombre-mov">${esRetiro ? "Retiro de efectivo propio" : "Aporte de capital propio"}</div>
+          <div class="datos-mov">${formatoFecha(m.fecha)}${m.nota ? " · " + escaparHtml(m.nota) : ""}</div>
+        </div>
+        <div class="der-mov">
+          <span class="badge-pago ${esRetiro ? "badge-pago-retiro" : "badge-pago-aporte"}">${esRetiro ? "RETIRO" : "APORTE"}</span>
+          <span class="monto-mov ${esRetiro ? "monto-retiro" : "monto-aporte"}">${esRetiro ? "" : "+"}${formatoPesos(m.monto)}</span>
+        </div>
+      </div>`;
+    }
     // gasto
     return `<div class="fila-mov">
       <span class="icono-mov mov-gasto">📤</span>
@@ -170,6 +189,7 @@ function filtrarHistorialGlobalTexto() {
   if (!q) { pintarHistorialGlobal(base); return; }
   const filtrado = base.filter(m => {
     if (m.tipoMov === "gasto") return (m.concepto || "").toLowerCase().includes(q);
+    if (m.tipoMov === "aporte" || m.tipoMov === "retiro") return (m.nota || "").toLowerCase().includes(q);
     const c = m.tipoMov === "pago" ? m.prestamos?.clientes : m.clientes;
     return (c?.nombre || "").toLowerCase().includes(q) || (c?.cedula || "").includes(q) || (c?.telefono || "").includes(q);
   });
