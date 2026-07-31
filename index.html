@@ -171,11 +171,26 @@
       <section id="seccion-historial" class="seccion oculto">
         <h3>Historial</h3>
         <input type="text" id="buscador-historial-global" placeholder="🔎 Buscar por nombre, cédula o celular..." oninput="filtrarHistorialGlobalTexto()" style="margin-bottom:10px">
-        <div class="chips-hist">
+        <div class="chips-hist" id="chips-filtro-fecha-historial">
           <button type="button" class="chip-hist activa" onclick="cambiarFiltroHistorialGlobal('todos', this)">Todos</button>
           <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('hoy', this)">Hoy</button>
           <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('semana', this)">Semana</button>
           <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('mes', this)">Mes</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('dia', this)">Elegir día</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroHistorialGlobal('rango', this)">Rango de fechas</button>
+        </div>
+        <div id="historial-fecha-dia-cont" class="oculto" style="margin:10px 0">
+          <input type="date" id="historial-fecha-dia" onchange="cargarHistorialGlobal('dia')">
+        </div>
+        <div id="historial-rango-cont" class="oculto" style="margin:10px 0; display:flex; gap:8px">
+          <input type="date" id="historial-rango-desde" onchange="cargarHistorialGlobal('rango')">
+          <input type="date" id="historial-rango-hasta" onchange="cargarHistorialGlobal('rango')">
+        </div>
+        <div class="chips-hist" id="chips-filtro-tipo-historial" style="margin-top:6px">
+          <button type="button" class="chip-hist activa" onclick="cambiarFiltroTipoHistorial('todos', this)">Todo tipo</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('pago', this)">Pagos</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('prestamo', this)">Préstamos</button>
+          <button type="button" class="chip-hist" onclick="cambiarFiltroTipoHistorial('gasto', this)">Gastos</button>
         </div>
         <p id="conteo-historial-global" class="texto-ayuda" style="margin:10px 2px 6px"></p>
         <div id="lista-historial-global"></div>

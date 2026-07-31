@@ -1734,8 +1734,14 @@ body.modo-oscuro .mini-card .chip.rojo { background: rgba(220,38,38,.18); color:
 .fila-mov .badge-pago { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: #e7f2f0; color: var(--primary-dark); }
 .fila-mov .badge-pago-parcial { background: #fff6de; color: #92650a; }
 .fila-mov .badge-pago-no_pago { background: #fde9e9; color: var(--danger); }
+.fila-mov .badge-pago-prestamo { background: #e8ecfd; color: #3949ab; }
+.fila-mov .badge-pago-gasto { background: #fdeee1; color: #b5580a; }
+.fila-mov .icono-mov.mov-prestamo { background: #e8ecfd; color: #3949ab; }
+.fila-mov .icono-mov.mov-gasto { background: #fdeee1; color: #b5580a; }
 .fila-mov .monto-mov { display: block; color: #0e8f3f; font-weight: 700; font-size: 13px; margin-top: 2px; }
 .fila-mov .monto-mov.monto-no-pago { color: var(--danger); }
+.fila-mov .monto-mov.monto-prestamo { color: #3949ab; }
+.fila-mov .monto-mov.monto-gasto { color: #b5580a; }
 .fila-mov .saldo-mov { font-size: 9.5px; color: var(--text-muted); }
 body.modo-oscuro .fila-mov { background: #1e2030; }
 body.modo-oscuro .chip-hist { background: #2a2c3d; color: #9aa0b4; }

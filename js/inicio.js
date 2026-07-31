@@ -123,11 +123,12 @@ async function cargarResumenDia() {
 
   const inicioMes = hoy.substring(0, 7) + "-01";
   const gananciaMes = await calcularUtilidadPorPrestamos(inicioMes, sumarDias(hoy, 1));
+  const nombreMesActual = new Date(hoy + "T00:00:00").toLocaleDateString("es-CO", { month: "long" });
 
   document.getElementById("grid-resumen-inicio").innerHTML = `
     <div class="mini-card"><span class="chip morado">▤</span><div class="txt"><div class="label">Por cobrar</div><div class="valor">${formatoPesos(carteraActiva)}</div></div></div>
     <div class="mini-card"><span class="chip azul">↓</span><div class="txt"><div class="label">Cobrado hoy</div><div class="valor">${formatoPesos(totalCobradoHoy)}</div></div></div>
-    <div class="mini-card"><span class="chip verde">↑</span><div class="txt"><div class="label">Ganancia del mes</div><div class="valor">${formatoPesos(gananciaMes)}</div></div></div>
+    <div class="mini-card"><span class="chip verde">↑</span><div class="txt"><div class="label">Ganancia de ${nombreMesActual}</div><div class="valor">${formatoPesos(gananciaMes)}</div></div></div>
     <div class="mini-card"><span class="chip rojo">⚠</span><div class="txt"><div class="label">Préstamos en mora</div><div class="valor">${clientesEnMora}</div></div></div>
   `;
 
