@@ -83,7 +83,7 @@ async function cargarReporteMes() {
     const [año, mes] = inputMes.value.split("-").map(Number);
     inicio = inputMes.value + "-01";
     fin = mes === 12 ? `${año + 1}-01-01` : `${año}-${String(mes + 1).padStart(2, "0")}-01`;
-    etiquetaPeriodo = "el mes";
+    etiquetaPeriodo = new Date(año, mes - 1, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" });
 
     // --- Comparación con el mes anterior ---
     const mesAnteriorFin = inicio;
@@ -1134,4 +1134,3 @@ async function verificarRecordatorioRespaldo() {
     contenedor.classList.add("oculto");
   }
 }
-
