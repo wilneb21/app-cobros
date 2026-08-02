@@ -196,7 +196,7 @@ async function cargarLibroDiario(inicio, fin) {
     supabaseClient.from("caja_diaria").select("fecha, base_inicial").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("pagos").select("fecha_pago, monto_pagado").gte("fecha_pago", inicio).lt("fecha_pago", fin),
     supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
-    supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio").gte("fecha_inicio", inicio).lt("fecha_inicio", fin),
+    supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin),
     supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin),
     supabaseClient.from("aportes_capital").select("fecha, monto, nota").gte("fecha", inicio).lt("fecha", fin),
     obtenerCapitalInicial(),
@@ -209,12 +209,15 @@ async function cargarLibroDiario(inicio, fin) {
   const cobroPorDia = {};
   (pagos || []).forEach(p => cobroPorDia[p.fecha_pago] = (cobroPorDia[p.fecha_pago] || 0) + Number(p.monto_pagado));
   // La Utilidad "al estilo libro de William" nace el día que se ENTREGA el
-  // préstamo (interés sobre lo prestado), no el día que se cobra — por eso
-  // aquí no se usa cobroPorDia para la utilidad, solo para la columna Cobro.
+  // préstamo (interés sobre lo prestado), no el día que se cobra ni el día
+  // de la primera cuota — por eso se agrupa por fecha_desembolso (el día
+  // real en que sale el efectivo), no por fecha_inicio (que es solo el
+  // cronograma de cuotas: por defecto mañana, o en una semana si es
+  // semanal, y puede ser varios días después del desembolso real).
   const utilidadPorDia = {};
   (prestamosParaUtilidad || []).forEach(p => {
     const interesDelPrestamo = Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100;
-    utilidadPorDia[p.fecha_inicio] = (utilidadPorDia[p.fecha_inicio] || 0) + interesDelPrestamo;
+    utilidadPorDia[p.fecha_desembolso] = (utilidadPorDia[p.fecha_desembolso] || 0) + interesDelPrestamo;
   });
   const gastoPorDia = {};
   (gastos || []).forEach(g => gastoPorDia[g.fecha] = (gastoPorDia[g.fecha] || 0) + Number(g.monto));
@@ -482,18 +485,22 @@ function exportarReporteCSV() {
 // --- UTILIDAD "AL ESTILO LIBRO DE WILLIAM" ---
 // A diferencia de contar la ganancia solo cuando el cliente COBRA (poco a
 // poco en cada cuota), esta utilidad se cuenta desde el día en que se
-// ENTREGA el préstamo: si hoy prestas $100 con 20% de interés, la utilidad
-// de hoy es $20 — completa, ese mismo día — sin importar cuándo el cliente
-// termine de pagar. Es la forma en que ya se llevaba a mano: cada préstamo
-// nuevo suma su interés al total de utilidad del negocio, sin mezclarse con
-// el resto de las cuentas (caja, gastos del día a día, etc.) hasta el
-// cierre de mes. La usa Reportes (Libro diario y las tarjetas de resumen).
+// ENTREGA el préstamo (fecha_desembolso — el día real en que sale el
+// efectivo, NO fecha_inicio, que es solo la fecha de la primera cuota y
+// puede caer varios días después): si hoy prestas $100 con 20% de interés,
+// la utilidad de hoy es $20 — completa, ese mismo día — sin importar cuándo
+// el cliente termine de pagar ni cuándo vence su primera cuota. Es la forma
+// en que ya se llevaba a mano: cada préstamo nuevo suma su interés al total
+// de utilidad del negocio, sin mezclarse con el resto de las cuentas (caja,
+// gastos del día a día, etc.) hasta el cierre de mes. La usa Reportes
+// (Libro diario y las tarjetas de resumen).
 async function calcularUtilidadPorPrestamos(inicio, fin) {
   const { data, error } = await supabaseClient
-    .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_inicio", inicio).lt("fecha_inicio", fin);
+    .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin);
   if (error || !data) return 0;
   return data.reduce((total, p) => total + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
+
 
 // Utilidad total acumulada de TODA la vida del negocio (préstamos entregados
 // desde siempre), sin límite de fechas — es el número que va subiendo solo,
@@ -540,7 +547,7 @@ function obtenerInicioCicloUtilidad(fechaTexto, diaCorte) {
 async function calcularUtilidadEntreFechas(desde, hasta) {
   if (desde >= hasta) return 0;
   const { data: prestamos } = await supabaseClient
-    .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_inicio", desde).lt("fecha_inicio", hasta);
+    .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_desembolso", desde).lt("fecha_desembolso", hasta);
   return (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
 
