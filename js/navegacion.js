@@ -14,7 +14,7 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   if (nombre === "clientes") cargarClientes();
   if (nombre === "prestamos") { cargarCuentasPorCobrar(); cargarRutas(); }
   if (nombre === "cobrar") cargarClientesParaCobrar();
-  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarPerfilConfig(); }
+  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarDiaCorteUtilidad(); pintarPerfilConfig(); }
   if (nombre === "reportes") {
     pintarCapitalInicial();
     cargarReporteMes();
@@ -93,4 +93,3 @@ function mostrarCargando(idContenedor) {
   const el = document.getElementById(idContenedor);
   if (el) el.innerHTML = `<div class="cargando">⏳ Cargando...</div>`;
 }
-

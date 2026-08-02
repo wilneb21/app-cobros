@@ -182,7 +182,17 @@ async function cargarLibroDiario(inicio, fin) {
   if (!contenedor) return;
   contenedor.innerHTML = '<div class="cargando">⏳ Calculando...</div>';
 
-  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamosParaUtilidad }, { data: prestamosParaCaja }, { data: aportes }, capitalInicial, utilidadHistoricaPrevia, utilidadHistoricaTotal] = await Promise.all([
+  // El punto de partida de "Utilidad acum." ya NO es el histórico de todo
+  // el negocio: es solo lo generado desde el día de corte del ciclo (por
+  // defecto el día 1, pero configurable en Ajustes) hasta justo antes de
+  // "inicio". Así cada ciclo arranca su propio acumulado en $0, y si el
+  // reporte empieza a mitad de ciclo (ej. un rango de fechas), igual respeta
+  // lo ya generado ese mismo ciclo antes del rango — pero nunca arrastra
+  // ciclos anteriores.
+  const diaCorte = await obtenerDiaCorteUtilidad();
+  const inicioDelCicloDeInicio = obtenerInicioCicloUtilidad(inicio, diaCorte);
+
+  const [{ data: caja }, { data: pagos }, { data: gastos }, { data: prestamosParaUtilidad }, { data: prestamosParaCaja }, { data: aportes }, capitalInicial, utilidadDelCicloPrevia, utilidadHistoricaTotal] = await Promise.all([
     supabaseClient.from("caja_diaria").select("fecha, base_inicial").gte("fecha", inicio).lt("fecha", fin),
     supabaseClient.from("pagos").select("fecha_pago, monto_pagado").gte("fecha_pago", inicio).lt("fecha_pago", fin),
     supabaseClient.from("gastos").select("fecha, monto").gte("fecha", inicio).lt("fecha", fin),
@@ -190,7 +200,7 @@ async function cargarLibroDiario(inicio, fin) {
     supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio, fecha_desembolso").gte("fecha_desembolso", inicio).lt("fecha_desembolso", fin),
     supabaseClient.from("aportes_capital").select("fecha, monto, nota").gte("fecha", inicio).lt("fecha", fin),
     obtenerCapitalInicial(),
-    calcularUtilidadHistoricaAntesDe(inicio),
+    calcularUtilidadEntreFechas(inicioDelCicloDeInicio, inicio),
     calcularUtilidadHistoricaTotal()
   ]);
 
@@ -226,13 +236,23 @@ async function cargarLibroDiario(inicio, fin) {
   const filas = [];
   let fechaCursor = inicio;
   const totales = { prestado: 0, cobro: 0, gasto: 0, utilidad: 0 };
-  // Ojo: esto NO arranca en 0. Arranca en la utilidad histórica de siempre
-  // (todo lo generado antes de este período), para que "Utilidad acum." sea
-  // de verdad el total acumulado del negocio y no se reinicie cada vez que
-  // se cambia el rango de fechas del reporte.
-  let utilidadAcumulada = utilidadHistoricaPrevia;
+  // Arranca en lo generado desde el inicio del ciclo actual (no en el
+  // histórico de todo el negocio). Cada ciclo tiene su propio acumulado: al
+  // cruzar al día de corte (ver más abajo, dentro del while), este contador
+  // se reinicia a $0.
+  let utilidadAcumulada = utilidadDelCicloPrevia;
+  let cicloEnCurso = inicioDelCicloDeInicio;
 
   while (fechaCursor < fin) {
+    // Nuevo ciclo (según el día de corte configurado): la "Utilidad acum."
+    // de cada ciclo es independiente, así que se reinicia a $0 en vez de
+    // seguir sumando sobre el ciclo anterior.
+    const inicioDelCicloDeLaFila = obtenerInicioCicloUtilidad(fechaCursor, diaCorte);
+    if (inicioDelCicloDeLaFila !== cicloEnCurso) {
+      cicloEnCurso = inicioDelCicloDeLaFila;
+      utilidadAcumulada = 0;
+    }
+
     const base = baseGuardada[fechaCursor] !== undefined ? baseGuardada[fechaCursor] : baseCorriente;
     const prestamosDia = prestamosPorDia[fechaCursor] || [];
     const prestado = await calcularDesembolsoReal(prestamosDia);
@@ -484,12 +504,43 @@ async function calcularUtilidadHistoricaTotal() {
   return (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
 
-// La misma utilidad histórica, pero solo la parte generada ANTES de una
-// fecha dada — se usa como punto de partida del acumulado del Libro diario,
-// para que "Utilidad acum." sea de verdad el total de siempre y no solo lo
-// que se ve dentro del período que se está mirando en pantalla.
-async function calcularUtilidadHistoricaAntesDe(fecha) {
-  const { data: prestamos } = await supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje").lt("fecha_inicio", fecha);
+// Días que tiene un mes dado (mes: 1-12).
+function diasEnMes(anio, mes) {
+  return new Date(anio, mes, 0).getDate();
+}
+
+// Dado el día de corte configurado (1-31) y una fecha "YYYY-MM-DD", devuelve
+// la fecha "YYYY-MM-DD" en la que empezó el ciclo que contiene esa fecha.
+// Con diaCorte = 1 se comporta exactamente igual que antes (mes calendario).
+// Con diaCorte = 29, por ejemplo: el 5 de julio cae en el ciclo que empezó
+// el 29 de junio; el 29 de julio ya es el inicio de un ciclo nuevo.
+// Si el día de corte elegido (29, 30 o 31) no existe en un mes en particular
+// (ej. 30 de febrero no existe), se usa el último día disponible de ese mes
+// como corte — así el ciclo siempre arranca en una fecha real.
+function obtenerInicioCicloUtilidad(fechaTexto, diaCorte) {
+  const [anio, mes, dia] = fechaTexto.split("-").map(Number);
+  const corteEsteMes = Math.min(diaCorte, diasEnMes(anio, mes));
+  if (dia >= corteEsteMes) {
+    return `${anio}-${String(mes).padStart(2, "0")}-${String(corteEsteMes).padStart(2, "0")}`;
+  }
+  let mesAnterior = mes - 1;
+  let anioDelCiclo = anio;
+  if (mesAnterior === 0) { mesAnterior = 12; anioDelCiclo -= 1; }
+  const corteMesAnterior = Math.min(diaCorte, diasEnMes(anioDelCiclo, mesAnterior));
+  return `${anioDelCiclo}-${String(mesAnterior).padStart(2, "0")}-${String(corteMesAnterior).padStart(2, "0")}`;
+}
+
+// Utilidad generada entre dos fechas ("desde" incluida, "hasta" no) — se usa
+// como punto de partida del acumulado del Libro diario cuando el reporte no
+// empieza justo en el día de corte del ciclo (ej. un rango "del 10 al 25"):
+// así "Utilidad acum." arranca con lo ya generado ese mismo ciclo antes del
+// rango, pero SIN arrastrar ciclos anteriores — cada ciclo (mes calendario
+// por defecto, o el que se haya configurado) tiene su propio acumulado,
+// independiente de los demás.
+async function calcularUtilidadEntreFechas(desde, hasta) {
+  if (desde >= hasta) return 0;
+  const { data: prestamos } = await supabaseClient
+    .from("prestamos").select("monto_prestado, interes_porcentaje").gte("fecha_inicio", desde).lt("fecha_inicio", hasta);
   return (prestamos || []).reduce((s, p) => s + Number(p.monto_prestado) * (Number(p.interes_porcentaje) || 0) / 100, 0);
 }
 

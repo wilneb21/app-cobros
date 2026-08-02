@@ -89,3 +89,61 @@ async function configurarCapitalInicial() {
     if (quiereRecalcular) await recalcularCajaDesdeCapitalInicial(false);
   }
 }
+
+// --- DÍA DE CORTE DEL CICLO DE UTILIDAD ---
+// Algunos negocios no cierran cuentas el día 1 de cada mes calendario, sino
+// en una fecha propia (ej. del 29 al 28, o del 30 al 29). Este valor le dice
+// a Reportes en qué día reiniciar a $0 la columna "Utilidad acum." del Libro
+// diario. Por defecto es 1 (día 1 de cada mes), que es como ya venía
+// funcionando la app. Vive en preferencias_usuario.dia_corte_utilidad.
+
+let diaCorteUtilidadCache = null; // número 1-31, null si aún no se ha cargado
+
+async function obtenerDiaCorteUtilidad(forzar) {
+  if (diaCorteUtilidadCache !== null && !forzar) return diaCorteUtilidadCache;
+  const user = await obtenerUsuarioActual();
+  const { data, error } = await supabaseClient
+    .from("preferencias_usuario").select("dia_corte_utilidad").eq("user_id", user.id).maybeSingle();
+  // Si no hay error pero tampoco hay fila/columna aún (cuenta nueva, o la
+  // migración no se ha corrido), se asume el día 1 — mismo comportamiento
+  // de siempre, para que nadie note el cambio hasta que lo configure.
+  diaCorteUtilidadCache = (!error && data?.dia_corte_utilidad) ? Number(data.dia_corte_utilidad) : 1;
+  return diaCorteUtilidadCache;
+}
+
+// Pinta la línea de Configuración con el valor actual.
+async function pintarDiaCorteUtilidad() {
+  const dia = await obtenerDiaCorteUtilidad(true);
+  const detalleConfig = document.getElementById("fila-config-corte-utilidad-detalle");
+  if (detalleConfig) {
+    detalleConfig.textContent = dia === 1
+      ? "Día 1 de cada mes (por defecto)"
+      : `Día ${dia} de cada mes`;
+  }
+}
+
+// Configura el día en que "Utilidad acum." se reinicia a $0 cada ciclo.
+async function configurarDiaCorteUtilidad() {
+  if (!requiereConexion()) return;
+  const actual = await obtenerDiaCorteUtilidad(true);
+
+  const diaTexto = await mostrarPrompt(
+    "¿Qué día del mes cierra tu ciclo de cuentas? Por ejemplo, si cierras del 29 al 28, escribe 29. \"Utilidad acum.\" se reiniciará a $0 ese día de cada mes. Si eliges 29, 30 o 31 y algún mes no tiene ese día (ej. febrero), se usa automáticamente el último día disponible de ese mes.",
+    String(actual)
+  );
+  if (diaTexto === null) return;
+  const dia = Number(String(diaTexto).trim());
+  if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
+    mostrarAlerta("Escribe un número entre 1 y 31.");
+    return;
+  }
+
+  const user = await obtenerUsuarioActual();
+  const { error } = await supabaseClient.from("preferencias_usuario")
+    .upsert({ user_id: user.id, dia_corte_utilidad: dia }, { onConflict: "user_id" });
+  if (error) { mostrarAlerta("No fue posible guardar el día de corte: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("✅ Día de corte guardado.");
+  await pintarDiaCorteUtilidad();
+  if (typeof cargarReporteMes === "function" && !document.getElementById("seccion-reportes").classList.contains("oculto")) cargarReporteMes();
+}
