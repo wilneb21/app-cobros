@@ -105,11 +105,22 @@ function calcularTotalConInteres(montoPrestado, interesPorcentaje) {
   return Number(montoPrestado) * (1 + (Number(interesPorcentaje) || 0) / 100);
 }
 
-// Saldo pendiente real de un préstamo: total con interés menos lo que ya
-// pagó. Nunca baja de $0. "prestamo" puede venir de un select("*") o de un
-// select parcial, siempre que incluya monto_prestado e interes_porcentaje.
+// Saldo pendiente real de un préstamo: lo que realmente se le puede llegar a
+// cobrar (cuota × número de cuotas) menos lo que ya pagó. Nunca baja de $0.
+// "prestamo" puede venir de un select("*") o de un select parcial.
+//
+// OJO: se usa cuota × numero_cuotas, NO monto_prestado × (1 + interés) sin
+// redondear. La cuota se calculó originalmente redondeando esa división, así
+// que la suma de TODAS las cuotas puede quedar unos pesos por debajo del
+// monto exacto matemático — si seguimos comparando contra ese monto exacto,
+// un cliente que pagó religiosamente cada cuota nunca llega a "saldo $0" y el
+// préstamo se queda "activo" para siempre por una diferencia de unos pesos
+// que nadie le va a cobrar. Si por algún motivo no tenemos cuota/numero_cuotas
+// (un select parcial que no las pidió), se usa el cálculo con interés como respaldo.
 function calcularSaldoPendiente(prestamo, totalPagado) {
-  const total = calcularTotalConInteres(prestamo.monto_prestado, prestamo.interes_porcentaje);
+  const total = (prestamo.cuota && prestamo.numero_cuotas)
+    ? Number(prestamo.cuota) * Number(prestamo.numero_cuotas)
+    : calcularTotalConInteres(prestamo.monto_prestado, prestamo.interes_porcentaje);
   return Math.max(total - Number(totalPagado || 0), 0);
 }
 

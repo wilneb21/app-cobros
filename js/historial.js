@@ -105,10 +105,8 @@ function aplicarFiltroTipoHistorial(lista) {
   return lista.filter(m => m.tipoMov === historialFiltroTipoActual);
 }
 
-function cambiarFiltroTipoHistorial(tipo, el) {
+function cambiarFiltroTipoHistorial(tipo) {
   historialFiltroTipoActual = tipo;
-  document.querySelectorAll("#chips-filtro-tipo-historial .chip-hist").forEach(c => c.classList.remove("activa"));
-  el.classList.add("activa");
   pintarHistorialGlobal(aplicarFiltroTipoHistorial(historialGlobalCache));
 }
 
@@ -196,9 +194,7 @@ function filtrarHistorialGlobalTexto() {
   pintarHistorialGlobal(filtrado);
 }
 
-function cambiarFiltroHistorialGlobal(filtro, el) {
-  document.querySelectorAll("#chips-filtro-fecha-historial .chip-hist").forEach(c => c.classList.remove("activa"));
-  el.classList.add("activa");
+function cambiarFiltroHistorialGlobal(filtro) {
   document.getElementById("buscador-historial-global").value = "";
   cargarHistorialGlobal(filtro);
 }

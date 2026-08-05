@@ -344,14 +344,14 @@ async function crearClienteNuevo(event) {
 // --- DETALLE DE CLIENTE (modal con pestañas) ---
 let clienteDetalleActualId = null;
 
-async function abrirDetalleCliente(clienteId) {
+async function abrirDetalleCliente(clienteId, tabInicial = "info") {
   clienteDetalleActualId = clienteId;
   const { data: cliente, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("id", clienteId).single();
   if (error) { mostrarAlerta("Error al cargar cliente: " + traducirErrorSupabase(error)); return; }
 
   document.getElementById("detalle-nombre-cliente").innerText = cliente.nombre;
-  cambiarTabDetalle("info");
-  pintarTabInfo(cliente);
+  cambiarTabDetalle(tabInicial);
+  if (tabInicial === "info") pintarTabInfo(cliente);
 
   document.getElementById("modal-detalle").classList.remove("oculto");
   empujarEstadoModal("modal-detalle");

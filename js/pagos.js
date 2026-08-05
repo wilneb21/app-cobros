@@ -173,7 +173,7 @@ function numeroComprobante(prestamoId, fecha) {
 
 async function mostrarRecibo(clienteId, monto, fecha, estado, prestamoId) {
   const [{ data: cliente }, { data: prestamo }, { data: pagos }] = await Promise.all([
-    supabaseClient.from("clientes").select("nombre").eq("id", clienteId).single(),
+    supabaseClient.from("clientes").select("nombre, telefono").eq("id", clienteId).single(),
     supabaseClient.from("prestamos").select("monto_prestado, interes_porcentaje, cuota, numero_cuotas").eq("id", prestamoId).single(),
     supabaseClient.from("pagos").select("monto_pagado").eq("prestamo_id", prestamoId),
   ]);
@@ -195,18 +195,26 @@ async function mostrarRecibo(clienteId, monto, fecha, estado, prestamoId) {
     <div class="recibo-linea"><span>Cliente</span><span>${escaparHtml(cliente ? cliente.nombre : "")}</span></div>
     <div class="recibo-linea"><span>Fecha</span><span>${formatoFecha(fecha)}</span></div>
     <div class="recibo-linea"><span>Tipo</span><span>${etiqueta}</span></div>${filaSaldo}
-    <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}', ${prestamoId})">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
+    <div class="acciones-recibo"><button onclick="compartirRecibo(${clienteId}, ${monto}, '${fecha}', '${estado}', ${prestamoId}, '${escaparAtributoJs(cliente?.telefono || "")}')">Compartir</button><button onclick="cerrarRecibo()" class="secundario">Cerrar</button></div>`;
   document.getElementById("modal-recibo").classList.remove("oculto");
   empujarEstadoModal("modal-recibo");
 }
 
-// Convierte el recibo visible en pantalla a una imagen (PNG) y la comparte
-// directamente por WhatsApp/etc. La imagen se genera solo en el momento, en
-// el propio celular — nunca se sube ni se guarda en Supabase, así que
-// compartir recibos así no gasta espacio de almacenamiento.
-async function compartirRecibo(clienteId, monto, fecha, estado, prestamoId) {
+// Convierte el recibo visible en pantalla a una imagen (PNG). La imagen se
+// genera solo en el momento, en el propio celular — nunca se sube ni se
+// guarda en Supabase, así que compartir recibos así no gasta espacio.
+//
+// Si el cliente tiene teléfono registrado, en vez de abrir el selector
+// genérico de "compartir con..." (que te deja escoger cualquier app y
+// cualquier contacto, no necesariamente el correcto), se guarda la imagen
+// y se abre DIRECTO el chat de WhatsApp de ese cliente — WhatsApp no deja
+// adjuntar una imagen automáticamente desde un enlace web (por seguridad,
+// ninguna web puede hacer eso), así que el único paso manual que queda es
+// tocar el clip 📎 de ese chat y elegir la imagen recién guardada.
+async function compartirRecibo(clienteId, monto, fecha, estado, prestamoId, telefono) {
   const nodo = document.getElementById("contenido-recibo");
   const nombreArchivo = `comprobante-${numeroComprobante(prestamoId, fecha)}.png`;
+  const telefonoLimpio = (telefono || "").replace(/\D/g, "");
 
   try {
     const canvas = await html2canvas(nodo, {
@@ -218,20 +226,34 @@ async function compartirRecibo(clienteId, monto, fecha, estado, prestamoId) {
     if (!blob) throw new Error("No se pudo generar la imagen");
     const archivo = new File([blob], nombreArchivo, { type: "image/png" });
 
+    if (telefonoLimpio) {
+      // Guarda la imagen en el celular y abre directo el chat de ese cliente.
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombreArchivo;
+      enlace.click();
+      URL.revokeObjectURL(url);
+      window.open(`https://wa.me/${armarNumeroWhatsapp(telefono)}`, "_blank", "noopener");
+      mostrarAlerta("📥 Comprobante guardado. Ya se abrió el chat de WhatsApp de este cliente — toca el clip 📎 y elige la imagen que se acaba de guardar.");
+      return;
+    }
+
     if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
       await navigator.share({ files: [archivo], title: "Comprobante de pago" });
       return;
     }
 
     // El navegador no soporta compartir archivos (poco común en celulares
-    // modernos): se descarga la imagen para que la envíes manualmente.
+    // modernos) ni hay teléfono registrado: se descarga la imagen para que
+    // la envíes manualmente.
     const url = URL.createObjectURL(blob);
     const enlace = document.createElement("a");
     enlace.href = url;
     enlace.download = nombreArchivo;
     enlace.click();
     URL.revokeObjectURL(url);
-    mostrarAlerta("Tu navegador no permite compartir imágenes directamente. Se descargó el comprobante para que lo envíes manualmente.");
+    mostrarAlerta("Este cliente no tiene teléfono registrado. Se descargó el comprobante para que lo envíes manualmente.");
   } catch (error) {
     if (error.name === "AbortError") return; // el usuario cerró el panel de compartir, no es un error
     mostrarAlerta("No fue posible generar la imagen del comprobante.");

@@ -1771,6 +1771,9 @@ body.modo-oscuro .mini-card .chip.rojo { background: rgba(220,38,38,.18); color:
 .chips-hist { display: flex; gap: 6px; }
 .chip-hist { padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #f1f1f5; color: var(--text-muted); border: none; width: auto; }
 .chip-hist.activa { background: var(--primary); color: #fff; }
+.fila-filtros-historial { display: flex; gap: 8px; margin-bottom: 10px; }
+.fila-filtros-historial select { flex: 1; width: auto; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border, #e2e2ea); background: var(--card, #fff); color: var(--text); font-size: 12.5px; font-weight: 600; }
+body.modo-oscuro .fila-filtros-historial select { background: #1e2030; border-color: #35374d; color: var(--text); }
 .fila-mov { display: flex; align-items: center; gap: 10px; background: var(--card, #fff); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(14,26,23,.05); }
 .fila-mov .icono-mov { width: 30px; height: 30px; border-radius: 9px; background: #e7f2f0; color: #128a5c; display: flex; align-items: center; justify-content: center; font-size: 13px; flex: none; }
 .fila-mov .icono-mov.mov-no-pago { background: #fde9e9; color: var(--danger); }

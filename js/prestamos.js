@@ -228,7 +228,7 @@ async function cargarCuentasPorCobrar() {
     ? "id, nombre, telefono, orden_prestamos, rutas(nombre)"
     : "id, nombre, telefono, rutas(nombre)";
   let { data: prestamos, error } = await supabaseClient
-    .from("prestamos").select(`id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(${columnasCliente})`)
+    .from("prestamos").select(`id, cliente_id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, clientes(${columnasCliente})`)
     .eq("estado", "activo").order("fecha_inicio");
 
   // Si la columna orden_prestamos todavía no existe (falta correr la
@@ -238,7 +238,7 @@ async function cargarCuentasPorCobrar() {
   if (error && columnaOrdenPrestamosDisponible) {
     columnaOrdenPrestamosDisponible = false;
     ({ data: prestamos, error } = await supabaseClient
-      .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
+      .from("prestamos").select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, numero_cuotas, frecuencia, fecha_inicio, clientes(id, nombre, telefono, rutas(nombre))")
       .eq("estado", "activo").order("fecha_inicio"));
   }
   if (error) { activas.textContent = "No fue posible cargar las cuentas por cobrar."; return; }
@@ -267,7 +267,7 @@ async function cargarCuentasPorCobrar() {
     .from("prestamos").select("cliente_id, clientes(id, nombre, telefono, rutas(nombre))").eq("estado", "pagado");
   if (errorFinalizados) { pagados.textContent = "No fue posible cargar los clientes finalizados."; return; }
   const clientesUnicos = [...new Map((finalizados || []).filter(p => p.clientes).map(p => [p.cliente_id, p.clientes])).values()];
-  pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" role="button" tabindex="0" onclick="abrirDetalleCliente(${c.id})"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
+  pagados.innerHTML = !clientesUnicos.length ? '<div class="estado-vacio">Aún no hay clientes con cuentas finalizadas.</div>' : clientesUnicos.map(c => `<div class="fila-finalizada" role="button" tabindex="0" onclick="abrirDetalleCliente(${c.id}, 'historial')"><span>✓</span><div><strong>${escaparHtml(c.nombre)}</strong><small>${escaparHtml(c.rutas?.nombre || "Sin ruta")}</small></div><b>Ver historial</b></div>`).join("");
 }
 
 function pintarCuentasActivas() {
@@ -277,7 +277,7 @@ function pintarCuentasActivas() {
   activas.innerHTML = lista.map(p => `
     <div class="tarjeta tarjeta-cuenta" data-cliente-id="${p.cliente_id}">
       <span class="asa-arrastre" aria-label="Mantén presionado y arrastra para reordenar">⠿</span>
-      <div role="button" tabindex="0" class="tarjeta-cuenta-contenido" onclick="abrirDetalleCliente(${p.cliente_id})">
+      <div role="button" tabindex="0" class="tarjeta-cuenta-contenido" onclick="abrirDetalleCliente(${p.cliente_id}, 'prestamos')">
         <div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div>
         <div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(p.saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div>
       </div>
