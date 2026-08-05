@@ -189,9 +189,17 @@ function pintarClientesLista(data) {
     }
     const riesgo = obtenerRiesgoCliente(cliente.id);
     const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
+    // riesgoClientesCache solo trae clientes con al menos un préstamo activo
+    // (ver calcularRiesgoTodosClientes), así que su presencia ahí nos sirve
+    // también para saber, sin otra consulta, quién tiene crédito activo.
+    const tienePrestamoActivo = cliente.id in riesgoClientesCache;
+    const badgePrestamo = tienePrestamoActivo
+      ? `<span class="badge-prestamo-cliente badge-prestamo-activo">💰 Con préstamo activo</span>`
+      : `<span class="badge-prestamo-cliente badge-sin-prestamo">Sin préstamo activo</span>`;
     contenedor.innerHTML += `
-      <div class="tarjeta cliente-clickable" role="button" tabindex="0" onclick="abrirDetalleCliente(${cliente.id})">
+      <div class="tarjeta cliente-clickable ${tienePrestamoActivo ? "" : "cliente-sin-prestamo"}" role="button" tabindex="0" onclick="abrirDetalleCliente(${cliente.id})">
         <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
+        ${badgePrestamo}
         ${cliente.cedula ? `<span>🪪 ${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)}</span><br>` : ""}
         <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
       </div>`;

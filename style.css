@@ -1260,6 +1260,24 @@ body.modo-oscuro .badge-riesgo-bueno { background: #103524; color: #6ee0a5; }
 body.modo-oscuro .badge-riesgo-regular { background: #3a2f10; color: #f2cc6b; }
 body.modo-oscuro .badge-riesgo-riesgoso { background: #3a1414; color: #f19c95; }
 
+/* --- Distinguir en la lista de "Clientes" quién tiene crédito activo --- */
+.badge-prestamo-cliente {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+.badge-prestamo-activo { background: #e5f7ee; color: #0e7d43; }
+.badge-sin-prestamo { background: #eef1f0; color: #7a8985; }
+body.modo-oscuro .badge-prestamo-activo { background: #103524; color: #6ee0a5; }
+body.modo-oscuro .badge-sin-prestamo { background: #263230; color: #9db0ab; }
+/* La tarjeta completa se atenúa un poco para que, al ver la lista de un
+   vistazo, los clientes sin préstamo activo "pesen" visualmente menos que
+   los que sí tienen crédito vigente. */
+.cliente-sin-prestamo { opacity: .68; }
+
 .texto-ayuda-export {
   font-size: 12px;
   color: var(--text-muted);
