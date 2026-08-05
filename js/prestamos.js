@@ -206,13 +206,17 @@ async function cargarClientesParaCobrar() {
   const { data: clientes, error } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("archivado", false).order("nombre");
   if (error) { mostrarAlerta("No fue posible cargar los clientes para cobrar."); return; }
   clientes.sort(compararClientesPorRutaYOrden);
-  clientesCobrarCache = clientes;
   const ids = (clientes || []).map(cliente => cliente.id);
   const { data: prestamosActivos } = ids.length
     ? await supabaseClient.from("prestamos").select("cliente_id").in("cliente_id", ids).eq("estado", "activo")
     : { data: [] };
   clientesConSaldoIds = new Set((prestamosActivos || []).map(prestamo => prestamo.cliente_id));
-  actualizarSelectorFiltroRuta(clientes);
+  // En "Cobrar" solo deben verse los clientes con un préstamo activo en este
+  // momento. Un cliente sin préstamo activo (aún no le han prestado, o ya
+  // pagó todo) desaparece de esta lista hasta que se le registre un nuevo
+  // préstamo.
+  clientesCobrarCache = clientes.filter(cliente => clientesConSaldoIds.has(cliente.id));
+  actualizarSelectorFiltroRuta(clientesCobrarCache);
   filtrarClientesCobrar();
 }
 
