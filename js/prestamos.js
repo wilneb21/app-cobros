@@ -281,7 +281,7 @@ function pintarCuentasActivas() {
   activas.innerHTML = lista.map(p => `
     <div class="tarjeta tarjeta-cuenta" data-cliente-id="${p.cliente_id}">
       <span class="asa-arrastre" aria-label="Mantén presionado y arrastra para reordenar">⠿</span>
-      <div role="button" tabindex="0" class="tarjeta-cuenta-contenido" onclick="abrirDetalleCliente(${p.cliente_id}, 'prestamos')">
+      <div role="button" tabindex="0" class="tarjeta-cuenta-contenido" onclick="abrirCobroCliente(${p.cliente_id})">
         <div><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><span>${escaparHtml(p.clientes?.rutas?.nombre || "Sin ruta")} · ${p.frecuencia}</span></div>
         <div class="cuenta-saldo"><small>Saldo</small><b>${formatoPesos(p.saldo)}</b><span>Cuota: ${formatoPesos(p.cuota)}</span></div>
       </div>
