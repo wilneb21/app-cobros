@@ -227,6 +227,12 @@
              saturada apenas se abre. -->
         <div id="resumen-mes"></div>
         <div id="comparacion-mes" class="comparacion-mes oculto"></div>
+
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-cartera-riesgo', this, '⚠️ Ver cartera en riesgo', '⚠️ Ocultar cartera en riesgo')">⚠️ Ver cartera en riesgo</button>
+        <div id="bloque-cartera-riesgo" class="oculto">
+          <p class="texto-ayuda">Así está la cartera de créditos activos <strong>ahora mismo</strong> (no cambia según el período que estés mirando arriba): cuántos clientes y cuánta plata hay en cada nivel, según sus cuotas atrasadas — mismo criterio que ya ves en Clientes.</p>
+          <div id="cartera-en-riesgo" class="resumen-destacado"></div>
+        </div>
         <div id="respaldo-recordatorio" class="oculto"></div>
 
         <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
@@ -238,11 +244,18 @@
 
         <p class="titulo-grupo-config">Detalle y herramientas</p>
 
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-grafico-utilidad', this, '📊 Ver gráfico de utilidad', '📊 Ocultar gráfico de utilidad')">📊 Ver gráfico de utilidad</button>
+        <div id="bloque-grafico-utilidad" class="oculto">
+          <p class="texto-ayuda">Utilidad por día (o por mes, si el período es un año o un rango largo). Toca o mantén presionada una barra para ver el monto exacto.</p>
+          <div id="grafico-utilidad-reportes" class="grafico-utilidad"></div>
+        </div>
+
         <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-libro-diario', this, '📒 Ver flujo de caja día por día', '📒 Ocultar flujo de caja día por día')">📒 Ver flujo de caja día por día</button>
         <div id="bloque-libro-diario" class="oculto">
-          <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés, sin contar el capital que vuelve) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente).</p>
+          <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés, sin contar el capital que vuelve — se cuenta el día en que sale el efectivo, no el día de la primera cuota) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente). La columna "Utilidad acum." se reinicia a $0 al empezar cada ciclo (configurable en Configuración → Día de corte de utilidad; por defecto el día 1 de cada mes).</p>
           <div class="tabla-libro-diario-envoltura"><div id="libro-diario"></div></div>
           <div id="notas-aportes-periodo"></div>
+          <div id="desglose-gastos-concepto"></div>
           <div id="libro-diario-totales" class="libro-diario-totales"></div>
         </div>
 
@@ -271,7 +284,7 @@
 
           <div class="bloque-respaldo-tecnico">
             <p class="titulo-respaldo-tecnico">🔒 Copia de seguridad técnica</p>
-            <p class="texto-ayuda-export">Archivo <strong>.json</strong> para restaurar tu información si algo sale mal. No está pensado para abrirlo ni leerlo — solo guárdalo.</p>
+            <p class="texto-ayuda-export">Tu información ya vive segura en el servidor (Supabase) — esto no reemplaza eso, es una copia <strong>extra</strong> por si algún día necesitas restaurar todo manualmente. Archivo <strong>.json</strong>: no está pensado para abrirlo ni leerlo, solo guárdalo (por ejemplo en Google Drive) y listo.</p>
             <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar copia de seguridad (.json)</button>
           </div>
         </div>
@@ -296,6 +309,18 @@
           <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono">🧮</span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono">💰</span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
           <button type="button" id="fila-config-corte-utilidad" class="fila-config" onclick="configurarDiaCorteUtilidad()"><span class="config-icono">📆</span><span><b>Día de corte de utilidad</b><small id="fila-config-corte-utilidad-detalle">Día 1 de cada mes (por defecto)</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-inicio-semana" class="fila-config" onclick="configurarDiaInicioSemana()"><span class="config-icono">🗓️</span><span><b>Inicio de semana (reporte)</b><small id="fila-config-inicio-semana-detalle">Lunes a domingo (por defecto)</small></span><span class="config-chevron">›</span></button>
+          <div class="fila-config fila-config-select">
+            <span class="config-icono">📊</span>
+            <span><b>Reporte por defecto</b><small>Con cuál se abre Reportes cada vez</small></span>
+            <select id="config-reporte-tipo-defecto" aria-label="Tipo de reporte por defecto" onchange="guardarTipoReporteDefecto(this.value)">
+              <option value="dia">Diario</option>
+              <option value="semana">Semanal</option>
+              <option value="mes">Mensual</option>
+              <option value="anio">Anual</option>
+              <option value="rango">Rango de fechas</option>
+            </select>
+          </div>
           <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
         </div>
         <button type="button" class="btn-cerrar-sesion-config" onclick="cerrarSesion()">Cerrar sesión</button>

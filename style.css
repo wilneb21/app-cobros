@@ -352,6 +352,13 @@ button.secundario {
   max-width: 260px;
 }
 
+#cartera-en-riesgo.resumen-destacado {
+  flex-wrap: wrap;
+}
+#cartera-en-riesgo.resumen-destacado .resumen-caja {
+  flex: 1 1 140px;
+}
+
 /* --- MOVIMIENTOS DEL DÍA (caja diaria de Inicio) --- */
 /* <details> nativo: escondido por defecto, se despliega con un click en el
    <summary>, sin necesitar JS aparte para abrir/cerrar. */
@@ -506,6 +513,46 @@ button.secundario {
   font-size: 9px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+/* --- GRÁFICO DE UTILIDAD (Reportes) ---
+   Mismo espíritu que .grafico-semana de Inicio, pero soporta muchas más
+   barras (hasta un mes día por día, o 12 meses si el período es un año):
+   ancho fijo por barra + scroll horizontal en vez de apretar todo en la
+   pantalla. */
+.grafico-utilidad {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 120px;
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 10px;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.barra-utilidad {
+  flex: 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.barra-utilidad .barra {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent), var(--primary));
+  border-radius: 5px 5px 0 0;
+  min-height: 3px;
+}
+
+.barra-utilidad .etiqueta-barra {
+  font-size: 8px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  white-space: nowrap;
 }
 
 /* --- SUBTARJETAS DE PRÉSTAMO --- */
@@ -1305,7 +1352,7 @@ body { background: radial-gradient(circle at 100% 0, #e7f2f0 0, transparent 29%)
 .barra-meta-relleno { background: linear-gradient(90deg, #0c7d70, #2f9c8c); }.fila-agenda.agenda-hoy { border-left-color: #0c7d70; background: #e7f2f0; }
 .menu-inferior { background: rgba(250,255,254,.96); box-shadow: 0 -8px 28px rgba(8,92,82,.11); }.barra-nav-btn { color: #6f8985; }.barra-nav-btn.activo { color: #085c52; background: #e7f2f0; }.btn-accion-flotante { background: linear-gradient(145deg, #0c7d70, #085c52); border-color: #f4f6f6; box-shadow: 0 12px 22px rgba(8,92,82,.32); }
 .encabezado-config { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }.encabezado-config h3 { margin-bottom: 3px; }.encabezado-config .texto-ayuda { margin: 0; }.icono-config { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: #e7f2f0; color: #085c52; font-size: 23px; }.grupo-config { margin-bottom: 19px; }.titulo-grupo-config { margin: 0 0 7px 3px; color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
-.fila-config { display: grid; grid-template-columns: 37px 1fr auto; align-items: center; gap: 10px; min-height: 69px; margin: 0 0 8px; padding: 10px 13px; color: var(--text); text-align: left; background: #fff; border: 1px solid #d3e8e3; border-radius: 16px; box-shadow: 0 5px 14px rgba(8,92,82,.05); }.fila-config span:nth-child(2) b, .fila-config span:nth-child(2) small { display: block; }.fila-config b { font-size: 13px; }.fila-config small { margin-top: 2px; color: var(--text-muted); font-size: 10px; font-weight: 400; }.config-icono { display: grid; place-items: center; width: 34px; height: 34px; background: #e7f2f0; color: #085c52; border-radius: 11px; font-size: 18px; }.config-chevron { color: #88a29e; font-size: 24px; font-weight: 300; }.btn-cerrar-sesion-config { margin-top: 3px; color: #b42318; background: #fff1ef; border: 1px solid #ffd9d4; box-shadow: none; }
+.fila-config { display: grid; grid-template-columns: 37px 1fr auto; align-items: center; gap: 10px; min-height: 69px; margin: 0 0 8px; padding: 10px 13px; color: var(--text); text-align: left; background: #fff; border: 1px solid #d3e8e3; border-radius: 16px; box-shadow: 0 5px 14px rgba(8,92,82,.05); }.fila-config span:nth-child(2) b, .fila-config span:nth-child(2) small { display: block; }.fila-config b { font-size: 13px; }.fila-config small { margin-top: 2px; color: var(--text-muted); font-size: 10px; font-weight: 400; }.config-icono { display: grid; place-items: center; width: 34px; height: 34px; background: #e7f2f0; color: #085c52; border-radius: 11px; font-size: 18px; }.config-chevron { color: #88a29e; font-size: 24px; font-weight: 300; }.btn-cerrar-sesion-config { margin-top: 3px; color: #b42318; background: #fff1ef; border: 1px solid #ffd9d4; box-shadow: none; }.fila-config-select select { width: auto; max-width: 120px; margin: 0; padding: 8px 9px; font-size: 11px; }
 body.modo-oscuro .top-bar, body.modo-oscuro .inicio-hero { background: linear-gradient(135deg, #07584f, #0a8175); } body.modo-oscuro .pildora-periodo, body.modo-oscuro .chip-cobrar, body.modo-oscuro .progreso-cobro-principal, body.modo-oscuro .fila-config { background: #1e302e; border-color: #35514d; color: var(--text); } body.modo-oscuro .progreso-cobro-fondo { background: #36514d; } body.modo-oscuro .menu-inferior { background: rgba(19,32,30,.96); } body.modo-oscuro .barra-nav-btn.activo { background: #1d5049; color: #8fe0d0; } body.modo-oscuro .accion-cliente { background: #183b36; } body.modo-oscuro .accion-prestamo { background: #183340; } body.modo-oscuro .accion-cobrar { background: #193c29; } body.modo-oscuro .accion-ruta { background: #3b3320; }
 
 /* Directorio de clientes y creación unificada de préstamos. */

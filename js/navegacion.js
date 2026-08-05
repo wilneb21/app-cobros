@@ -14,10 +14,11 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   if (nombre === "clientes") cargarClientes();
   if (nombre === "prestamos") { cargarCuentasPorCobrar(); cargarRutas(); }
   if (nombre === "cobrar") cargarClientesParaCobrar();
-  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarDiaCorteUtilidad(); pintarPerfilConfig(); }
+  if (nombre === "configuracion") { actualizarFilaConfigBloqueo(); actualizarFilaConfigPush(); pintarCapitalInicial(); pintarDiaCorteUtilidad(); pintarDiaInicioSemana(); pintarTipoReporteDefecto(); pintarPerfilConfig(); }
   if (nombre === "reportes") {
     pintarCapitalInicial();
-    cargarReporteMes();
+    const aplicoDefecto = aplicarTipoReporteDefecto();
+    if (!aplicoDefecto) cargarReporteMes();
   }
   if (nombre === "historial") cargarHistorialGlobal();
   cerrarMenuPrincipal();

@@ -51,3 +51,37 @@ function aplicarVisibilidadFuncionesAvanzadas() {
 
 document.addEventListener("DOMContentLoaded", aplicarVisibilidadFuncionesAvanzadas);
 
+// --- TIPO DE REPORTE POR DEFECTO ---
+// Reportes siempre abría en "mensual". Esto permite elegir con qué tipo de
+// reporte prefieres que abra cada vez (diario, semanal, mensual, anual o
+// rango) — se guarda en este celular (localStorage), igual que el modo
+// oscuro, porque es una preferencia de cómo prefieres VER la pantalla, no
+// un dato del negocio.
+function obtenerTipoReporteDefecto() {
+  return localStorage.getItem("reporteTipoDefecto") || "mes";
+}
+
+function guardarTipoReporteDefecto(tipo) {
+  localStorage.setItem("reporteTipoDefecto", tipo);
+}
+
+// Se llama al abrir la sección Reportes. Si el tipo guardado es distinto al
+// que ya está seleccionado, lo aplica (y dispara la carga del reporte a
+// través de cambiarTipoReporte). Devuelve true si tuvo que aplicar un
+// cambio, para que quien llama sepa si ya se encargó de cargar el reporte.
+function aplicarTipoReporteDefecto() {
+  const tipo = obtenerTipoReporteDefecto();
+  const select = document.getElementById("reporte-tipo");
+  if (select && select.value !== tipo) {
+    select.value = tipo;
+    cambiarTipoReporte();
+    return true;
+  }
+  return false;
+}
+
+// Pinta el selector de Configuración con el valor actual guardado.
+function pintarTipoReporteDefecto() {
+  const select = document.getElementById("config-reporte-tipo-defecto");
+  if (select) select.value = obtenerTipoReporteDefecto();
+}

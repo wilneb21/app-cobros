@@ -28,12 +28,14 @@ function cambiarTipoReporte() {
   if (tipo !== "rango") cargarReporteMes();
 }
 
-// Devuelve el lunes de la semana que contiene la fecha dada ("YYYY-MM-DD")
-function obtenerLunesDeSemana(fechaTexto) {
+// Devuelve el inicio ("YYYY-MM-DD") de la semana que contiene la fecha dada,
+// según el día de inicio de semana configurado (0=domingo…6=sábado, por
+// defecto 1=lunes — mismo comportamiento de siempre si no se ha cambiado).
+function obtenerInicioSemana(fechaTexto, diaInicioSemana) {
   const [a, m, d] = fechaTexto.split("-").map(Number);
   const fecha = new Date(a, m - 1, d);
   const diaSemana = fecha.getDay(); // 0 = domingo
-  const diff = diaSemana === 0 ? -6 : 1 - diaSemana;
+  const diff = -((diaSemana - diaInicioSemana + 7) % 7);
   fecha.setDate(fecha.getDate() + diff);
   const año = fecha.getFullYear();
   const mes = String(fecha.getMonth() + 1).padStart(2, "0");
@@ -56,7 +58,8 @@ async function cargarReporteMes() {
     fin = fecha.toISOString().split("T")[0];
     etiquetaPeriodo = "el día";
   } else if (tipo === "semana") {
-    inicio = obtenerLunesDeSemana(hoy);
+    const diaInicioSemana = await obtenerDiaInicioSemana();
+    inicio = obtenerInicioSemana(hoy, diaInicioSemana);
     const finFecha = new Date(inicio + "T00:00:00");
     finFecha.setDate(finFecha.getDate() + 7);
     fin = finFecha.toISOString().split("T")[0];
@@ -98,14 +101,40 @@ async function cargarReporteMes() {
       .from("pagos").select("monto_pagado").gte("fecha_pago", inicio).lt("fecha_pago", fin);
     const totalMesActual = (pagosMesActualPreview || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
 
+    // Además de comparar lo COBRADO, compara la GANANCIA NETA (utilidad de
+    // lo prestado, menos gastos) mes contra mes — es la pregunta que de
+    // verdad importa al cierre: "¿gané más o menos que el mes pasado?", no
+    // solo "¿cobré más o menos?" (cobrar mucho no siempre significa ganar
+    // más, si también prestaste y gastaste mucho ese mes).
+    const [gananciaBrutaMesAnterior, { data: gastosMesAnterior }, gananciaBrutaMesActual, { data: gastosMesActualPreview }] = await Promise.all([
+      calcularUtilidadPorPrestamos(mesAnteriorInicio, mesAnteriorFin),
+      supabaseClient.from("gastos").select("monto").gte("fecha", mesAnteriorInicio).lt("fecha", mesAnteriorFin),
+      calcularUtilidadPorPrestamos(inicio, fin),
+      supabaseClient.from("gastos").select("monto").gte("fecha", inicio).lt("fecha", fin)
+    ]);
+    const gananciaNetaMesAnterior = gananciaBrutaMesAnterior - (gastosMesAnterior || []).reduce((s, g) => s + Number(g.monto), 0);
+    const gananciaNetaMesActualPreview = gananciaBrutaMesActual - (gastosMesActualPreview || []).reduce((s, g) => s + Number(g.monto), 0);
+
     const contenedorComp = document.getElementById("comparacion-mes");
+    const lineasComp = [];
     if (totalMesAnterior > 0) {
       const variacion = ((totalMesActual - totalMesAnterior) / totalMesAnterior) * 100;
       const positivo = variacion >= 0;
-      contenedorComp.innerHTML = `
-        <span class="${positivo ? "variacion-positiva" : "variacion-negativa"}">
-          ${positivo ? "📈" : "📉"} ${positivo ? "+" : ""}${variacion.toFixed(1)}% vs. mes anterior (${formatoPesos(totalMesAnterior)})
-        </span>`;
+      lineasComp.push(`<span class="${positivo ? "variacion-positiva" : "variacion-negativa"}">${positivo ? "📈" : "📉"} ${positivo ? "+" : ""}${variacion.toFixed(1)}% cobrado vs. mes anterior (${formatoPesos(totalMesAnterior)})</span>`);
+    }
+    if (gananciaNetaMesAnterior !== 0) {
+      const variacionGanancia = ((gananciaNetaMesActualPreview - gananciaNetaMesAnterior) / Math.abs(gananciaNetaMesAnterior)) * 100;
+      const positivoGanancia = variacionGanancia >= 0;
+      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">${positivoGanancia ? "📈" : "📉"} ${positivoGanancia ? "+" : ""}${variacionGanancia.toFixed(1)}% ganancia neta vs. mes anterior (${formatoPesos(gananciaNetaMesAnterior)})</span>`);
+    } else if (gananciaNetaMesActualPreview !== 0) {
+      // El mes anterior cerró en $0 exacto (o no había datos) — no se puede
+      // calcular un porcentaje sobre una base de $0, así que se muestra el
+      // cambio en pesos en vez de un porcentaje sin sentido.
+      const positivoGanancia = gananciaNetaMesActualPreview >= 0;
+      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">${positivoGanancia ? "📈" : "📉"} ganancia neta: ${formatoPesos(gananciaNetaMesActualPreview)} (mes anterior cerró en $0)</span>`);
+    }
+    if (lineasComp.length) {
+      contenedorComp.innerHTML = lineasComp.join("<br>");
       contenedorComp.classList.remove("oculto");
     }
   }
@@ -160,6 +189,7 @@ async function cargarReporteMes() {
   await cargarRefinanciamientosPeriodo(refinanciados, inicio, fin);
   await cargarLibroDiario(inicio, fin);
   await cargarDetalleClientesDelDia(inicio, fin, tipo === "dia");
+  await cargarCarteraEnRiesgo();
   await verificarRecordatorioRespaldo();
 }
 
@@ -323,6 +353,136 @@ async function cargarLibroDiario(inicio, fin) {
     <div class="resumen-caja ${totales.utilidad >= 0 ? "tono-exito" : "tono-peligro"}"><span class="numero">${formatoPesos(totales.utilidad)}</span><span class="etiqueta">Utilidad del período</span><span class="subetiqueta">${utilidadPctTotal.toFixed(1)}% de lo prestado</span></div>
     <div class="resumen-caja tono-primario"><span class="numero">${formatoPesos(filas[filas.length - 1].cierre)}</span><span class="etiqueta">Cierre del período</span><span class="subetiqueta">Flujo de caja al final de ${formatoFecha(filas[filas.length - 1].fecha)}</span></div>
     <div class="resumen-caja tono-exito"><span class="numero">${formatoPesos(utilidadHistoricaTotal)}</span><span class="etiqueta">💰 Utilidad total acumulada</span><span class="subetiqueta">De todos los préstamos hechos desde siempre — de aquí saca el dueño las ganancias, no de la caja</span></div>`;
+
+  await cargarDesglosePorConcepto(inicio, fin);
+  if (typeof pintarGraficoUtilidad === "function") pintarGraficoUtilidad(filas);
+}
+
+// --- GASTOS POR CONCEPTO (desglose del período) ---
+// El total de gastos ya se ve en "Flujo de caja día por día", pero no en
+// qué se fue la plata. Esto agrupa los gastos del período por su texto de
+// "Concepto" tal cual se escribió al registrarlos (no hay categorías fijas
+// en la app — cada quien escribe lo que quiera, ej: "gasolina", "Gasolina
+// moto", "GASOLINA"), así que se normaliza a minúsculas/sin espacios extra
+// para agrupar variantes del mismo gasto, pero se muestra con el texto
+// como lo escribió la primera vez, para que se reconozca fácil.
+async function cargarDesglosePorConcepto(inicio, fin) {
+  const contenedor = document.getElementById("desglose-gastos-concepto");
+  if (!contenedor) return;
+
+  const { data: gastos, error } = await supabaseClient
+    .from("gastos").select("concepto, monto").gte("fecha", inicio).lt("fecha", fin);
+  if (error || !gastos || gastos.length === 0) { contenedor.innerHTML = ""; return; }
+
+  const porConcepto = {};
+  gastos.forEach(g => {
+    const clave = (g.concepto || "(sin concepto)").trim().toLowerCase();
+    if (!porConcepto[clave]) porConcepto[clave] = { etiqueta: (g.concepto || "(sin concepto)").trim(), total: 0, cantidad: 0 };
+    porConcepto[clave].total += Number(g.monto);
+    porConcepto[clave].cantidad += 1;
+  });
+
+  const totalGeneral = gastos.reduce((s, g) => s + Number(g.monto), 0);
+  const filasOrdenadas = Object.values(porConcepto).sort((a, b) => b.total - a.total);
+
+  contenedor.innerHTML = `
+    <p class="texto-ayuda" style="margin:14px 2px 6px"><strong>Gastos por concepto en este período:</strong></p>
+    ${filasOrdenadas.map(f => `
+      <div class="fila-libro-diario" style="grid-template-columns: 1fr 60px 90px;">
+        <span style="white-space:normal">${escaparHtml(f.etiqueta)}${f.cantidad > 1 ? ` <small>(${f.cantidad}×)</small>` : ""}</span>
+        <span>${totalGeneral > 0 ? ((f.total / totalGeneral) * 100).toFixed(0) : 0}%</span>
+        <span><b>${formatoPesos(f.total)}</b></span>
+      </div>`).join("")}`;
+}
+
+// --- GRÁFICO DE UTILIDAD DEL PERÍODO ---
+// Reutiliza las mismas filas que ya se calcularon para el Libro diario (no
+// hace ninguna consulta extra). Si el período es corto (hasta 31 días —
+// cubre día/semana/mes/rangos cortos) muestra una barra por día. Si es más
+// largo (año, o un rango de varios meses) agrupa por mes para no terminar
+// con cientos de barras invisibles de tan angostas.
+function pintarGraficoUtilidad(filas) {
+  const contenedor = document.getElementById("grafico-utilidad-reportes");
+  if (!contenedor || !filas || filas.length === 0) return;
+
+  let puntos;
+  if (filas.length <= 31) {
+    puntos = filas.map(f => {
+      const [, m, d] = f.fecha.split("-");
+      return { etiqueta: `${d}/${m}`, valor: f.utilidad, titulo: `${formatoFecha(f.fecha)}: ${formatoPesos(f.utilidad)}` };
+    });
+  } else {
+    const nombresMeses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const porMes = {};
+    filas.forEach(f => {
+      const clave = f.fecha.substring(0, 7);
+      porMes[clave] = (porMes[clave] || 0) + f.utilidad;
+    });
+    puntos = Object.keys(porMes).sort().map(clave => {
+      const mes = Number(clave.substring(5, 7));
+      return { etiqueta: nombresMeses[mes - 1], valor: porMes[clave], titulo: `${nombresMeses[mes - 1]} ${clave.substring(0, 4)}: ${formatoPesos(porMes[clave])}` };
+    });
+  }
+
+  const maximo = Math.max(...puntos.map(p => p.valor), 1);
+  contenedor.innerHTML = puntos.map(p => `
+    <div class="barra-utilidad" title="${p.titulo}">
+      <div class="barra" style="height:${Math.max((p.valor / maximo) * 100, 2)}%"></div>
+      <span class="etiqueta-barra">${p.etiqueta}</span>
+    </div>`).join("");
+}
+
+// --- CARTERA EN RIESGO ---
+// Reutiliza el mismo sistema de "riesgo" que ya se ve en Clientes (bueno /
+// regular / riesgoso, según cuotas atrasadas) para dar una foto GLOBAL y
+// ACTUAL del negocio: cuántos clientes y cuánta plata hay en cada nivel.
+// A diferencia del resto de Reportes, esto NO depende del período que se
+// esté viendo (día/semana/mes/año) — es "así está la cartera ahora mismo",
+// igual que en Clientes.
+async function cargarCarteraEnRiesgo() {
+  const contenedor = document.getElementById("cartera-en-riesgo");
+  if (!contenedor) return;
+  contenedor.innerHTML = '<div class="estado-vacio">Cargando…</div>';
+
+  const { data: prestamos, error } = await supabaseClient.from("prestamos")
+    .select("id, cliente_id, monto_prestado, interes_porcentaje, cuota, frecuencia, fecha_inicio, numero_cuotas, contar_domingos_festivos")
+    .eq("estado", "activo");
+  if (error) { contenedor.innerHTML = '<div class="estado-vacio">No fue posible cargar la cartera en riesgo.</div>'; return; }
+  if (!prestamos || prestamos.length === 0) { contenedor.innerHTML = '<div class="estado-vacio">No hay créditos activos ahora mismo.</div>'; return; }
+
+  const ids = prestamos.map(p => p.id);
+  const { data: pagos } = ids.length
+    ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids)
+    : { data: [] };
+  const pagadoPorPrestamo = {};
+  (pagos || []).forEach(pg => pagadoPorPrestamo[pg.prestamo_id] = (pagadoPorPrestamo[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
+
+  const riesgoPorNivel = {
+    bueno: { clientes: new Set(), saldo: 0 },
+    regular: { clientes: new Set(), saldo: 0 },
+    riesgoso: { clientes: new Set(), saldo: 0 }
+  };
+
+  for (const p of prestamos) {
+    const totalPagado = pagadoPorPrestamo[p.id] || 0;
+    const saldo = calcularSaldoPendiente(p, totalPagado);
+    const atraso = await cuotasAtrasadasPrestamo(p, totalPagado);
+    const nivel = nivelRiesgoDesdeCuotasAtrasadas(atraso);
+    riesgoPorNivel[nivel].clientes.add(p.cliente_id);
+    riesgoPorNivel[nivel].saldo += saldo;
+  }
+
+  const info = {
+    bueno: { emoji: "🟢", texto: "Al día", clase: "tono-exito" },
+    regular: { emoji: "🟡", texto: "Atraso leve", clase: "tono-advertencia" },
+    riesgoso: { emoji: "🔴", texto: "En riesgo", clase: "tono-peligro" }
+  };
+  contenedor.innerHTML = ["bueno", "regular", "riesgoso"].map(nivel => `
+    <div class="resumen-caja ${info[nivel].clase}">
+      <span class="numero">${riesgoPorNivel[nivel].clientes.size}</span>
+      <span class="etiqueta">${info[nivel].emoji} ${info[nivel].texto}</span>
+      <span class="subetiqueta">${formatoPesos(riesgoPorNivel[nivel].saldo)} en cartera</span>
+    </div>`).join("");
 }
 
 // --- CLIENTES DEL DÍA (solo para el reporte tipo "día") ---

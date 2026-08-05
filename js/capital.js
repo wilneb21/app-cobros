@@ -147,3 +147,58 @@ async function configurarDiaCorteUtilidad() {
   await pintarDiaCorteUtilidad();
   if (typeof cargarReporteMes === "function" && !document.getElementById("seccion-reportes").classList.contains("oculto")) cargarReporteMes();
 }
+
+// --- DÍA DE INICIO DE SEMANA (para el Reporte semanal) ---
+// El Reporte semanal asumía siempre semana calendario lunes-domingo. Este
+// valor permite que empiece cualquier otro día, para negocios cuyo ciclo de
+// cobro no coincide con la semana calendario (ej. jueves a miércoles).
+// 0 = domingo … 6 = sábado (estándar de Date.getDay()). Por defecto 1 (lunes).
+const NOMBRES_DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+let diaInicioSemanaCache = null;
+
+async function obtenerDiaInicioSemana(forzar) {
+  if (diaInicioSemanaCache !== null && !forzar) return diaInicioSemanaCache;
+  const user = await obtenerUsuarioActual();
+  const { data, error } = await supabaseClient
+    .from("preferencias_usuario").select("dia_inicio_semana").eq("user_id", user.id).maybeSingle();
+  diaInicioSemanaCache = (!error && data?.dia_inicio_semana !== null && data?.dia_inicio_semana !== undefined)
+    ? Number(data.dia_inicio_semana) : 1;
+  return diaInicioSemanaCache;
+}
+
+async function pintarDiaInicioSemana() {
+  const dia = await obtenerDiaInicioSemana(true);
+  const detalleConfig = document.getElementById("fila-config-inicio-semana-detalle");
+  if (detalleConfig) {
+    detalleConfig.textContent = dia === 1
+      ? "Lunes a domingo (por defecto)"
+      : `${NOMBRES_DIAS_SEMANA[dia].charAt(0).toUpperCase()}${NOMBRES_DIAS_SEMANA[dia].slice(1)} a ${NOMBRES_DIAS_SEMANA[(dia + 6) % 7]}`;
+  }
+}
+
+async function configurarDiaInicioSemana() {
+  if (!requiereConexion()) return;
+  const actual = await obtenerDiaInicioSemana(true);
+
+  const opciones = NOMBRES_DIAS_SEMANA.map((n, i) => `${i} = ${n}`).join(", ");
+  const diaTexto = await mostrarPrompt(
+    `¿Qué día empieza tu semana de cobro para el "Reporte semanal"? Escribe el número: ${opciones}.`,
+    String(actual)
+  );
+  if (diaTexto === null) return;
+  const dia = Number(String(diaTexto).trim());
+  if (!Number.isInteger(dia) || dia < 0 || dia > 6) {
+    mostrarAlerta("Escribe un número entre 0 (domingo) y 6 (sábado).");
+    return;
+  }
+
+  const user = await obtenerUsuarioActual();
+  const { error } = await supabaseClient.from("preferencias_usuario")
+    .upsert({ user_id: user.id, dia_inicio_semana: dia }, { onConflict: "user_id" });
+  if (error) { mostrarAlerta("No fue posible guardar el día de inicio de semana: " + traducirErrorSupabase(error)); return; }
+
+  mostrarAlerta("✅ Día de inicio de semana guardado.");
+  await pintarDiaInicioSemana();
+  if (typeof cargarReporteMes === "function" && !document.getElementById("seccion-reportes").classList.contains("oculto")) cargarReporteMes();
+}
