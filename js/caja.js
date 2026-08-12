@@ -239,32 +239,42 @@ async function reabrirCajaDeHoy() {
 }
 
 // Calcula con cuánto efectivo debería empezar el día de hoy, tomando el
-// cierre de ayer como punto de partida (así el cobrador no tiene que hacer
-// esta cuenta a mano cada mañana). Prioridad:
-//   1. Si ayer contaste físicamente la caja al cerrar (efectivo_final), esa
-//      es la base real y más confiable.
-//   2. Si abriste caja ayer pero no la cerraste, se calcula lo que debería
-//      haber quedado (base + cobros + aportes - gastos - prestado de ayer).
-//   3. Si no hay ningún registro de ayer (primer día, o se te pasó), 0 — y el
-//      cobrador puede escribir el monto real a mano, como siempre.
+// cierre del último día con caja registrada como punto de partida (así el
+// cobrador no tiene que hacer esta cuenta a mano cada mañana). Prioridad:
+//   1. Si ese último día contaste físicamente la caja al cerrar
+//      (efectivo_final), esa es la base real y más confiable.
+//   2. Si abriste caja ese día pero no la cerraste, se calcula lo que
+//      debería haber quedado (base + cobros + aportes - gastos - prestado).
+//   3. Si nunca ha habido ningún registro (primer día), 0 — y el cobrador
+//      puede escribir el monto real a mano, como siempre.
+//
+// OJO: a propósito NO se busca solo "el día calendario de ayer" — se busca
+// el último día que SÍ tenga fila en caja_diaria, sin importar cuántos días
+// atrás haya sido. Antes, si un día no se abría caja (ej. domingo sin
+// cobro), la búsqueda de "ayer" no encontraba nada y la base se reiniciaba a
+// $0 al día siguiente, aunque el efectivo real seguía siendo el del último
+// cierre — la plata nunca desaparecía de Reportes, solo se perdía el rastro
+// aquí en Caja Diaria.
 async function calcularBaseSugerida() {
-  const ayer = sumarDias(obtenerFechaLocal(), -1);
-  const { data: cajaAyer } = await supabaseClient.from("caja_diaria").select("*").eq("fecha", ayer).maybeSingle();
-  if (!cajaAyer) return 0;
-  if (cajaAyer.efectivo_final !== null && cajaAyer.efectivo_final !== undefined) {
-    return Number(cajaAyer.efectivo_final);
+  const hoy = obtenerFechaLocal();
+  const { data: cajaAnterior } = await supabaseClient
+    .from("caja_diaria").select("*").lt("fecha", hoy).order("fecha", { ascending: false }).limit(1).maybeSingle();
+  if (!cajaAnterior) return 0;
+  if (cajaAnterior.efectivo_final !== null && cajaAnterior.efectivo_final !== undefined) {
+    return Number(cajaAnterior.efectivo_final);
   }
+  const fechaAnterior = cajaAnterior.fecha;
   const [pagos, gastos, prestamos, aportes] = await Promise.all([
-    supabaseClient.from("pagos").select("monto_pagado").eq("fecha_pago", ayer),
-    supabaseClient.from("gastos").select("monto").eq("fecha", ayer),
-    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_desembolso", ayer),
-    supabaseClient.from("aportes_capital").select("monto").eq("fecha", ayer)
+    supabaseClient.from("pagos").select("monto_pagado").eq("fecha_pago", fechaAnterior),
+    supabaseClient.from("gastos").select("monto").eq("fecha", fechaAnterior),
+    supabaseClient.from("prestamos").select("monto_prestado, prestamo_anterior_id, fecha_inicio").eq("fecha_desembolso", fechaAnterior),
+    supabaseClient.from("aportes_capital").select("monto").eq("fecha", fechaAnterior)
   ]);
   const cobros = (pagos.data || []).reduce((s, p) => s + Number(p.monto_pagado), 0);
   const gastosDia = (gastos.data || []).reduce((s, g) => s + Number(g.monto), 0);
   const aportesDia = (aportes.data || []).reduce((s, a) => s + Number(a.monto), 0);
   const prestado = await calcularDesembolsoReal(prestamos.data);
-  const baseAyer = Number(cajaAyer.base_inicial || 0);
+  const baseAyer = Number(cajaAnterior.base_inicial || 0);
   // OJO: aquí ya NO se fuerza a 0 con Math.max — si el resultado da negativo
   // (prestaste o gastaste más efectivo del que tenías, por ejemplo poniendo
   // plata de tu bolsillo sin registrarla como "aporte propio"), se devuelve
