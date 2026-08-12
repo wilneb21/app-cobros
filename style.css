@@ -58,6 +58,52 @@ body {
   margin-bottom: 20px;
 }
 
+/* --- Pantalla de login "profesional" (sin auto-registro) ---
+   Mismo tamaño y comportamiento de .pantalla, solo un poco más pulida:
+   franja de color arriba, logo dentro de un círculo con degradado y
+   más aire entre los campos, para que se sienta como un login de
+   producto vendido a clientes y no como un formulario genérico. */
+.pantalla-login-pro {
+  position: relative;
+  padding-top: 44px;
+  overflow: hidden;
+}
+
+.pantalla-login-pro::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+}
+
+.pantalla-login-pro .logo-login {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--tint), var(--tint-border));
+  box-shadow: 0 6px 16px rgba(12, 125, 112, 0.18);
+}
+
+.pantalla-login-pro h1 {
+  font-size: 21px;
+}
+
+.pantalla-login-pro .subtitulo {
+  margin-bottom: 24px;
+}
+
+.pantalla-login-pro input {
+  text-align: left;
+}
+
 .oculto { display: none !important; }
 
 /* Oculta visualmente pero deja disponible para lectores de pantalla — para
@@ -1841,3 +1887,342 @@ body.modo-oscuro .opcion-modal-prestar.existente { background: rgba(12,125,112,.
 .perfil-config strong { display: block; font-size: 13px; word-break: break-all; }
 .perfil-config small { color: var(--text-muted); font-size: 11px; }
 body.modo-oscuro .perfil-config { background: #1e302e; border-color: #35514d; }
+/* --- Gestión de usuarios (roles y permisos) --- */
+.tarjeta-cobrador { background: #fff; border: 1px solid #d3e8e3; border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: 0 5px 14px rgba(8,92,82,.05); }
+.tarjeta-cobrador-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.tarjeta-cobrador-encabezado b { display: block; font-size: 13px; }
+.tarjeta-cobrador-encabezado small { color: var(--text-muted); font-size: 11px; }
+.tarjeta-cobrador-permisos { display: flex; flex-direction: column; gap: 8px; }
+/* --- Fila de permiso: rediseñada con grid (no flex) ---
+   El bug que rompía el texto letra por letra venía de aquí: el <span> con
+   el título/descripción de cada permiso nunca tenía min-width definido
+   dentro de la fila flex, así que el navegador se negaba a encogerlo bien
+   y lo partía de forma errática en vez de ajustarlo a la columna. Con
+   grid y columnas fijas (checkbox de 20px + el resto), el texto siempre
+   sabe exactamente cuánto ancho tiene disponible. */
+.fila-permiso {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  column-gap: 10px;
+  align-items: start;
+  padding: 10px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.fila-permiso:hover { background: #f2f8f7; }
+.fila-permiso input[type="checkbox"] { margin: 2px 0 0; flex: none; }
+.fila-permiso > span {
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.fila-permiso b { display: block; font-size: 12px; }
+.fila-permiso small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 1px; }
+.btn-secundario { background: #e7f2f0; color: #085c52; border: none; border-radius: 10px; padding: 7px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
+body.modo-oscuro .tarjeta-cobrador { background: #1e302e; border-color: #35514d; }
+body.modo-oscuro .fila-permiso:hover { background: #24413d; }
+body.modo-oscuro .btn-secundario { background: #24413d; color: #b7e4da; }
+.modal-caja { max-height: 88vh; overflow-y: auto; }
+#modal-generico-contenido { text-align: left; }
+#modal-generico-contenido .modal-botones { text-align: center; }
+
+/* --- MODAL "AGREGAR COBRADOR" ---
+   El modal genérico (#modal-generico) fue pensado para alertas cortas de
+   confirmar/cancelar (por eso .modal-caja es angosta y centrada). Este
+   formulario es más largo — datos de acceso + lista de permisos — y con
+   ese mismo molde se veía apretado y sin jerarquía. En vez de crear un
+   modal nuevo (que obligaría a tocar usuarios.js), usamos :has() para
+   reconocer ESTE contenido por la presencia de .tarjeta-cobrador-permisos
+   y darle su propio ancho, encabezado y orden visual, sin cambiar el
+   resto de modales que reutilizan la misma caja genérica. */
+
+#modal-generico:has(.tarjeta-cobrador-permisos) .modal-caja {
+  max-width: 440px;
+  width: 92%;
+  padding: 0;
+  text-align: left;
+}
+
+/* Encabezado con color, para que se sienta "formulario" y no "alerta" */
+#modal-generico:has(.tarjeta-cobrador-permisos) .detalle-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-radius: 16px 16px 0 0;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .detalle-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0;
+  color: #fff;
+  font-size: 16.5px;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .detalle-header h3::before {
+  content: "👤";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  background: rgba(255,255,255,.18);
+  font-size: 16px;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .btn-cerrar-detalle {
+  background: rgba(255,255,255,.16);
+  color: #fff;
+}
+
+/* Cuerpo: todo lo que no es el encabezado ni los botones finales, con
+   aire lateral parejo */
+#modal-generico:has(.tarjeta-cobrador-permisos) .modal-mensaje,
+#modal-generico:has(.tarjeta-cobrador-permisos) input,
+#modal-generico:has(.tarjeta-cobrador-permisos) .titulo-grupo-config,
+#modal-generico:has(.tarjeta-cobrador-permisos) .tarjeta-cobrador-permisos,
+#modal-generico:has(.tarjeta-cobrador-permisos) .mensaje-modal {
+  margin-left: 22px;
+  margin-right: 22px;
+  width: calc(100% - 44px);
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .modal-mensaje {
+  margin-top: 16px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+/* Campos con icono, para diferenciarlos de un formulario genérico */
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-nombre,
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-correo,
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-clave {
+  padding-left: 42px;
+  background-repeat: no-repeat;
+  background-position: left 13px center;
+  background-size: 18px;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-nombre {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6b6a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='3.5'/%3E%3Cpath d='M4.5 20c1.5-4 4-6 7.5-6s6 2 7.5 6'/%3E%3C/svg%3E");
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-correo {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6b6a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='M3 7l9 6 9-6'/%3E%3C/svg%3E");
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-clave {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6b6a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 018 0v4'/%3E%3C/svg%3E");
+}
+
+/* Etiqueta "Permisos iniciales" como encabezado de sección real */
+#modal-generico:has(.tarjeta-cobrador-permisos) .titulo-grupo-config {
+  margin-top: 18px !important;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Panel de permisos: tarjeta propia en vez de checkboxes sueltos */
+#modal-generico:has(.tarjeta-cobrador-permisos) .tarjeta-cobrador-permisos {
+  gap: 0;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 13px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso {
+  border-radius: 0;
+  padding: 11px 12px;
+  border-bottom: 1px solid #eef1f0;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso:last-child {
+  border-bottom: none;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary);
+}
+
+/* Pie con jerarquía clara: un botón principal, uno secundario (no dos
+   verdes idénticos apilados, que es lo que hacía sentir el modal genérico) */
+#modal-generico:has(.tarjeta-cobrador-permisos) .modal-botones {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 14px 22px 20px;
+  margin: 14px 0 0;
+  width: 100%;
+  border-top: 1px solid #eef1f0;
+}
+#modal-generico:has(.tarjeta-cobrador-permisos) .modal-botones + button {
+  width: calc(100% - 44px);
+  margin: 0 22px 20px;
+  background: #f1f1f5;
+  color: var(--text);
+  box-shadow: none;
+}
+
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) .tarjeta-cobrador-permisos {
+  border-color: #35514d;
+}
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso {
+  border-bottom-color: #26403c;
+}
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) .modal-botones {
+  background: #17231f;
+  border-top-color: #26403c;
+}
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) .modal-botones + button {
+  background: #24413d;
+  color: #eafffb;
+}
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-nombre,
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-correo,
+body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador-clave {
+  background-color: #1e302e;
+}
+
+/* --- MODAL "GESTIÓN DE USUARIOS" ---
+   Mismo criterio que el modal de "Agregar cobrador": la caja genérica es
+   angosta y pensada para mensajes cortos, y aquí vive una lista completa
+   de cobradores con permisos. Le damos su propio ancho y encabezado, en
+   este caso apoyándonos en el id del modal (#modal-usuarios ya es único,
+   no hace falta :has()). */
+
+#modal-usuarios .modal-caja {
+  max-width: 440px;
+  width: 92%;
+  padding: 0;
+  text-align: left;
+}
+
+#modal-usuarios .detalle-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-radius: 16px 16px 0 0;
+}
+#modal-usuarios .detalle-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 16.5px;
+}
+#modal-usuarios .btn-cerrar-detalle {
+  background: rgba(255,255,255,.16);
+  color: #fff;
+}
+
+#modal-usuarios .texto-ayuda {
+  margin: 16px 22px 14px;
+  width: calc(100% - 44px);
+  font-size: 13.5px;
+}
+
+#modal-usuarios > .modal-caja > button[onclick="abrirFormularioNuevoCobrador()"] {
+  width: calc(100% - 44px);
+  margin: 0 22px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 8px 18px rgba(12,125,112,.22);
+}
+
+#lista-cobradores {
+  padding: 0 22px 22px;
+}
+#lista-cobradores .cargando,
+#lista-cobradores .texto-ayuda {
+  margin: 0;
+  padding: 30px 4px;
+  text-align: center;
+}
+
+/* Tarjeta de cada cobrador: avatar + nombre + estado en pastilla, en vez
+   de un renglón de texto plano */
+.tarjeta-cobrador-encabezado {
+  align-items: center;
+}
+.tarjeta-cobrador-encabezado > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tarjeta-cobrador-encabezado > span::before {
+  content: "🧑‍💼";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  background: #e7f2f0;
+  font-size: 15px;
+}
+.tarjeta-cobrador-encabezado b { font-size: 13.5px; }
+.tarjeta-cobrador-encabezado small {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: #e5f7ee;
+  color: #0e7d43;
+}
+.tarjeta-cobrador-encabezado[data-inactivo="true"] small,
+.tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small {
+  background: #eef1f0;
+  color: #7a8985;
+}
+
+.tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="true"] {
+  background: #fdeaea;
+  color: #b3261e;
+}
+.tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="false"] {
+  background: #e5f7ee;
+  color: #0e7d43;
+}
+body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="true"] {
+  background: #3a1414; color: #f19c95;
+}
+body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="false"] {
+  background: #103524; color: #6ee0a5;
+}
+
+/* Subtítulo "Permisos" dentro de cada tarjeta de la lista, arriba de los
+   checkboxes (el formulario de "Agregar cobrador" ya trae su propio
+   título "Permisos iniciales", así que esto se limita a #modal-usuarios) */
+#modal-usuarios .tarjeta-cobrador-permisos {
+  position: relative;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #eef1f0;
+}
+#modal-usuarios .tarjeta-cobrador-permisos::before {
+  content: "Permisos";
+  position: absolute;
+  top: -9px;
+  left: 0;
+  background: #fff;
+  padding-right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos { border-top-color: #35514d; }
+body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos::before { background: #1e302e; }
+body.modo-oscuro .tarjeta-cobrador-encabezado small { background: #103524; color: #6ee0a5; }
+body.modo-oscuro .tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small { background: #26403c; color: #9db0ab; }

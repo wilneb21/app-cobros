@@ -5,18 +5,28 @@
 // Nota: esto cubre el registro de pagos sobre datos ya cargados en pantalla;
 // para abrir un cliente nuevo o consultar reportes sigue haciendo falta señal.
 
-const CLAVE_COLA_OFFLINE = "cobros_cola_offline_pagos";
+// Antes esto era una sola clave fija ("cobros_cola_offline_pagos") para todo
+// el navegador. El problema: localStorage no sabe de sesiones — si en el
+// mismo celular/computador se usa más de una cuenta (ej. tu cuenta de
+// administrador y luego la de un negocio de prueba/cliente), la cola de
+// pagos pendientes de UNA cuenta se seguía mostrando y se podía llegar a
+// sincronizar bajo la sesión de OTRA cuenta. Ahora la clave incluye el
+// correo de quien inició sesión, así cada cuenta tiene su propia cola.
+function claveColaOffline() {
+  const correo = (window.sesionActual && window.sesionActual.correo) || "sin_sesion";
+  return "cobros_cola_offline_pagos_" + correo.toLowerCase();
+}
 
 function obtenerColaOffline() {
   try {
-    return JSON.parse(localStorage.getItem(CLAVE_COLA_OFFLINE)) || [];
+    return JSON.parse(localStorage.getItem(claveColaOffline())) || [];
   } catch {
     return [];
   }
 }
 
 function guardarColaOffline(cola) {
-  localStorage.setItem(CLAVE_COLA_OFFLINE, JSON.stringify(cola));
+  localStorage.setItem(claveColaOffline(), JSON.stringify(cola));
   actualizarIndicadorOffline();
 }
 

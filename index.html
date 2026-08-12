@@ -39,14 +39,13 @@
     </div>
   </div>
 
-  <div id="login-screen" class="pantalla">
+  <div id="login-screen" class="pantalla pantalla-login-pro">
     <div class="logo-login">💰</div>
-    <h1>App de Cobros</h1>
-    <p class="subtitulo">Gestiona tus créditos y rutas de cobro</p>
-    <input type="email" id="email" aria-label="Correo electrónico" placeholder="Correo electrónico">
-    <input type="password" id="password" aria-label="Contraseña" placeholder="Contraseña">
+    <h1>Bienvenido a App de Cobros</h1>
+    <p class="subtitulo">Inicia sesión con el acceso que te asignaron</p>
+    <input type="email" id="email" autocomplete="username" aria-label="Usuario" placeholder="Usuario">
+    <input type="password" id="password" autocomplete="current-password" aria-label="Contraseña" placeholder="Contraseña">
     <button onclick="iniciarSesion()">Entrar</button>
-    <button onclick="abrirModalCrearCuenta()" class="secundario">Crear cuenta nueva</button>
     <p class="link-olvide" role="button" tabindex="0" onclick="recuperarContrasena()">¿Olvidaste tu contraseña?</p>
     <p id="mensaje-error"></p>
   </div>
@@ -305,6 +304,11 @@
         </div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Gestión</p>
+          <button type="button" class="fila-config" data-requiere-permiso="gestionar_usuarios" onclick="abrirGestionUsuarios()">
+            <span class="config-icono">👥</span>
+            <span><b>Gestión de usuarios</b><small>Crea cobradores y decide qué puede hacer cada uno</small></span>
+            <span class="config-chevron">›</span>
+          </button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">▤</span><span><b>Préstamos activos</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
@@ -324,6 +328,14 @@
             </select>
           </div>
           <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
+        </div>
+        <div id="grupo-config-plataforma" class="grupo-config oculto">
+          <p class="titulo-grupo-config">Plataforma</p>
+          <button type="button" class="fila-config" onclick="abrirFormularioNuevoNegocio()">
+            <span class="config-icono">🏢</span>
+            <span><b>Crear cliente nuevo</b><small>Da de alta un negocio aparte, con acceso propio y datos separados</small></span>
+            <span class="config-chevron">›</span>
+          </button>
         </div>
         <button type="button" class="btn-cerrar-sesion-config" onclick="cerrarSesion()">Cerrar sesión</button>
       </section>
@@ -472,18 +484,6 @@
     </div>
   </div>
 
-  <div id="modal-crear-cuenta" class="modal-overlay oculto">
-    <div class="modal-caja">
-      <div class="detalle-header"><h3>Crear cuenta</h3><button class="btn-cerrar-detalle" onclick="cerrarModalCrearCuenta()" aria-label="Cerrar creación de cuenta">✕</button></div>
-      <p class="texto-ayuda">Usa una contraseña de mínimo 8 caracteres.</p>
-      <input type="email" id="crear-email" aria-label="Correo electrónico" placeholder="Correo electrónico">
-      <input type="password" id="crear-password" aria-label="Contraseña" placeholder="Contraseña">
-      <input type="password" id="crear-password-confirmar" aria-label="Confirma tu contraseña" placeholder="Confirma tu contraseña">
-      <button onclick="registrarUsuario()">Crear mi cuenta</button>
-      <p id="mensaje-crear-cuenta" class="mensaje-modal"></p>
-    </div>
-  </div>
-
   <div id="modal-gastos" class="modal-overlay oculto">
     <div class="modal-caja">
       <div class="detalle-header">
@@ -534,6 +534,7 @@
   <script src="js/capital.js"></script>
   <script src="js/reportes.js"></script>
   <script src="js/gastos.js"></script>
+  <script src="js/usuarios.js"></script>
 
   <script>
     if ("serviceWorker" in navigator) {
@@ -544,5 +545,14 @@
       });
     }
   </script>
+
+  <div id="modal-usuarios" class="modal-overlay oculto">
+    <div class="modal-caja">
+      <div class="detalle-header"><h3>👥 Gestión de usuarios</h3><button class="btn-cerrar-detalle" onclick="cerrarGestionUsuarios()" aria-label="Cerrar gestión de usuarios">✕</button></div>
+      <p class="texto-ayuda">Aquí puedes crear cobradores nuevos y decidir, con checkboxes, qué puede ver o hacer cada uno.</p>
+      <button type="button" style="width:100%;margin-bottom:16px" onclick="abrirFormularioNuevoCobrador()">+ Agregar cobrador</button>
+      <div id="lista-cobradores"></div>
+    </div>
+  </div>
 </body>
 </html>

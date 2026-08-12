@@ -1,35 +1,8 @@
-async function registrarUsuario() {
-  const email = document.getElementById("crear-email").value.trim();
-  const password = document.getElementById("crear-password").value;
-  const confirmar = document.getElementById("crear-password-confirmar").value;
-  if (!email || password.length < 8) {
-    document.getElementById("mensaje-crear-cuenta").innerText = "Usa un correo válido y una contraseña de al menos 8 caracteres.";
-    return;
-  }
-  if (password !== confirmar) {
-    document.getElementById("mensaje-crear-cuenta").innerText = "Las contraseñas no coinciden.";
-    return;
-  }
-  const { error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-    options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` }
-  });
-  document.getElementById("mensaje-crear-cuenta").innerText = error
-    ? "Error: " + traducirErrorSupabase(error)
-    : "Cuenta creada. Revisa tu correo si pide confirmación, o inicia sesión.";
-}
-
-function abrirModalCrearCuenta() {
-  document.getElementById("modal-crear-cuenta").classList.remove("oculto");
-  document.getElementById("crear-email").focus();
-  empujarEstadoModal("modal-crear-cuenta");
-}
-
-function cerrarModalCrearCuenta() {
-  cerrarModalConHistorial("modal-crear-cuenta");
-  document.getElementById("mensaje-crear-cuenta").textContent = "";
-}
+// NOTA: el auto-registro público (signUp) se quitó a propósito. Ahora la
+// única forma de entrar a la app es con un usuario y contraseña que tú
+// mismo creas (desde Supabase o desde "Gestión de usuarios" para
+// cobradores). Así, aunque alguien tenga el link de la app, no puede
+// crear su propia cuenta ni entrar sin que tú le hayas dado el acceso.
 
 async function iniciarSesion() {
   const email = document.getElementById("email").value.trim();
@@ -38,7 +11,7 @@ async function iniciarSesion() {
   if (error) {
     document.getElementById("mensaje-error").innerText = "Error: " + traducirErrorSupabase(error);
   } else {
-    mostrarAppPrincipal();
+    await mostrarAppPrincipal();
   }
 }
 
@@ -68,7 +41,9 @@ async function cerrarSesion() {
   colchonesExtra = 0;
 }
 
-function mostrarAppPrincipal() {
+async function mostrarAppPrincipal() {
+  await cargarSesionActual();
+  aplicarRestriccionesDeRol();
   document.getElementById("login-screen").classList.add("oculto");
   const app = document.getElementById("app-principal");
   app.classList.remove("oculto");
@@ -109,8 +84,8 @@ function ocultarSplash() {
 // pantalla de carga: a los 4 segundos se oculta sí o sí y aparece el login.
 setTimeout(ocultarSplash, 4000);
 
-supabaseClient.auth.getSession().then(({ data: { session } }) => {
-  if (session) mostrarAppPrincipal();
+supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
+  if (session) await mostrarAppPrincipal();
   ocultarSplash();
 }).catch(() => {
   ocultarSplash();
