@@ -320,10 +320,19 @@ function validarMontoPositivo(monto, etiqueta = "El monto") {
 }
 
 async function obtenerUsuarioActual() {
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
-  if (error || !user) {
+  // OJO: se usa getSession() (lee la sesión guardada en el propio celular)
+  // en vez de getUser() (que antes se usaba aquí, y hace una llamada al
+  // servidor de Supabase cada vez para revalidar). Con señal lenta o
+  // inestable, esa llamada podía fallar por un instante y la app
+  // interpretaba eso como "sesión inválida", cerrando la sesión sin
+  // necesidad — obligando a iniciar sesión de nuevo en cada actualización
+  // de la página aunque la sesión siguiera siendo válida. getSession() no
+  // depende de que el servidor responda al instante, así que es mucho más
+  // resistente a esos cortes momentáneos.
+  const { data: { session }, error } = await supabaseClient.auth.getSession();
+  if (error || !session?.user) {
     await cerrarSesion();
     throw new Error("Tu sesión expiró. Inicia sesión nuevamente.");
   }
-  return user;
+  return session.user;
 }
