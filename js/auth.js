@@ -84,11 +84,27 @@ function ocultarSplash() {
 // pantalla de carga: a los 4 segundos se oculta sí o sí y aparece el login.
 setTimeout(ocultarSplash, 4000);
 
-supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
-  if (session) await mostrarAppPrincipal();
-  ocultarSplash();
-}).catch(() => {
-  ocultarSplash();
+// OJO: esto está adentro de un "window.addEventListener('load', ...)" a
+// propósito. Antes se ejecutaba apenas el navegador leía esta línea del
+// archivo — pero como esto revisa la sesión y de una vez intenta mostrar
+// toda la app (incluyendo funciones que viven en OTROS archivos .js que se
+// cargan después de este, como usuarios.js), a veces ganaba la carrera esta
+// revisión de sesión y a veces ganaba la carga de los demás archivos. Cuando
+// ganaba la revisión de sesión, la app fallaba por dentro (una función
+// "no estaba definida todavía") y como no se veía ningún error en pantalla,
+// simplemente parecía que "te sacaba al login" al recargar — pasaba más o
+// menos la mitad de las veces, sin ningún patrón claro.
+//
+// El evento "load" del navegador solo se dispara cuando TODOS los archivos
+// de la página (incluyendo todos los .js) ya terminaron de cargarse por
+// completo — así que, a partir de aquí, ya no hay ninguna carrera posible.
+window.addEventListener("load", () => {
+  supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
+    if (session) await mostrarAppPrincipal();
+    ocultarSplash();
+  }).catch(() => {
+    ocultarSplash();
+  });
 });
 
 // Cuando el usuario da clic en el enlace del correo de "recuperar contraseña",
