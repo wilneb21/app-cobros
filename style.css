@@ -1362,6 +1362,22 @@ body.modo-oscuro .badge-riesgo-riesgoso { background: #3a1414; color: #f19c95; }
 .badge-sin-prestamo { background: #eef1f0; color: #7a8985; }
 body.modo-oscuro .badge-prestamo-activo { background: #103524; color: #6ee0a5; }
 body.modo-oscuro .badge-sin-prestamo { background: #263230; color: #9db0ab; }
+/* Punto de color + etiqueta de texto junto al nombre, en vez del emoji de
+   antes: el color nunca aparece solo (para que nadie lo lea como "este
+   préstamo se perdió"), siempre va acompañado de la palabra que dice qué
+   significa ("Riesgoso", "Regular", "Bueno"). */
+.fila-nombre-riesgo { display: flex; align-items: center; gap: 6px; }
+.punto-riesgo { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.punto-riesgo-bueno { background: #0e7d43; }
+.punto-riesgo-regular { background: #92650a; }
+.punto-riesgo-riesgoso { background: #b3261e; }
+.texto-riesgo { font-size: 12px; margin: 1px 0 6px 14px; }
+.texto-riesgo-bueno { color: #0e7d43; }
+.texto-riesgo-regular { color: #92650a; }
+.texto-riesgo-riesgoso { color: #b3261e; }
+body.modo-oscuro .punto-riesgo-bueno, body.modo-oscuro .texto-riesgo-bueno { background: #6ee0a5; color: #6ee0a5; }
+body.modo-oscuro .punto-riesgo-regular, body.modo-oscuro .texto-riesgo-regular { background: #f2cc6b; color: #f2cc6b; }
+body.modo-oscuro .punto-riesgo-riesgoso, body.modo-oscuro .texto-riesgo-riesgoso { background: #f19c95; color: #f19c95; }
 /* La tarjeta completa se atenúa un poco para que, al ver la lista de un
    vistazo, los clientes sin préstamo activo "pesen" visualmente menos que
    los que sí tienen crédito vigente. */

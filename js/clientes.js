@@ -89,7 +89,7 @@ function toggleRankingClientes() {
   rankingClientesVisible = !rankingClientesVisible;
   const cont = document.getElementById("ranking-clientes");
   document.getElementById("link-ver-ranking").textContent = rankingClientesVisible
-    ? "← Ocultar ranking" : "🏆 Ver ranking de cumplimiento";
+    ? "← Ocultar ranking" : "Ver ranking de cumplimiento";
   cont.classList.toggle("oculto", !rankingClientesVisible);
   if (rankingClientesVisible) cargarRankingClientes();
 }
@@ -165,7 +165,7 @@ function toggleVerArchivados() {
   mostrandoArchivados = !mostrandoArchivados;
   document.getElementById("link-ver-archivados").innerText = mostrandoArchivados
     ? "← Volver a clientes activos"
-    : "📦 Ver clientes archivados";
+    : "Ver clientes archivados";
   cargarClientes();
 }
 
@@ -174,8 +174,8 @@ function pintarClientesLista(data) {
 
   if (data.length === 0) {
     contenedor.innerHTML = mostrandoArchivados
-      ? `<div class="estado-vacio">📦 No tienes clientes archivados.</div>`
-      : `<div class="estado-vacio">👤 Aún no tienes clientes registrados.<br>Toca <strong>Nuevo</strong> para crear el primero.</div>`;
+      ? `<div class="estado-vacio">No tienes clientes archivados.</div>`
+      : `<div class="estado-vacio">Aún no tienes clientes registrados.<br>Toca <strong>Nuevo</strong> para crear el primero.</div>`;
     return;
   }
 
@@ -184,24 +184,29 @@ function pintarClientesLista(data) {
   data.forEach(cliente => {
     const nombreRuta = cliente.rutas ? cliente.rutas.nombre : null;
     if (nombreRuta !== rutaAnterior) {
-      contenedor.innerHTML += `<div class="grupo-ruta-titulo">📍 ${nombreRuta ? escaparHtml(nombreRuta) : "Sin ruta asignada"}</div>`;
+      contenedor.innerHTML += `<div class="grupo-ruta-titulo">${nombreRuta ? escaparHtml(nombreRuta) : "Sin ruta asignada"}</div>`;
       rutaAnterior = nombreRuta;
     }
+    // El color de riesgo nunca va solo (para no confundirse con "el préstamo
+    // se perdió"): siempre lo acompaña el punto chico + la palabra que dice
+    // qué significa. El badge de préstamo activo queda neutro porque el
+    // riesgo ya se muestra arriba, junto al nombre.
     const riesgo = obtenerRiesgoCliente(cliente.id);
-    const iconoRiesgo = { bueno: "🟢", regular: "🟡", riesgoso: "🔴" }[riesgo];
+    const etiquetaRiesgoCorta = { bueno: "Bueno", regular: "Regular", riesgoso: "Riesgoso" }[riesgo];
     // riesgoClientesCache solo trae clientes con al menos un préstamo activo
     // (ver calcularRiesgoTodosClientes), así que su presencia ahí nos sirve
     // también para saber, sin otra consulta, quién tiene crédito activo.
     const tienePrestamoActivo = cliente.id in riesgoClientesCache;
     const badgePrestamo = tienePrestamoActivo
-      ? `<span class="badge-prestamo-cliente badge-prestamo-activo">💰 Con préstamo activo</span>`
+      ? `<span class="badge-prestamo-cliente badge-prestamo-activo">Con préstamo activo</span>`
       : `<span class="badge-prestamo-cliente badge-sin-prestamo">Sin préstamo activo</span>`;
     contenedor.innerHTML += `
       <div class="tarjeta cliente-clickable ${tienePrestamoActivo ? "" : "cliente-sin-prestamo"}" role="button" tabindex="0" onclick="abrirDetalleCliente(${cliente.id})">
-        <strong>${iconoRiesgo} ${escaparHtml(cliente.nombre)}</strong>
+        <div class="fila-nombre-riesgo"><span class="punto-riesgo punto-riesgo-${riesgo}"></span><strong>${escaparHtml(cliente.nombre)}</strong></div>
+        ${tienePrestamoActivo ? `<div class="texto-riesgo texto-riesgo-${riesgo}">${etiquetaRiesgoCorta}</div>` : ""}
         ${badgePrestamo}
-        ${cliente.cedula ? `<span>🪪 ${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)}</span><br>` : ""}
-        <span>📞 ${escaparHtml(cliente.telefono || "sin teléfono")}</span>
+        ${cliente.cedula ? `<span>${escaparHtml(cliente.tipo_documento || "CC")} ${escaparHtml(cliente.cedula)}</span><br>` : ""}
+        <span>${escaparHtml(cliente.telefono || "sin teléfono")}</span>
       </div>`;
   });
 }
@@ -211,7 +216,7 @@ function filtrarClientesLista() {
   const filtrados = clientesCache.filter(c => c.nombre.toLowerCase().includes(texto) || (c.cedula || "").includes(texto));
 
   if (filtrados.length === 0 && texto) {
-    document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">🔍 Ningún cliente coincide con "${escaparHtml(texto)}".</div>`;
+    document.getElementById("lista-clientes").innerHTML = `<div class="estado-vacio">Ningún cliente coincide con "${escaparHtml(texto)}".</div>`;
     pintarContadorClientes(0);
     return;
   }
@@ -264,7 +269,7 @@ async function cargarRutasEnSelectorNuevoCliente(rutaSeleccionadaId = "") {
   const selectorRuta = document.getElementById("nuevo-cliente-ruta");
   selectorRuta.innerHTML = '<option value="">Sin ruta por ahora</option>';
   (rutas || []).forEach(ruta => selectorRuta.innerHTML += `<option value="${ruta.id}">${escaparHtml(ruta.nombre)}</option>`);
-  selectorRuta.innerHTML += '<option value="__nueva__">➕ Crear nueva ruta...</option>';
+  selectorRuta.innerHTML += '<option value="__nueva__">Crear nueva ruta...</option>';
   selectorRuta.value = rutaSeleccionadaId;
 }
 
@@ -400,7 +405,8 @@ async function pintarTabInfo(cliente) {
   // todos los créditos activos del cliente (0 si no tiene ninguno activo).
   const cuotasAtrasadasCliente = (activos || []).reduce((peor, p) => Math.max(peor, cuotasAtrasadasPrestamo(p, pagadoPorPrestamo[p.id] || 0)), 0);
   const riesgo = nivelRiesgoDesdeCuotasAtrasadas(cuotasAtrasadasCliente);
-  const etiquetaRiesgo = { bueno: "🟢 Bueno", regular: "🟡 Regular", riesgoso: "🔴 Riesgoso" }[riesgo];
+  // El color del badge (.badge-riesgo-*) ya distingue el nivel — el texto no necesita repetirlo con un emoji.
+  const etiquetaRiesgo = { bueno: "Bueno", regular: "Regular", riesgoso: "Riesgoso" }[riesgo];
   // Antes esta sugerencia se calculaba y mostraba siempre, aunque el cliente
   // ya tuviera un crédito activo y el cobrador no estuviera pensando en
   // prestarle de nuevo. Ahora solo aparece cuando de verdad podría servir:
@@ -433,19 +439,19 @@ async function pintarTabInfo(cliente) {
       <input type="text" id="editar-direccion" value="${escaparHtml(cliente.direccion || "")}" placeholder="Dirección">
       <label class="etiqueta-select">Notas</label>
       <textarea id="editar-notas" rows="2" placeholder="Notas">${escaparHtml(cliente.notas || "")}</textarea>
-      <button type="submit" class="btn-editar-cliente">💾 Guardar cambios</button>
+      <button type="submit" class="btn-editar-cliente">Guardar cambios</button>
     </form>
-    ${telefonoLimpio ? `<button class="btn-whatsapp" onclick="window.open('https://wa.me/${armarNumeroWhatsapp(cliente.telefono)}')">💬 Enviar WhatsApp</button>` : ""}
-    ${cliente.direccion ? `<button class="btn-mapa" onclick="abrirMapaCliente(${cliente.id})">🗺️ Abrir ubicación en el mapa</button>` : ""}
-    ${tieneHistorial ? `<button class="btn-pdf" onclick="exportarEstadoCuentaPDF(${cliente.id})">🧾 Exportar estado de cuenta</button>` : ""}
+    ${telefonoLimpio ? `<button class="btn-whatsapp" onclick="window.open('https://wa.me/${armarNumeroWhatsapp(cliente.telefono)}')">Enviar WhatsApp</button>` : ""}
+    ${cliente.direccion ? `<button class="btn-mapa" onclick="abrirMapaCliente(${cliente.id})">Abrir ubicación en el mapa</button>` : ""}
+    ${tieneHistorial ? `<button class="btn-pdf" onclick="exportarEstadoCuentaPDF(${cliente.id})">Exportar estado de cuenta</button>` : ""}
 
     ${cliente.archivado
-      ? `<button class="btn-editar-cliente" onclick="desarchivarCliente(${cliente.id})">📤 Desarchivar cliente</button>`
+      ? `<button class="btn-editar-cliente" onclick="desarchivarCliente(${cliente.id})">Desarchivar cliente</button>`
       : tieneHistorial
-        ? `<button class="btn-eliminar" onclick="archivarCliente(${cliente.id})">📦 Archivar cliente</button>
+        ? `<button class="btn-eliminar" onclick="archivarCliente(${cliente.id})">Archivar cliente</button>
            <p class="nota-ayuda">Este cliente tiene ${count} préstamo(s) en su historial — lo normal es archivarlo, no borrarlo, para no perder tus reportes de meses pasados.</p>
            <p class="link-borrar-todo" role="button" tabindex="0" onclick="forzarEliminarCliente(${cliente.id}, '${escaparAtributoJs(cliente.nombre)}')">¿Fue un error? Borrar cliente y TODO su historial para siempre</p>`
-        : `<button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">🗑️ Eliminar cliente</button>`
+        : `<button class="btn-eliminar" onclick="eliminarCliente(${cliente.id})">Eliminar cliente</button>`
     }
   `;
 }
@@ -554,7 +560,7 @@ async function forzarEliminarCliente(clienteId, nombreCliente) {
   const { error } = await supabaseClient.from("clientes").delete().eq("id", clienteId);
   if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
 
-  mostrarAlerta("🗑️ Cliente y todo su historial fueron eliminados.");
+  mostrarAlerta("✅ Cliente y todo su historial fueron eliminados.");
   cerrarDetalleCliente();
   cargarClientes();
 }
@@ -580,7 +586,7 @@ async function archivarCliente(clienteId) {
   const { error } = await supabaseClient.from("clientes").update({ archivado: true }).eq("id", clienteId);
   if (error) { mostrarAlerta("Error: " + traducirErrorSupabase(error)); return; }
 
-  mostrarAlerta("📦 Cliente archivado");
+  mostrarAlerta("✅ Cliente archivado");
   cerrarDetalleCliente();
   cargarClientes();
 }
@@ -593,7 +599,7 @@ async function desarchivarCliente(clienteId) {
   mostrarAlerta("✅ Cliente desarchivado, ya aparece de nuevo en tu lista activa.");
   cerrarDetalleCliente();
   mostrandoArchivados = false;
-  document.getElementById("link-ver-archivados").innerText = "📦 Ver clientes archivados";
+  document.getElementById("link-ver-archivados").innerText = "Ver clientes archivados";
   cargarClientes();
 }
 
@@ -724,7 +730,7 @@ async function eliminarPagoDesdeDetalle(pagoId) {
   const { error } = await supabaseClient.from("pagos").delete().eq("id", pagoId);
   if (error) { mostrarAlerta("No fue posible borrar el pago: " + traducirErrorSupabase(error)); return; }
 
-  mostrarAlerta("🗑️ Pago eliminado.");
+  mostrarAlerta("✅ Pago eliminado.");
   pintarTabHistorial();
   const { data: cliente } = await supabaseClient.from("clientes").select("*, rutas(nombre)").eq("id", clienteDetalleActualId).single();
   if (cliente) pintarTabInfo(cliente);
