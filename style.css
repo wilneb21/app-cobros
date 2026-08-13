@@ -1523,6 +1523,22 @@ body.modo-oscuro .caja-descuadre.faltante { background: #3a1414; }
 
 .caja-subcabecera { background: var(--card); padding: 4px 12px; font-size: 11px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .link-ver-otro-dia { background: none; border: none; color: var(--primary); font-size: 11px; padding: 2px 0; text-decoration: underline; cursor: pointer; }
+
+/* "Ver otro día" en Caja: el botón visible llama a abrirSelectorOtroDia(),
+   que abre por código el <input type="date"> de aquí abajo — se mantiene
+   fuera de la vista pero "renderizado" (no display:none), que es lo que
+   piden los navegadores para poder abrirlo con showPicker(). */
+.wrapper-otro-dia { position: relative; display: inline-block; }
+.wrapper-otro-dia .input-fecha-otro-dia {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+  margin: -1px;
+}
 .caja-fecha-vista { font-weight: 700; color: var(--text-muted); }
 .caja-aviso-offline { background: #fff9e6; color: #6b5a00; font-size: 11px; padding: 8px 10px; margin: 0; }
 .link-editar-base { background: none; border: none; cursor: pointer; font-size: 11px; padding: 0 0 0 4px; }

@@ -112,7 +112,10 @@ async function cargarCajaDiaria(fecha) {
     : "";
 
   const encabezadoFecha = esHoy
-    ? `<button type="button" class="link-ver-otro-dia" onclick="verCajaDeOtroDia()">📅 Ver otro día</button>`
+    ? `<span class="wrapper-otro-dia">
+         <button type="button" class="link-ver-otro-dia" onclick="abrirSelectorOtroDia()">📅 Ver otro día</button>
+         <input type="date" id="input-fecha-otro-dia" class="input-fecha-otro-dia" aria-label="Elegir otro día para ver la caja" max="${obtenerFechaLocal()}" onchange="if(this.value) cargarCajaDiaria(this.value)">
+       </span>`
     : `<span class="caja-fecha-vista">📅 ${formatoFecha(fechaVista)} (solo lectura)</span> <button type="button" class="link-ver-otro-dia" onclick="volverACajaDeHoy()">← Volver a hoy</button>`;
 
   // En modo automático no hay "Abrir/Cerrar caja" (eso ya pasó solo); en su
@@ -194,14 +197,20 @@ async function cargarCajaDiaria(fecha) {
       </div>` : ""}`;
 }
 
-function verCajaDeOtroDia() {
-  mostrarPrompt("¿Qué día quieres consultar? (formato AAAA-MM-DD)", fechaCajaMostrada || obtenerFechaLocal())
-    .then(fecha => {
-      if (!fecha) return;
-      const valida = /^\d{4}-\d{2}-\d{2}$/.test(fecha.trim());
-      if (!valida) { mostrarAlerta("Escribe la fecha en formato AAAA-MM-DD, por ejemplo 2026-07-15."); return; }
-      cargarCajaDiaria(fecha.trim());
-    });
+// El botón "Ver otro día" no es el propio <input type="date"> (que queda
+// escondido) — este botón lo abre por código. Así funciona igual de bien
+// en celular (donde tocar cualquier input de fecha ya abre el calendario)
+// y en computador (donde solo el icono del calendario lo abre si se hace
+// clic directo sobre el input, algo que no podíamos garantizar estando
+// escondido).
+function abrirSelectorOtroDia() {
+  const input = document.getElementById("input-fecha-otro-dia");
+  if (!input) return;
+  if (typeof input.showPicker === "function") {
+    try { input.showPicker(); return; } catch (error) { /* sigue al respaldo de abajo */ }
+  }
+  input.focus();
+  input.click();
 }
 
 function volverACajaDeHoy() {
