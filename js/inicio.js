@@ -12,7 +12,7 @@ function toggleMasEstadisticasInicio() {
   const boton = document.getElementById("btn-ver-mas-inicio");
   if (!bloque || !boton) return;
   const abierto = bloque.classList.toggle("oculto") === false;
-  boton.textContent = abierto ? "📊 Ocultar ganancia, gráficos y agenda" : "📊 Ver ganancia, gráficos y agenda de vencimientos";
+  boton.textContent = abierto ? "📊 Ocultar análisis" : "📊 Ver análisis (capital, gráfico y tendencia)";
 }
 
 function cambiarPeriodoInicio(periodo) {
@@ -133,6 +133,15 @@ async function cargarResumenDia() {
   `;
 
   pintarJornadaPorRutas(jornada);
+
+  // Los recordatorios de "cuotas vencidas u hoy" antes dependían de una
+  // sección aparte ("Agenda de vencimientos") que cargaba lo mismo que ya
+  // tenemos en `jornada` (todo lo que falta por cobrar hoy). En vez de
+  // pedirle esos datos otra vez a Supabase, reusamos el conteo que ya
+  // calculamos aquí mismo.
+  const pendientesHoy = jornada.length;
+  mostrarLinkRecordatorios(pendientesHoy);
+  dispararRecordatorioLocal(pendientesHoy);
 }
 
 // Tarjeta de Capital inicial en Inicio — reutiliza el mismo dato de
@@ -154,8 +163,11 @@ let jornadaRutasOrdenNombres = [];
 function pintarJornadaPorRutas(jornada) {
   const contenedor = document.getElementById("jornada-por-rutas");
   if (!contenedor) return;
-  const resumen = document.getElementById("resumen-pendientes-hoy");
-  if (resumen) resumen.textContent = `▸ Pendientes por cobrar hoy (${jornada.length})`;
+  const badge = document.getElementById("badge-pendientes-hoy");
+  if (badge) {
+    badge.textContent = jornada.length;
+    badge.classList.toggle("badge-pendientes-cero", jornada.length === 0);
+  }
   if (!jornada.length) { contenedor.innerHTML = '<div class="estado-vacio">🎉 Ya registraste la visita de todos tus clientes activos hoy.</div>'; return; }
   const porRuta = jornada.reduce((grupos, item) => {
     (grupos[item.ruta] ||= []).push(item);
@@ -255,38 +267,6 @@ async function cargarTendenciaCobro() {
   const variacion = ((actual - anterior) / anterior) * 100;
   const sube = variacion >= 0;
   contenedor.innerHTML = `<span class="${sube ? "tendencia-sube" : "tendencia-baja"}">${sube ? "↗" : "↘"} ${Math.abs(variacion).toFixed(1)}% ${sube ? "más" : "menos"} que el mes pasado</span><small>${formatoPesos(actual)} este mes · ${formatoPesos(anterior)} el mes anterior</small>`;
-}
-
-async function cargarAgendaVencimientos() {
-  const contenedor = document.getElementById("agenda-vencimientos");
-  if (!contenedor) return;
-  contenedor.innerHTML = '<div class="cargando">Cargando agenda...</div>';
-  const hoy = obtenerFechaLocal();
-  const { data: prestamos, error } = await supabaseClient
-    .from("prestamos").select("id, cuota, frecuencia, fecha_inicio, clientes(nombre, telefono)").eq("estado", "activo");
-  if (error) { contenedor.textContent = "No fue posible cargar la agenda."; return; }
-  const ids = (prestamos || []).map(p => p.id);
-  const { data: pagos } = ids.length
-    ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids)
-    : { data: [] };
-  const totalPagado = {};
-  (pagos || []).forEach(p => totalPagado[p.prestamo_id] = (totalPagado[p.prestamo_id] || 0) + Number(p.monto_pagado));
-  // Solo se muestra lo que ya está vencido o vence hoy — antes mostraba los
-  // próximos 7 días, pero para créditos diarios eso terminaba siendo casi
-  // todos los clientes, duplicando lo que ya se ve en la pestaña Cobrar.
-  const agenda = (prestamos || []).map(p => {
-    const cuotasPagadas = Math.floor((totalPagado[p.id] || 0) / Number(p.cuota));
-    return { ...p, proximaFecha: sumarDias(p.fecha_inicio, cuotasPagadas * (p.frecuencia === "semanal" ? 7 : 1)) };
-  }).filter(p => p.proximaFecha <= hoy).sort((a, b) => a.proximaFecha.localeCompare(b.proximaFecha));
-  contenedor.innerHTML = !agenda.length
-    ? '<div class="estado-vacio">No hay cuotas vencidas ni pendientes por hoy. 🎉</div>'
-    : agenda.map(p => {
-      const etiqueta = p.proximaFecha < hoy ? "Vencida" : "Hoy";
-      return `<div class="fila-agenda agenda-hoy"><span>${etiqueta}</span><strong>${escaparHtml(p.clientes?.nombre || "Cliente")}</strong><b>${formatoPesos(p.cuota)}</b></div>`;
-    }).join("");
-
-  mostrarLinkRecordatorios(agenda.length);
-  dispararRecordatorioLocal(agenda.length);
 }
 
 // --- RECORDATORIOS LOCALES DE VENCIMIENTOS ---

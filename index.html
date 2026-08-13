@@ -75,14 +75,6 @@
           </div>
         </div>
 
-        <div id="tarjeta-capital-inicio" class="tarjeta-capital oculto">
-          <div class="fila-top"><span class="icono">◧</span> Capital inicial</div>
-          <div class="monto" id="capital-inicio-monto"></div>
-          <div class="fecha-capital-inicio" id="capital-inicio-fecha"></div>
-        </div>
-
-        <div id="grid-resumen-inicio" class="grid-2x2"></div>
-
         <div id="progreso-cobro-principal" class="progreso-cobro-principal"></div>
 
         <div class="fila-2botones">
@@ -95,13 +87,22 @@
           <p class="texto-ayuda">Organizados por ruta, con los atrasados primero y los días que llevan vencidos.</p>
           <div id="jornada-por-rutas"></div>
         </details>
+        <p id="link-activar-recordatorios" class="link-olvide oculto" role="button" tabindex="0" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
+
+        <div id="grid-resumen-inicio" class="grid-2x2"></div>
 
         <div id="caja-diaria" class="caja-diaria"></div>
         <button type="button" class="btn-aporte-propio" onclick="abrirModalGastos()">💸 Gastos</button>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver gráficos y agenda de vencimientos</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleMasEstadisticasInicio()" id="btn-ver-mas-inicio">📊 Ver análisis (capital, gráfico y tendencia)</button>
 
         <div id="inicio-mas-estadisticas" class="oculto">
+          <div id="tarjeta-capital-inicio" class="tarjeta-capital oculto">
+            <div class="fila-top"><span class="icono">◧</span> Capital inicial</div>
+            <div class="monto" id="capital-inicio-monto"></div>
+            <div class="fecha-capital-inicio" id="capital-inicio-fecha"></div>
+          </div>
+
           <div class="filtros-periodo" role="group" aria-label="Periodo del resumen">
             <button type="button" class="pildora-periodo activa" data-periodo="hoy" onclick="cambiarPeriodoInicio('hoy')">Hoy</button>
             <button type="button" class="pildora-periodo" data-periodo="ayer" onclick="cambiarPeriodoInicio('ayer')">Ayer</button>
@@ -113,11 +114,6 @@
           <h4>Recaudo últimos 7 días</h4>
           <div id="grafico-semana" class="grafico-semana"></div>
           <div id="tendencia-cobro" class="tendencia-cobro"></div>
-
-          <h4>Agenda de vencimientos</h4>
-          <p class="texto-ayuda">Cuotas vencidas o que vencen hoy.</p>
-          <p id="link-activar-recordatorios" class="link-olvide oculto" role="button" tabindex="0" onclick="activarRecordatoriosLocales()">🔔 Activar recordatorios de vencidos en este celular</p>
-          <div id="agenda-vencimientos"></div>
         </div>
       </section>
 

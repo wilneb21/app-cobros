@@ -55,7 +55,6 @@ async function mostrarAppPrincipal() {
   cargarGraficoSemana();
   cargarCajaDiaria(obtenerFechaLocal());
   cargarTendenciaCobro();
-  cargarAgendaVencimientos();
   prepararInicio();
   prepararNavegacionMovil();
   marcarNavActivo("inicio");

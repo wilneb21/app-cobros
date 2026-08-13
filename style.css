@@ -429,6 +429,49 @@ button.secundario {
   margin-top: 6px;
 }
 
+/* --- "Pendientes por cobrar hoy": tarjeta con badge, no el <details> plano ---
+   Comparte la clase .detalle-movimientos-dia con otros dos bloques (caja y
+   reportes), así que todo esto va con el id único #detalle-pendientes-hoy
+   para no cambiarles el estilo a esos otros. */
+#detalle-pendientes-hoy { margin: 10px 0 6px; }
+#detalle-pendientes-hoy > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--tint-border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+}
+#detalle-pendientes-hoy > summary::-webkit-details-marker { display: none; }
+#detalle-pendientes-hoy .lado-resumen-pendientes { display: flex; align-items: center; gap: 8px; }
+#detalle-pendientes-hoy .badge-pendientes {
+  background: #fdeaea;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+#detalle-pendientes-hoy .badge-pendientes.badge-pendientes-cero {
+  background: #e5f7ee;
+  color: #0e7d43;
+}
+#detalle-pendientes-hoy .flecha-resumen-pendientes {
+  color: var(--text-muted);
+  font-size: 15px;
+  transition: transform .2s ease;
+}
+#detalle-pendientes-hoy[open] .flecha-resumen-pendientes { transform: rotate(90deg); }
+body.modo-oscuro #detalle-pendientes-hoy > summary { background: #1e302e; border-color: #35514d; color: #eafffb; }
+body.modo-oscuro #detalle-pendientes-hoy .badge-pendientes { background: rgba(220,38,38,.18); color: #ffb4b4; }
+body.modo-oscuro #detalle-pendientes-hoy .badge-pendientes.badge-pendientes-cero { background: rgba(18,138,92,.18); color: #6ee7b7; }
+
 .fila-movimiento {
   display: flex;
   justify-content: space-between;
