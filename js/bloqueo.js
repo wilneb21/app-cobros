@@ -1,184 +1,276 @@
-// --- BLOQUEO CON PIN / HUELLA (candado local del celular) ---
-// Esto NO reemplaza el login de Supabase: la sesión sigue siendo la que da
-// acceso real a los datos. Este candado es una capa extra para que, si alguien
-// toma el celular ya desbloqueado y con la sesión abierta, no pueda entrar
-// directo a ver los datos de tus clientes sin conocer tu PIN (o tu huella/Face ID).
-// El PIN se guarda SOLO en este celular (hasheado, nunca en texto plano y nunca
-// en Supabase), por eso "olvidé mi PIN" no se puede recuperar: la única salida
-// es cerrar sesión y volver a entrar con tu correo y contraseña.
+// NOTA: el auto-registro público (signUp) se quitó a propósito. Ahora la
+// única forma de entrar a la app es con un usuario y contraseña que tú
+// mismo creas (desde Supabase o desde "Gestión de usuarios" para
+// cobradores). Así, aunque alguien tenga el link de la app, no puede
+// crear su propia cuenta ni entrar sin que tú le hayas dado el acceso.
 
-let bloqueoDesbloqueadoEstaSesion = false;
-let momentoAppOculta = null;
-
-async function hashTexto(texto) {
-  const datos = new TextEncoder().encode(texto);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", datos);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-function pinEstaActivo() {
-  return !!localStorage.getItem("pinHash");
-}
-
-function biometriaEstaActiva() {
-  return !!localStorage.getItem("credencialBiometricaId");
-}
-
-async function biometriaDisponibleEnDispositivo() {
-  return typeof PublicKeyCredential !== "undefined" &&
-    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable &&
-    await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-}
-
-// --- CONFIGURAR PIN (desde Configuración) ---
-async function configurarPin() {
-  if (pinEstaActivo()) {
-    const confirmado = await mostrarConfirmacion("¿Quieres desactivar el bloqueo con PIN de este celular?");
-    if (!confirmado) return;
-    const actual = await mostrarPrompt("Para desactivarlo, escribe tu PIN actual:");
-    if (actual === null) return;
-    if (await hashTexto(actual) !== localStorage.getItem("pinHash")) { mostrarAlerta("PIN incorrecto."); return; }
-    localStorage.removeItem("pinHash");
-    localStorage.removeItem("credencialBiometricaId");
-    actualizarFilaConfigBloqueo();
-    mostrarAlerta("🔓 Bloqueo con PIN desactivado en este celular.");
-    return;
-  }
-
-  const nuevo = await mostrarPrompt("Crea un PIN de 4 a 6 dígitos para abrir la app en este celular:");
-  if (nuevo === null) return;
-  if (!/^\d{4,6}$/.test(nuevo)) { mostrarAlerta("El PIN debe tener entre 4 y 6 números."); return; }
-  const confirmar = await mostrarPrompt("Confirma el mismo PIN:");
-  if (confirmar === null) return;
-  if (nuevo !== confirmar) { mostrarAlerta("Los PIN no coinciden. Intenta de nuevo."); return; }
-
-  localStorage.setItem("pinHash", await hashTexto(nuevo));
-  actualizarFilaConfigBloqueo();
-  mostrarAlerta("🔒 Listo. Desde ahora la app pedirá este PIN cada vez que la abras en este celular.");
-
-  try {
-    const user = await obtenerUsuarioActual();
-    await supabaseClient.from("preferencias_usuario")
-      .upsert({ user_id: user.id, pin_activado_alguna_vez: true }, { onConflict: "user_id" });
-  } catch (e) { /* no bloquea el flujo si falla el guardado remoto */ }
-
-  if (await biometriaDisponibleEnDispositivo()) {
-    const quiereHuella = await mostrarConfirmacion("Este celular tiene huella o Face ID disponible. ¿Quieres poder usarla también para desbloquear más rápido (en vez de escribir el PIN cada vez)?");
-    if (quiereHuella) await activarBiometria();
-  }
-}
-
-async function activarBiometria() {
-  try {
-    const credencial = await navigator.credentials.create({
-      publicKey: {
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: "App de Cobros" },
-        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "cobrador", displayName: "Cobrador" },
-        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-        timeout: 60000
-      }
-    });
-    if (!credencial) throw new Error("no se creó la credencial");
-    localStorage.setItem("credencialBiometricaId", credencial.id);
-    mostrarAlerta("✅ Huella/Face ID activada como acceso rápido. El PIN sigue funcionando como respaldo.");
-  } catch (e) {
-    mostrarAlerta("No fue posible activar la huella/Face ID en este celular. El PIN sigue funcionando normalmente.");
-  }
-}
-
-function actualizarFilaConfigBloqueo() {
-  const fila = document.getElementById("fila-config-pin");
-  if (!fila) return;
-  fila.querySelector("small").textContent = pinEstaActivo()
-    ? "Activado en este celular · toca para desactivar"
-    : "Pide un PIN cada vez que abras la app";
-}
-
-// Si el usuario activó el PIN alguna vez (en cualquier celular) pero en ESTE
-// celular no está activo (por ejemplo, reinstaló la app o entró desde uno
-// nuevo), se lo recuerda una sola vez por día — sin ser insistente.
-async function verificarRecordatorioPin() {
-  if (pinEstaActivo()) return;
-  const hoy = obtenerFechaLocal();
-  if (localStorage.getItem("avisoPinVistoFecha") === hoy) return;
-
-  try {
-    const user = await obtenerUsuarioActual();
-    const { data } = await supabaseClient.from("preferencias_usuario")
-      .select("pin_activado_alguna_vez").eq("user_id", user.id).maybeSingle();
-    if (!data?.pin_activado_alguna_vez) return;
-
-    localStorage.setItem("avisoPinVistoFecha", hoy);
-    const activar = await mostrarConfirmacion("🔒 En otro celular tenías activado el bloqueo con PIN, pero en este todavía no. ¿Quieres activarlo ahora para proteger los datos de tus clientes?");
-    if (activar) await configurarPin();
-  } catch (e) { /* si falla la consulta, simplemente no se muestra el aviso hoy */ }
-}
-
-// --- PANTALLA DE BLOQUEO ---
-function mostrarPantallaBloqueo() {
-  if (!pinEstaActivo()) return;
-  bloqueoDesbloqueadoEstaSesion = false;
-  document.getElementById("pantalla-bloqueo").classList.remove("oculto");
-  document.getElementById("bloqueo-pin-input").value = "";
-  document.getElementById("bloqueo-error").textContent = "";
-  document.getElementById("btn-bloqueo-huella").classList.toggle("oculto", !biometriaEstaActiva());
-  setTimeout(() => document.getElementById("bloqueo-pin-input").focus(), 50);
-  if (biometriaEstaActiva()) intentarDesbloqueoBiometrico(true);
-}
-
-async function intentarDesbloqueoBiometrico(automatico = false) {
-  try {
-    const resultado = await navigator.credentials.get({
-      publicKey: {
-        challenge: crypto.getRandomValues(new Uint8Array(32)),
-        allowCredentials: [{ id: Uint8Array.from(atob(localStorage.getItem("credencialBiometricaId").replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0)), type: "public-key" }],
-        userVerification: "required",
-        timeout: 30000
-      }
-    });
-    if (resultado) desbloquearApp();
-  } catch (e) {
-    // Si fue automático (al abrir) y falla o el usuario cancela, simplemente se
-    // queda en la pantalla de PIN, sin mostrar error para no asustar al cobrador.
-    if (!automatico) document.getElementById("bloqueo-error").textContent = "No se pudo verificar la huella/Face ID. Usa tu PIN.";
-  }
-}
-
-async function verificarPinBloqueo() {
-  const valor = document.getElementById("bloqueo-pin-input").value;
-  if (await hashTexto(valor) === localStorage.getItem("pinHash")) {
-    desbloquearApp();
+async function iniciarSesion() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) {
+    document.getElementById("mensaje-error").innerText = "Error: " + traducirErrorSupabase(error);
   } else {
-    document.getElementById("bloqueo-error").textContent = "PIN incorrecto. Intenta de nuevo.";
-    document.getElementById("bloqueo-pin-input").value = "";
+    await mostrarAppPrincipal();
   }
 }
 
-function desbloquearApp() {
-  bloqueoDesbloqueadoEstaSesion = true;
-  document.getElementById("pantalla-bloqueo").classList.add("oculto");
+async function recuperarContrasena() {
+  const email = await mostrarPrompt("Escribe tu correo para enviarte el enlace de recuperación:");
+  if (!email) return;
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}${window.location.pathname}`
+  });
+  if (error) {
+    mostrarAlerta("Error: " + traducirErrorSupabase(error));
+  } else {
+    mostrarAlerta("Te enviamos un correo con instrucciones para recuperar tu contraseña.");
+  }
 }
 
-async function olvidoPinBloqueo() {
-  const confirmado = await mostrarConfirmacion("Si olvidaste tu PIN, la única forma de continuar es cerrar la sesión de este celular y volver a entrar con tu correo y contraseña.<br><br>Tus datos NO se pierden — siguen guardados en Supabase.<br><br>¿Quieres cerrar sesión ahora?");
-  if (!confirmado) return;
-  localStorage.removeItem("pinHash");
-  localStorage.removeItem("credencialBiometricaId");
-  document.getElementById("pantalla-bloqueo").classList.add("oculto");
-  await cerrarSesion();
+async function cerrarSesion() {
+  await supabaseClient.auth.signOut();
+  document.getElementById("app-principal").classList.add("oculto");
+  document.getElementById("login-screen").classList.remove("oculto");
+  document.getElementById("pantalla-bloqueo")?.classList.add("oculto");
+  marcarBloqueado();
+  detenerControlInactividad();
+  navegacionMovilPreparada = false;
+  salidaConfirmada = false;
+  mostrandoDialogoSalida = false;
+  colchonesExtra = 0;
 }
 
-// Vuelve a pedir el candado cuando el celular regresa de estar en segundo plano
-// más de 20 segundos (pantalla apagada, cambio de app, etc.) — no cada vez que
-// el cobrador solo revisa una notificación rápida.
-document.addEventListener("visibilitychange", () => {
-  if (!pinEstaActivo() || document.getElementById("app-principal")?.classList.contains("oculto")) return;
-  if (document.hidden) {
-    momentoAppOculta = Date.now();
-  } else if (momentoAppOculta && Date.now() - momentoAppOculta > 20000) {
-    bloqueoDesbloqueadoEstaSesion = false;
-    mostrarPantallaBloqueo();
+async function mostrarAppPrincipal() {
+  await cargarSesionActual();
+  aplicarRestriccionesDeRol();
+  document.getElementById("login-screen").classList.add("oculto");
+  const app = document.getElementById("app-principal");
+  app.classList.remove("oculto");
+  app.classList.remove("app-entrada");
+  requestAnimationFrame(() => app.classList.add("app-entrada"));
+  cargarRutas();
+  cargarClientes();
+  cargarResumenDia();
+  cargarGraficoSemana();
+  cargarCajaDiaria(obtenerFechaLocal());
+  cargarTendenciaCobro();
+  prepararInicio();
+  prepararNavegacionMovil();
+  marcarNavActivo("inicio");
+  iniciarControlInactividad();
+  mostrarPantallaBloqueo();
+  if (!pinEstaActivo()) verificarRecordatorioPin();
+}
+
+// --- PANTALLA DE BIENVENIDA (animación de entrada) ---
+const horaInicioSplash = Date.now();
+let splashYaOculto = false;
+function ocultarSplash() {
+  if (splashYaOculto) return;
+  splashYaOculto = true;
+  const splash = document.getElementById("pantalla-splash");
+  if (!splash) return;
+  const transcurrido = Date.now() - horaInicioSplash;
+  const espera = Math.max(0, 550 - transcurrido); // muestra el splash mínimo 550ms para que no "parpadee"
+  setTimeout(() => {
+    splash.classList.add("splash-salida");
+    setTimeout(() => splash.remove(), 500);
+  }, espera);
+}
+
+// Si la conexión es lenta o falla, jamás dejamos al usuario atrapado en la
+// pantalla de carga: a los 4 segundos se oculta sí o sí y aparece el login.
+setTimeout(ocultarSplash, 4000);
+
+// OJO: esto está adentro de un "window.addEventListener('load', ...)" a
+// propósito. Antes se ejecutaba apenas el navegador leía esta línea del
+// archivo — pero como esto revisa la sesión y de una vez intenta mostrar
+// toda la app (incluyendo funciones que viven en OTROS archivos .js que se
+// cargan después de este, como usuarios.js), a veces ganaba la carrera esta
+// revisión de sesión y a veces ganaba la carga de los demás archivos. Cuando
+// ganaba la revisión de sesión, la app fallaba por dentro (una función
+// "no estaba definida todavía") y como no se veía ningún error en pantalla,
+// simplemente parecía que "te sacaba al login" al recargar — pasaba más o
+// menos la mitad de las veces, sin ningún patrón claro.
+//
+// El evento "load" del navegador solo se dispara cuando TODOS los archivos
+// de la página (incluyendo todos los .js) ya terminaron de cargarse por
+// completo — así que, a partir de aquí, ya no hay ninguna carrera posible.
+window.addEventListener("load", () => {
+  supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
+    if (session) await mostrarAppPrincipal();
+    ocultarSplash();
+  }).catch(() => {
+    ocultarSplash();
+  });
+});
+
+// Cuando el usuario da clic en el enlace del correo de "recuperar contraseña",
+// Supabase inicia sesión temporalmente y avisa con este evento — antes esto no
+// se manejaba, así que el enlace no llevaba a ninguna parte útil.
+supabaseClient.auth.onAuthStateChange((evento) => {
+  if (evento === "PASSWORD_RECOVERY") {
+    ocultarSplash();
+    mostrarPantallaNuevaContrasena();
   }
 });
+
+function mostrarPantallaNuevaContrasena() {
+  const cont = document.getElementById("modal-generico-contenido");
+  cont.innerHTML = `
+    <p class="modal-mensaje">Escribe tu nueva contraseña (mínimo 8 caracteres).</p>
+    <input type="password" id="nueva-clave-1" placeholder="Nueva contraseña">
+    <input type="password" id="nueva-clave-2" placeholder="Confirma la nueva contraseña">
+    <p id="nueva-clave-error" class="mensaje-modal"></p>
+    <div class="modal-botones">
+      <button class="btn-modal-confirmar" id="btn-guardar-nueva-clave" style="width:100%">Guardar nueva contraseña</button>
+    </div>`;
+  document.getElementById("modal-generico").classList.remove("oculto");
+  document.getElementById("nueva-clave-1").focus();
+
+  document.getElementById("btn-guardar-nueva-clave").onclick = async () => {
+    const clave1 = document.getElementById("nueva-clave-1").value;
+    const clave2 = document.getElementById("nueva-clave-2").value;
+    const elError = document.getElementById("nueva-clave-error");
+    if (clave1.length < 8) { elError.textContent = "La contraseña debe tener al menos 8 caracteres."; return; }
+    if (clave1 !== clave2) { elError.textContent = "Las contraseñas no coinciden."; return; }
+
+    const { error } = await supabaseClient.auth.updateUser({ password: clave1 });
+    if (error) { elError.textContent = "Error: " + traducirErrorSupabase(error); return; }
+
+    cerrarModalGenerico();
+    // Por seguridad (el enlace pudo abrirse en un celular compartido), cerramos
+    // la sesión temporal de recuperación y pedimos entrar de nuevo ya con la clave nueva.
+    await supabaseClient.auth.signOut();
+    document.getElementById("app-principal").classList.add("oculto");
+    document.getElementById("login-screen").classList.remove("oculto");
+    mostrarAlerta("✅ Contraseña actualizada. Ya puedes iniciar sesión con tu nueva contraseña.");
+  };
+}
+
+// --- Cierre de sesión automático por inactividad (30 minutos) ---
+let temporizadorInactividad;
+let controlInactividadActivo = false;
+const eventosInactividad = ["click", "keydown", "touchstart"];
+const reiniciarInactividad = () => {
+  clearTimeout(temporizadorInactividad);
+  temporizadorInactividad = setTimeout(() => {
+    cerrarSesion();
+    mostrarAlerta("Tu sesión se cerró por inactividad.");
+  }, 30 * 60 * 1000);
+};
+function iniciarControlInactividad() {
+  if (!controlInactividadActivo) {
+    eventosInactividad.forEach(evento => document.addEventListener(evento, reiniciarInactividad));
+    controlInactividadActivo = true;
+  }
+  reiniciarInactividad();
+}
+
+function detenerControlInactividad() {
+  clearTimeout(temporizadorInactividad);
+  if (controlInactividadActivo) {
+    eventosInactividad.forEach(evento => document.removeEventListener(evento, reiniciarInactividad));
+    controlInactividadActivo = false;
+  }
+}
+
+// --- NAVEGACIÓN CON EL BOTÓN "ATRÁS" (Android / navegador móvil) ---
+// El botón atrás ya no cierra la app de una: primero cierra la ventana/modal
+// que esté abierta, luego regresa a la sección anterior dentro de la app,
+// y solo al llegar al inicio sin nada abierto pregunta si se quiere salir.
+let salidaConfirmada = false;
+let navegacionMovilPreparada = false;
+let estadoNavActual = { seccion: "inicio", modal: null };
+// Si el usuario toca "atrás" varias veces rápido MIENTRAS el diálogo de salida
+// sigue abierto (muy común: como no ve reacción inmediata, insiste), cada toque
+// extra se cuenta aquí para reponer el "colchón" las veces necesarias y que
+// ninguno de esos toques adicionales saque de la app sin preguntar.
+let mostrandoDialogoSalida = false;
+let colchonesExtra = 0;
+let contadorColchon = 0;
+// Repone un paso en el historial con una URL (#nav-N) realmente distinta a
+// la anterior — necesario por la misma razón explicada en prepararNavegacionMovil.
+function reponerColchon() {
+  contadorColchon++;
+  window.history.pushState(estadoNavActual, "", "#nav-" + contadorColchon);
+}
+
+function prepararNavegacionMovil() {
+  if (navegacionMovilPreparada) return;
+  estadoNavActual = { seccion: "inicio", modal: null };
+  // OJO: debe ser pushState (no replaceState). Así queda un "colchón" en el
+  // historial debajo de nuestro estado; si no, con una sola entrada el botón
+  // atrás sale directo de la app sin darle chance a este código de actuar.
+// Se pone un "#nav1"/"#nav2" real en la URL (no solo un estado invisible)
+  // porque algunos navegadores/PWA instaladas como standalone en Android NO
+  // disparan "popstate" cuando la URL no cambia en absoluto — con solo el
+  // estado, el botón atrás podía saltarse todo este código y cerrar la app
+  // directamente. Con la URL cambiando de verdad, el navegador sí lo trata
+  // como una navegación real y dispara el evento como corresponde.
+  window.history.pushState(estadoNavActual, "", "#nav1");
+  window.history.pushState(estadoNavActual, "", "#nav2");
+  navegacionMovilPreparada = true;
+
+  window.addEventListener("popstate", async (evento) => {
+    const estado = evento.state;
+
+    if (!estado) {
+      // Ya no queda ningún paso de la app en el historial: confirmar salida real
+      if (salidaConfirmada) return;
+
+      if (mostrandoDialogoSalida) {
+        // Toque repetido mientras el diálogo ya estaba abierto: se repone el
+        // colchón y no se abre un segundo diálogo encima del primero.
+        colchonesExtra++;
+        reponerColchon();
+        return;
+      }
+
+      mostrandoDialogoSalida = true;
+      const salir = await mostrarConfirmacion("¿Quieres salir de la aplicación?");
+      mostrandoDialogoSalida = false;
+
+      if (salir) {
+        salidaConfirmada = true;
+        // Se deshacen también los "colchones" extra que se hayan repuesto
+        // mientras el usuario dudaba, para que salir funcione en un solo intento.
+        for (let i = 0; i <= colchonesExtra; i++) window.history.back();
+      } else if (colchonesExtra === 0) {
+        reponerColchon();
+      }
+      colchonesExtra = 0;
+      return;
+    }
+
+    // Si veníamos con un modal abierto y el estado al que volvimos no lo trae, se cierra
+    if (estadoNavActual.modal && estadoNavActual.modal !== estado.modal) {
+      document.getElementById(estadoNavActual.modal)?.classList.add("oculto");
+    }
+    // Si el estado al que volvimos corresponde a otra sección, se muestra esa sección
+    if (estado.seccion && estado.seccion !== estadoNavActual.seccion) {
+      mostrarSeccion(estado.seccion, true);
+    }
+    estadoNavActual = estado;
+  });
+}
+
+// Registra en el historial la apertura de un modal de pantalla completa
+// (detalle de cliente, nuevo cliente, búsqueda, recibo, crear cuenta) para
+// que el botón atrás lo cierre en vez de salir de la app.
+function empujarEstadoModal(idModal) {
+  if (!navegacionMovilPreparada) return;
+  estadoNavActual = { seccion: estadoNavActual.seccion, modal: idModal };
+  window.history.pushState(estadoNavActual, "", "#" + idModal);
+}
+
+// Cierra un modal registrado con empujarEstadoModal, manteniendo el
+// historial sincronizado (sin dejar "pasos fantasma" para el botón atrás).
+function cerrarModalConHistorial(idModal) {
+  document.getElementById(idModal)?.classList.add("oculto");
+  if (navegacionMovilPreparada && estadoNavActual.modal === idModal) {
+    estadoNavActual = { seccion: estadoNavActual.seccion, modal: null };
+    window.history.replaceState(estadoNavActual, "", "#" + estadoNavActual.seccion);
+  }
+}

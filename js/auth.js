@@ -33,7 +33,7 @@ async function cerrarSesion() {
   document.getElementById("app-principal").classList.add("oculto");
   document.getElementById("login-screen").classList.remove("oculto");
   document.getElementById("pantalla-bloqueo")?.classList.add("oculto");
-  bloqueoDesbloqueadoEstaSesion = false;
+  marcarBloqueado();
   detenerControlInactividad();
   navegacionMovilPreparada = false;
   salidaConfirmada = false;
