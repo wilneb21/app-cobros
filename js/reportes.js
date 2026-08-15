@@ -181,8 +181,7 @@ async function cargarReporteMes() {
       <div class="resumen-caja ${claseFlujo}"><span class="numero">${flujoNeto >= 0 ? "+" : ""}${formatoPesos(flujoNeto)}</span><span class="etiqueta">Flujo de caja</span><span class="subetiqueta">Cobrado menos gastos en ${etiquetaPeriodo}</span></div>
       <div class="resumen-caja ${claseGanancia}"><span class="numero">${gananciaNeta >= 0 ? "+" : ""}${formatoPesos(gananciaNeta)}</span><span class="etiqueta">Ganancia neta</span><span class="subetiqueta">Utilidad de lo prestado, menos gastos</span></div>
     </div>
-    <p class="texto-ayuda">💡 <strong>Flujo de caja</strong> es cuánto efectivo entró y salió (incluye tu propio capital regresando). <strong>Ganancia neta</strong> es la utilidad real de los préstamos entregados en ${etiquetaPeriodo} (interés), sin contar el capital que se presta y regresa. Por eso casi siempre son números distintos.</p>
-    <p class="texto-ayuda">El detalle de desembolso, cobro, gastos y cierre día por día está en "Flujo de caja día por día" más abajo.</p>`;
+    <p class="texto-ayuda">💡 <strong>Flujo de caja</strong> es cuánto efectivo entró y salió (incluye tu propio capital regresando). <strong>Ganancia neta</strong> es la utilidad real de los préstamos entregados en ${etiquetaPeriodo} (interés), sin contar el capital que se presta y regresa. Por eso casi siempre son números distintos.</p>`;
 
   ultimoReporteExportable = { inicio, fin, etiquetaPeriodo, tipo, esDia: tipo === "dia", totalPrestadoNuevo, totalCobrado, totalGastos, flujoNeto, gananciaBruta, gananciaNeta, pagosPeriodo: pagosPeriodo || [] };
 
@@ -619,32 +618,10 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
 }
 
 // --- EXPORTAR REPORTE A CSV ---
+// (la función exportarReporteCSV que vivía aquí ya no tiene botón que la
+// llame — ver "Más formas de exportar" en Reportes — pero esta variable
+// la siguen usando las demás exportaciones, así que se queda.)
 let ultimoReporteExportable = null;
-
-function exportarReporteCSV() {
-  if (!ultimoReporteExportable) { mostrarAlerta("Espera a que cargue el reporte antes de exportar."); return; }
-  const r = ultimoReporteExportable;
-  const filas = [
-    ["Reporte", r.etiquetaPeriodo],
-    ["Desde", formatoFecha(r.inicio)], ["Hasta", formatoFecha(sumarDias(r.fin, -1))],
-    ["Desembolso nuevo", r.totalPrestadoNuevo], ["Cobrado", r.totalCobrado],
-    ["Gastos", r.totalGastos], ["Flujo de caja", r.flujoNeto],
-    ["Utilidad de préstamos entregados", r.gananciaBruta],
-    ["Ganancia neta", r.gananciaNeta], [],
-    ["Flujo de caja día por día"],
-    ["Fecha", "Base", "Préstamos", "Cobro", "Gasto", "Utilidad", "Utilidad acumulada", "Utilidad %", "Cierre"],
-    ...(ultimoLibroDiario?.filas || []).map(f => [formatoFecha(f.fecha), f.base, f.prestado, f.cobro, f.gasto, f.utilidad.toFixed(0), f.utilidadAcumulada.toFixed(0), f.utilidadPct.toFixed(1), f.cierre]),
-    [], ["Detalle de pagos del período"],
-    ["Monto pagado"], ...r.pagosPeriodo.map(p => [p.monto_pagado])
-  ];
-  const csv = filas.map(fila => fila.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const enlace = document.createElement("a");
-  enlace.href = URL.createObjectURL(blob);
-  enlace.download = `reporte-${r.inicio}-a-${r.fin}.csv`;
-  enlace.click();
-  URL.revokeObjectURL(enlace.href);
-}
 
 // --- UTILIDAD "AL ESTILO LIBRO DE WILLIAM" ---
 // A diferencia de contar la ganancia solo cuando el cliente COBRA (poco a
@@ -717,15 +694,17 @@ async function calcularUtilidadEntreFechas(desde, hasta) {
 
 // --- REFINANCIAMIENTOS: separa cuánto es saldo renovado y cuánto es plata adicional nueva ---
 async function cargarRefinanciamientosPeriodo(refinanciados, inicio, fin) {
+  const envoltura = document.getElementById("refinanciamientos-envoltura");
   const contenedor = document.getElementById("bloque-refinanciamientos");
-  if (!refinanciados || refinanciados.length === 0) { contenedor.classList.add("oculto"); return; }
+  if (!envoltura || !contenedor) return;
+  if (!refinanciados || refinanciados.length === 0) { envoltura.classList.add("oculto"); return; }
 
   const { data: filas, error } = await supabaseClient
     .from("prestamos")
     .select("id, monto_prestado, fecha_inicio, prestamo_anterior_id, clientes(nombre)")
     .not("prestamo_anterior_id", "is", null)
     .gte("fecha_inicio", inicio).lt("fecha_inicio", fin);
-  if (error || !filas || filas.length === 0) { contenedor.classList.add("oculto"); return; }
+  if (error || !filas || filas.length === 0) { envoltura.classList.add("oculto"); return; }
 
   let totalRenovado = 0;
   const detalle = [];
@@ -739,7 +718,10 @@ async function cargarRefinanciamientosPeriodo(refinanciados, inicio, fin) {
     detalle.push({ nombre: nuevo.clientes?.nombre || "Cliente", saldoViejo, montoNuevo: Number(nuevo.monto_prestado) });
   }
 
-  contenedor.classList.remove("oculto");
+  envoltura.classList.remove("oculto");
+  contenedor.classList.add("oculto");
+  const botonRefi = envoltura.querySelector(".btn-ver-mas-inicio");
+  if (botonRefi) botonRefi.textContent = "Ver refinanciamientos";
   contenedor.innerHTML = `
     <h4>Refinanciamientos de este período (${filas.length})</h4>
     <div class="resumen-dia" style="margin-bottom:10px;">
@@ -1053,10 +1035,11 @@ async function ejecutarExportacionExcel(boton, funcion) {
 // Reportes arriba.
 async function exportarResumenGeneralExcel(evento) {
   await ejecutarExportacionExcel(evento?.currentTarget, async () => {
-    const [{ data: pagos }, { data: gastos }, { data: prestamos }, capitalInicial] = await Promise.all([
+    const [{ data: pagos }, { data: gastos }, { data: prestamos }, { data: aportes }, capitalInicial] = await Promise.all([
       supabaseClient.from("pagos").select("monto_pagado, prestamo_id, prestamos(interes_porcentaje)"),
       supabaseClient.from("gastos").select("monto"),
       supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, prestamo_anterior_id, fecha_inicio, estado"),
+      supabaseClient.from("aportes_capital").select("monto"),
       obtenerCapitalInicial()
     ]);
 
@@ -1073,20 +1056,37 @@ async function exportarResumenGeneralExcel(evento) {
       .filter(p => p.estado === "activo")
       .reduce((s, p) => s + calcularSaldoPendiente(p, pagadoPorPrestamo[p.id] || 0), 0);
 
+    // --- ¿Ha crecido la cartera inicial? ---
+    // Patrimonio actual = lo que pusiste al empezar, más lo que has ganado de
+    // verdad (ganancia neta histórica), más/menos cualquier aporte o retiro
+    // de tu bolsillo que hayas hecho aparte (aportes_capital: positivo si
+    // metiste plata extra, negativo si retiraste). Este número — no la
+    // cartera activa sola — es la comparación justa contra el capital
+    // inicial, porque parte de la ganancia puede estar sentada en efectivo
+    // (caja) y no solo prestada en la calle.
+    const montoCapitalInicial = capitalInicial ? capitalInicial.monto : 0;
+    const netoAportes = (aportes || []).reduce((s, a) => s + Number(a.monto), 0);
+    const patrimonioActual = montoCapitalInicial + gananciaNeta + netoAportes;
+    const crecimiento = patrimonioActual - montoCapitalInicial;
+    const crecimientoPct = montoCapitalInicial > 0 ? (crecimiento / montoCapitalInicial) * 100 : null;
+
     const filas = [
-      { concepto: "Cartera / capital inicial", monto: capitalInicial ? capitalInicial.monto : 0 },
+      { concepto: "Cartera / capital inicial", monto: montoCapitalInicial },
       { concepto: "Total prestado (efectivo entregado, histórico)", monto: totalDesembolsado },
       { concepto: "Total cobrado (histórico)", monto: totalCobrado },
       { concepto: "Utilidad total acumulada (de préstamos entregados, histórica)", monto: gananciaBruta },
       { concepto: "Gastos operativos (histórico)", monto: totalGastos },
       { concepto: "Ganancia neta (histórica)", monto: gananciaNeta },
-      { concepto: "Cartera activa hoy (lo que falta por cobrar)", monto: carteraActiva }
+      { concepto: "Aportes/retiros de capital propio (neto, histórico)", monto: netoAportes },
+      { concepto: "Cartera activa hoy (lo que falta por cobrar)", monto: carteraActiva },
+      { concepto: "Patrimonio actual (capital inicial + ganancia neta + aportes/retiros)", monto: patrimonioActual },
+      { concepto: `Crecimiento vs. capital inicial${crecimientoPct !== null ? ` (${crecimientoPct >= 0 ? "+" : ""}${crecimientoPct.toFixed(1)}%)` : ""}`, monto: crecimiento }
     ];
 
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, construirHojaEstilizada(
       filas,
-      [{ header: `Resumen general (desde ${capitalInicial?.fecha ? formatoFecha(capitalInicial.fecha) : "el inicio"} hasta hoy)`, key: "concepto", ancho: 55 }, { header: "Monto", key: "monto", tipo: "moneda", ancho: 20 }],
+      [{ header: `Resumen general (desde ${capitalInicial?.fecha ? formatoFecha(capitalInicial.fecha) : "el inicio"} hasta hoy)`, key: "concepto", ancho: 60 }, { header: "Monto", key: "monto", tipo: "moneda", ancho: 20 }],
       "252F86"
     ), "Resumen general");
     XLSX.writeFile(libro, `resumen-general-${obtenerFechaLocal()}.xlsx`);
@@ -1310,39 +1310,10 @@ async function descargarRespaldo() {
   document.getElementById("respaldo-recordatorio").classList.add("oculto");
 }
 
-function escaparCsv(valor) {
-  return `"${String(valor ?? "").replace(/"/g, '""')}"`;
-}
-
-function descargarArchivoCsv(nombre, columnas, filas) {
-  const contenido = [columnas.join(","), ...filas.map(fila => fila.map(escaparCsv).join(","))].join("\n");
-  const blob = new Blob(["\ufeff" + contenido], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const enlace = document.createElement("a");
-  enlace.href = url; enlace.download = `${nombre}-${obtenerFechaLocal()}.csv`; enlace.click();
-  URL.revokeObjectURL(url);
-}
-
-async function exportarCsv(tipo) {
-  if (tipo === "pagos") {
-    const { data, error } = await supabaseClient.from("pagos").select("fecha_pago, monto_pagado, estado, prestamos(clientes(nombre))").order("fecha_pago", { ascending: false });
-    if (error) return mostrarAlerta("No fue posible exportar los pagos.");
-    descargarArchivoCsv("pagos", ["Fecha", "Cliente", "Estado", "Monto"], (data || []).map(p => [p.fecha_pago, p.prestamos?.clientes?.nombre, p.estado, p.monto_pagado]));
-  } else if (tipo === "gastos") {
-    const { data, error } = await supabaseClient.from("gastos").select("fecha, concepto, monto").order("fecha", { ascending: false });
-    if (error) return mostrarAlerta("No fue posible exportar los gastos.");
-    descargarArchivoCsv("gastos", ["Fecha", "Concepto", "Monto"], (data || []).map(g => [g.fecha, g.concepto, g.monto]));
-  } else {
-    const { data: prestamos, error } = await supabaseClient.from("prestamos").select("id, monto_prestado, interes_porcentaje, cuota, prestamo_anterior_id, clientes(nombre)").eq("estado", "activo");
-    if (error) return mostrarAlerta("No fue posible exportar la cartera.");
-    const ids = (prestamos || []).map(p => p.id);
-    const { data: pagos } = ids.length ? await supabaseClient.from("pagos").select("prestamo_id, monto_pagado").in("prestamo_id", ids) : { data: [] };
-    const abonado = {}; (pagos || []).forEach(p => abonado[p.prestamo_id] = (abonado[p.prestamo_id] || 0) + Number(p.monto_pagado));
-    descargarArchivoCsv("cartera", ["Cliente", "Monto inicial", "Interés %", "Cuota", "Abonado", "Saldo", "Es refinanciamiento"], (prestamos || []).map(p => {
-      return [p.clientes?.nombre, p.monto_prestado, p.interes_porcentaje, p.cuota, abonado[p.id] || 0, calcularSaldoPendiente(p, abonado[p.id] || 0), p.prestamo_anterior_id ? "Sí" : "No"];
-    }));
-  }
-}
+// (los CSV sueltos de pagos/cartera/gastos que vivían aquí se quitaron: eran
+// exactamente los mismos datos que ya trae "Exportar todo a Excel", solo que
+// separados en 3 descargas en vez de una — ver bloque "Más formas de
+// exportar" en Reportes.)
 
 // --- Recordatorio de respaldo si han pasado más de 7 días ---
 // Antes vivía en localStorage (por celular); ahora vive en Supabase, junto

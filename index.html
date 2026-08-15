@@ -232,7 +232,10 @@
         </div>
         <div id="respaldo-recordatorio" class="oculto"></div>
 
-        <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
+        <div id="refinanciamientos-envoltura" class="oculto">
+          <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-refinanciamientos', this, 'Ver refinanciamientos', 'Ocultar refinanciamientos')">Ver refinanciamientos</button>
+          <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
+        </div>
 
         <div id="detalle-clientes-dia-envoltura" class="oculto">
           <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('detalle-clientes-dia', this, 'Ver clientes del día', 'Ocultar clientes del día')">Ver clientes del día</button>
@@ -264,14 +267,8 @@
           <details class="detalle-movimientos-dia">
             <summary>▸ Más formas de exportar</summary>
             <p class="texto-ayuda-export">Estas son variantes para casos puntuales — el botón de arriba ya cubre lo que la mayoría necesita.</p>
-            <button type="button" class="btn-exportar-csv" onclick="exportarReporteCSV()">Este mismo reporte, en CSV</button>
             <button type="button" onclick="exportarResumenGeneralExcel(event)" class="btn-excel">Resumen general (histórico completo, sin importar el período)</button>
             <button type="button" onclick="exportarReporteDiarioExcel(event)" class="btn-excel">Solo el día de hoy (o el día del reporte), con cada cliente</button>
-            <div class="exportaciones-csv">
-              <button type="button" onclick="exportarCsv('pagos')">Pagos (CSV)</button>
-              <button type="button" onclick="exportarCsv('cartera')">Cartera (CSV)</button>
-              <button type="button" onclick="exportarCsv('gastos')">Gastos (CSV)</button>
-            </div>
             <details class="detalle-movimientos-dia">
               <summary>▸ Exportación completa (avanzada, para contabilidad)</summary>
               <p class="texto-ayuda-export">Un solo Excel con las 8 hojas de detalle: Clientes, Préstamos, Pagos, Gastos, Refinanciamientos, Libro diario, etc.</p>
@@ -308,21 +305,32 @@
           <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos', false, { abrirRutas: true })"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h4a3 3 0 003-3v0a3 3 0 00-3-3H9a3 3 0 01-3-3v0a3 3 0 013-3h4"/></svg></span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M6.5 5.5h7M6.5 9h.01M10 9h.01M13.5 9h.01M6.5 12h.01M10 12h.01M13.5 12v3M6.5 15h4"/></svg></span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="15" height="10.5" rx="1.5"/><path d="M2.5 8.5h15"/><circle cx="14" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-corte-utilidad" class="fila-config" onclick="configurarDiaCorteUtilidad()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/></svg></span><span><b>Día de corte de utilidad</b><small id="fila-config-corte-utilidad-detalle">Día 1 de cada mes (por defecto)</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-inicio-semana" class="fila-config" onclick="configurarDiaInicioSemana()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3M7 12h6"/></svg></span><span><b>Inicio de semana (reporte)</b><small id="fila-config-inicio-semana-detalle">Lunes a domingo (por defecto)</small></span><span class="config-chevron">›</span></button>
-          <div class="fila-config fila-config-select">
-            <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span>
-            <span><b>Reporte por defecto</b><small>Con cuál se abre Reportes cada vez</small></span>
-            <select id="config-reporte-tipo-defecto" aria-label="Tipo de reporte por defecto" onchange="guardarTipoReporteDefecto(this.value)">
-              <option value="dia">Diario</option>
-              <option value="semana">Semanal</option>
-              <option value="mes">Mensual</option>
-              <option value="anio">Anual</option>
-              <option value="rango">Rango de fechas</option>
-            </select>
+        </div>
+        <div class="grupo-config">
+          <!-- Antes estos 5 vivían mezclados arriba, junto a lo de uso
+               diario — pero son ajustes que normalmente se ponen UNA vez,
+               al empezar a usar la app, y casi nunca se vuelven a tocar.
+               Plegados aquí para que no compitan visualmente con lo que sí
+               se usa seguido. -->
+          <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-config-inicial', this, 'Ver configuración inicial', 'Ocultar configuración inicial')">Ver configuración inicial</button>
+          <div id="bloque-config-inicial" class="oculto">
+            <p class="texto-ayuda">Estos ajustes normalmente se ponen una sola vez, al empezar a usar la app.</p>
+            <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="15" height="10.5" rx="1.5"/><path d="M2.5 8.5h15"/><circle cx="14" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
+            <button type="button" id="fila-config-corte-utilidad" class="fila-config" onclick="configurarDiaCorteUtilidad()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/></svg></span><span><b>Día de corte de utilidad</b><small id="fila-config-corte-utilidad-detalle">Día 1 de cada mes (por defecto)</small></span><span class="config-chevron">›</span></button>
+            <button type="button" id="fila-config-inicio-semana" class="fila-config" onclick="configurarDiaInicioSemana()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3M7 12h6"/></svg></span><span><b>Inicio de semana (reporte)</b><small id="fila-config-inicio-semana-detalle">Lunes a domingo (por defecto)</small></span><span class="config-chevron">›</span></button>
+            <div class="fila-config fila-config-select">
+              <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span>
+              <span><b>Reporte por defecto</b><small>Con cuál se abre Reportes cada vez</small></span>
+              <select id="config-reporte-tipo-defecto" aria-label="Tipo de reporte por defecto" onchange="guardarTipoReporteDefecto(this.value)">
+                <option value="dia">Diario</option>
+                <option value="semana">Semanal</option>
+                <option value="mes">Mensual</option>
+                <option value="anio">Anual</option>
+                <option value="rango">Rango de fechas</option>
+              </select>
+            </div>
+            <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5v4h-4M4 15v-4h4"/><path d="M5 8a6 6 0 019.5-3.2M15 12a6 6 0 01-9.5 3.2"/></svg></span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
           </div>
-          <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5v4h-4M4 15v-4h4"/><path d="M5 8a6 6 0 019.5-3.2M15 12a6 6 0 01-9.5 3.2"/></svg></span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
         </div>
         <div id="grupo-config-plataforma" class="grupo-config oculto">
           <p class="titulo-grupo-config">Plataforma</p>
