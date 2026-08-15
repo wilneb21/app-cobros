@@ -9,6 +9,10 @@ function mostrarSeccion(nombre, desdeHistorial = false, opciones = {}) {
   document.querySelectorAll(".seccion").forEach(sec => sec.classList.add("oculto"));
   document.getElementById("seccion-" + nombre).classList.remove("oculto");
   marcarNavActivo(nombre);
+  // El menú "Más" (donde viven Configuración y Reportes) se queda abierto
+  // tapando la pantalla si no se cierra explícitamente al navegar — antes
+  // solo se cerraba tocando fuera de él o el botón "Más" otra vez.
+  cerrarMenuPrincipal();
 
   if (nombre === "inicio") { cargarResumenDia(); cargarGraficoSemana(); cargarCajaDiaria(obtenerFechaLocal()); cargarTendenciaCobro(); }
   if (nombre === "clientes") cargarClientes();

@@ -132,6 +132,17 @@ Deno.serve(async (req) => {
       await admin.from("rutas").update({ cobrador_id: idUsuarioCobrador }).in("id", ruta_ids).eq("negocio_id", negocio_id);
     }
 
+    // Guardamos también un "perfil" (nombre + correo) legible desde la
+    // app — el user_metadata de Auth que ya llenamos arriba NO se puede
+    // leer desde el navegador, así que sin esto la lista de cobradores
+    // no tendría forma de mostrar quién es quién.
+    await admin.from("perfiles").upsert({
+      id: idUsuarioCobrador,
+      negocio_id,
+      nombre: nombre ?? correo,
+      correo,
+    });
+
     return respuesta({ ok: true, user_id: idUsuarioCobrador, miembro_id: miembro.id });
   } catch (excepcion) {
     return respuesta({ error: "Error inesperado: " + (excepcion as Error).message }, 500);

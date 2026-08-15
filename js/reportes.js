@@ -120,18 +120,18 @@ async function cargarReporteMes() {
     if (totalMesAnterior > 0) {
       const variacion = ((totalMesActual - totalMesAnterior) / totalMesAnterior) * 100;
       const positivo = variacion >= 0;
-      lineasComp.push(`<span class="${positivo ? "variacion-positiva" : "variacion-negativa"}">${positivo ? "📈" : "📉"} ${positivo ? "+" : ""}${variacion.toFixed(1)}% cobrado vs. mes anterior (${formatoPesos(totalMesAnterior)})</span>`);
+      lineasComp.push(`<span class="${positivo ? "variacion-positiva" : "variacion-negativa"}">${positivo ? "+" : ""}${variacion.toFixed(1)}% cobrado vs. mes anterior (${formatoPesos(totalMesAnterior)})</span>`);
     }
     if (gananciaNetaMesAnterior !== 0) {
       const variacionGanancia = ((gananciaNetaMesActualPreview - gananciaNetaMesAnterior) / Math.abs(gananciaNetaMesAnterior)) * 100;
       const positivoGanancia = variacionGanancia >= 0;
-      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">${positivoGanancia ? "📈" : "📉"} ${positivoGanancia ? "+" : ""}${variacionGanancia.toFixed(1)}% ganancia neta vs. mes anterior (${formatoPesos(gananciaNetaMesAnterior)})</span>`);
+      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">${positivoGanancia ? "+" : ""}${variacionGanancia.toFixed(1)}% ganancia neta vs. mes anterior (${formatoPesos(gananciaNetaMesAnterior)})</span>`);
     } else if (gananciaNetaMesActualPreview !== 0) {
       // El mes anterior cerró en $0 exacto (o no había datos) — no se puede
       // calcular un porcentaje sobre una base de $0, así que se muestra el
       // cambio en pesos en vez de un porcentaje sin sentido.
       const positivoGanancia = gananciaNetaMesActualPreview >= 0;
-      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">${positivoGanancia ? "📈" : "📉"} ganancia neta: ${formatoPesos(gananciaNetaMesActualPreview)} (mes anterior cerró en $0)</span>`);
+      lineasComp.push(`<span class="${positivoGanancia ? "variacion-positiva" : "variacion-negativa"}">ganancia neta: ${formatoPesos(gananciaNetaMesActualPreview)} (mes anterior cerró en $0)</span>`);
     }
     if (lineasComp.length) {
       contenedorComp.innerHTML = lineasComp.join("<br>");
@@ -176,13 +176,13 @@ async function cargarReporteMes() {
   // rápido se confunde (fácil pensar "hoy" cuando en realidad se está viendo
   // el mes completo).
   document.getElementById("resumen-mes").innerHTML = `
-    <div class="resumen-banner-periodo">📅 Mostrando: <strong>${etiquetaPeriodo === "el día" ? formatoFecha(inicio) : etiquetaPeriodo}</strong></div>
+    <div class="resumen-banner-periodo">Mostrando: <strong>${etiquetaPeriodo === "el día" ? formatoFecha(inicio) : etiquetaPeriodo}</strong></div>
     <div class="resumen-destacado">
       <div class="resumen-caja ${claseFlujo}"><span class="numero">${flujoNeto >= 0 ? "+" : ""}${formatoPesos(flujoNeto)}</span><span class="etiqueta">Flujo de caja</span><span class="subetiqueta">Cobrado menos gastos en ${etiquetaPeriodo}</span></div>
       <div class="resumen-caja ${claseGanancia}"><span class="numero">${gananciaNeta >= 0 ? "+" : ""}${formatoPesos(gananciaNeta)}</span><span class="etiqueta">Ganancia neta</span><span class="subetiqueta">Utilidad de lo prestado, menos gastos</span></div>
     </div>
     <p class="texto-ayuda">💡 <strong>Flujo de caja</strong> es cuánto efectivo entró y salió (incluye tu propio capital regresando). <strong>Ganancia neta</strong> es la utilidad real de los préstamos entregados en ${etiquetaPeriodo} (interés), sin contar el capital que se presta y regresa. Por eso casi siempre son números distintos.</p>
-    <p class="texto-ayuda">👇 El detalle de desembolso, cobro, gastos y cierre día por día está en "Flujo de caja día por día" más abajo.</p>`;
+    <p class="texto-ayuda">El detalle de desembolso, cobro, gastos y cierre día por día está en "Flujo de caja día por día" más abajo.</p>`;
 
   ultimoReporteExportable = { inicio, fin, etiquetaPeriodo, tipo, esDia: tipo === "dia", totalPrestadoNuevo, totalCobrado, totalGastos, flujoNeto, gananciaBruta, gananciaNeta, pagosPeriodo: pagosPeriodo || [] };
 
@@ -352,7 +352,7 @@ async function cargarLibroDiario(inicio, fin) {
     <div class="resumen-caja tono-peligro"><span class="numero">${formatoPesos(totales.gasto)}</span><span class="etiqueta">Gastos</span></div>
     <div class="resumen-caja ${totales.utilidad >= 0 ? "tono-exito" : "tono-peligro"}"><span class="numero">${formatoPesos(totales.utilidad)}</span><span class="etiqueta">Utilidad del período</span><span class="subetiqueta">${utilidadPctTotal.toFixed(1)}% de lo prestado</span></div>
     <div class="resumen-caja tono-primario"><span class="numero">${formatoPesos(filas[filas.length - 1].cierre)}</span><span class="etiqueta">Cierre del período</span><span class="subetiqueta">Flujo de caja al final de ${formatoFecha(filas[filas.length - 1].fecha)}</span></div>
-    <div class="resumen-caja tono-exito"><span class="numero">${formatoPesos(utilidadHistoricaTotal)}</span><span class="etiqueta">💰 Utilidad total acumulada</span><span class="subetiqueta">De todos los préstamos hechos desde siempre — de aquí saca el dueño las ganancias, no de la caja</span></div>`;
+    <div class="resumen-caja tono-exito"><span class="numero">${formatoPesos(utilidadHistoricaTotal)}</span><span class="etiqueta">Utilidad total acumulada</span><span class="subetiqueta">De todos los préstamos hechos desde siempre — de aquí saca el dueño las ganancias, no de la caja</span></div>`;
 
   await cargarDesglosePorConcepto(inicio, fin);
   if (typeof pintarGraficoUtilidad === "function") pintarGraficoUtilidad(filas);
@@ -472,15 +472,17 @@ async function cargarCarteraEnRiesgo() {
     riesgoPorNivel[nivel].saldo += saldo;
   }
 
+  // El color de la tarjeta (clase) ya distingue el nivel — el texto no
+  // necesita repetirlo con un emoji encima.
   const info = {
-    bueno: { emoji: "🟢", texto: "Al día", clase: "tono-exito" },
-    regular: { emoji: "🟡", texto: "Atraso leve", clase: "tono-advertencia" },
-    riesgoso: { emoji: "🔴", texto: "En riesgo", clase: "tono-peligro" }
+    bueno: { texto: "Al día", clase: "tono-exito" },
+    regular: { texto: "Atraso leve", clase: "tono-advertencia" },
+    riesgoso: { texto: "En riesgo", clase: "tono-peligro" }
   };
   contenedor.innerHTML = ["bueno", "regular", "riesgoso"].map(nivel => `
     <div class="resumen-caja ${info[nivel].clase}">
       <span class="numero">${riesgoPorNivel[nivel].clientes.size}</span>
-      <span class="etiqueta">${info[nivel].emoji} ${info[nivel].texto}</span>
+      <span class="etiqueta">${info[nivel].texto}</span>
       <span class="subetiqueta">${formatoPesos(riesgoPorNivel[nivel].saldo)} en cartera</span>
     </div>`).join("");
 }
@@ -510,7 +512,7 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
   // entraba a Reportes). El botón de arriba lo despliega con un clic.
   contenedor.classList.add("oculto");
   const botonToggle = envoltura.querySelector(".btn-ver-mas-inicio");
-  if (botonToggle) botonToggle.textContent = "👥 Ver clientes del día";
+  if (botonToggle) botonToggle.textContent = "Ver clientes del día";
   contenedor.innerHTML = '<div class="cargando">⏳ Cargando clientes del día...</div>';
 
   const { data: prestamosActivos, error } = await supabaseClient
@@ -540,7 +542,9 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
   const pagadoAcumulado = {};
   (pagosHastaEseDia || []).forEach(pg => pagadoAcumulado[pg.prestamo_id] = (pagadoAcumulado[pg.prestamo_id] || 0) + Number(pg.monto_pagado));
 
-  const etiquetas = { pago: "Pagó ✅", parcial: "Parcial ⚠️", no_pago: "No pagó ❌", pendiente: "Pendiente ⏳" };
+  // La fila entera ya va coloreada según el estado (ver "clases" abajo), así
+  // que el texto del badge no necesita repetir el color con un emoji.
+  const etiquetas = { pago: "Pagó", parcial: "Parcial", no_pago: "No pagó", pendiente: "Pendiente" };
   // Mismos colores que ya usa la pantalla de Cobrar: verde = al día, amarillo
   // = parcial, rojo = no pagó, gris = todavía no se pasa por él — para que el
   // ojo no tenga que aprender un código de colores nuevo.
@@ -598,10 +602,10 @@ async function cargarDetalleClientesDelDia(inicio, fin, esReporteDeUnDia) {
 
   contenedor.innerHTML = `
     <div class="resumen-clientes-dia">
-      <span class="tono-exito-texto">✅ ${cantidadPago} pagaron</span>
-      <span class="tono-advertencia-texto">⚠️ ${cantidadParcial} parcial</span>
-      <span class="tono-peligro-texto">❌ ${cantidadNoPago} no pagaron</span>
-      <span class="tono-pendiente-texto">⏳ ${cantidadPendiente} pendientes</span>
+      <span class="tono-exito-texto">${cantidadPago} pagaron</span>
+      <span class="tono-advertencia-texto">${cantidadParcial} parcial</span>
+      <span class="tono-peligro-texto">${cantidadNoPago} no pagaron</span>
+      <span class="tono-pendiente-texto">${cantidadPendiente} pendientes</span>
     </div>
     ${filasHtml}
     <div class="subtarjeta fila-cliente-dia fila-cliente-dia-total">
@@ -737,7 +741,7 @@ async function cargarRefinanciamientosPeriodo(refinanciados, inicio, fin) {
 
   contenedor.classList.remove("oculto");
   contenedor.innerHTML = `
-    <h4>🔄 Refinanciamientos de este período (${filas.length})</h4>
+    <h4>Refinanciamientos de este período (${filas.length})</h4>
     <div class="resumen-dia" style="margin-bottom:10px;">
       <div class="resumen-caja tono-advertencia"><span class="numero">${formatoPesos(totalRenovado)}</span><span class="etiqueta">Saldo renovado</span><span class="subetiqueta">No es plata nueva en la calle</span></div>
     </div>

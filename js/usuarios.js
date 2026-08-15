@@ -199,14 +199,31 @@ async function cargarListaCobradores() {
   const { data: todosLosPermisos } = await supabaseClient
     .from("permisos_miembro").select("miembro_id, permiso").in("miembro_id", miembros.map(m => m.id));
 
+  // Nombre y correo reales (antes cada tarjeta solo decía "Cobrador", sin
+  // forma de distinguir a uno de otro).
+  const { data: perfiles } = await supabaseClient
+    .from("perfiles").select("id, nombre, correo").in("id", miembros.map(m => m.user_id));
+  const perfilPorUserId = new Map((perfiles || []).map(p => [p.id, p]));
+
+  // Activos primero (con lo que trabajas día a día), luego los
+  // desactivados — y dentro de cada grupo, el más nuevo arriba.
+  const ordenados = [...miembros].sort((a, b) => (b.activo === a.activo ? 0 : b.activo ? 1 : -1));
+  const activos = miembros.filter(m => m.activo).length;
+
+  const resumen = document.createElement("div");
+  resumen.className = "resumen-cobradores";
+  resumen.innerHTML = `<span>${miembros.length} cobrador${miembros.length === 1 ? "" : "es"}</span><span class="punto-separador">·</span><span class="resumen-activos">${activos} activo${activos === 1 ? "" : "s"}</span>`;
+
   cont.innerHTML = "";
-  miembros.forEach(miembro => {
+  cont.appendChild(resumen);
+  ordenados.forEach(miembro => {
     const permisosDeEste = new Set((todosLosPermisos || []).filter(p => p.miembro_id === miembro.id).map(p => p.permiso));
-    cont.appendChild(crearTarjetaCobrador(miembro, permisosDeEste));
+    const perfil = perfilPorUserId.get(miembro.user_id);
+    cont.appendChild(crearTarjetaCobrador(miembro, permisosDeEste, perfil));
   });
 }
 
-function crearTarjetaCobrador(miembro, permisosActivos) {
+function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
   const tarjeta = document.createElement("div");
   tarjeta.className = "tarjeta-cobrador";
 
@@ -216,9 +233,18 @@ function crearTarjetaCobrador(miembro, permisosActivos) {
       <span><b>${p.etiqueta}</b><small>${p.detalle}</small></span>
     </label>`).join("");
 
+  const nombre = escaparHtml(perfil?.nombre || "Cobrador sin nombre");
+  const correo = escaparHtml(perfil?.correo || "");
+  const fechaCreacion = miembro.creado_en
+    ? new Date(miembro.creado_en).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+    : "";
+
   tarjeta.innerHTML = `
     <div class="tarjeta-cobrador-encabezado">
-      <span><b>Cobrador</b><small>${miembro.activo ? "Activo" : "Desactivado"}</small></span>
+      <span>
+        <b>${nombre}</b>
+        <small>${correo}${correo && fechaCreacion ? " · " : ""}${fechaCreacion ? "Desde " + fechaCreacion : ""}</small>
+      </span>
       <button type="button" class="btn-secundario" data-accion="toggle-activo" data-miembro="${miembro.id}" data-activo="${miembro.activo}">
         ${miembro.activo ? "Desactivar" : "Reactivar"}
       </button>

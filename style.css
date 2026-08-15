@@ -1362,22 +1362,6 @@ body.modo-oscuro .badge-riesgo-riesgoso { background: #3a1414; color: #f19c95; }
 .badge-sin-prestamo { background: #eef1f0; color: #7a8985; }
 body.modo-oscuro .badge-prestamo-activo { background: #103524; color: #6ee0a5; }
 body.modo-oscuro .badge-sin-prestamo { background: #263230; color: #9db0ab; }
-/* Punto de color + etiqueta de texto junto al nombre, en vez del emoji de
-   antes: el color nunca aparece solo (para que nadie lo lea como "este
-   préstamo se perdió"), siempre va acompañado de la palabra que dice qué
-   significa ("Riesgoso", "Regular", "Bueno"). */
-.fila-nombre-riesgo { display: flex; align-items: center; gap: 6px; }
-.punto-riesgo { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.punto-riesgo-bueno { background: #0e7d43; }
-.punto-riesgo-regular { background: #92650a; }
-.punto-riesgo-riesgoso { background: #b3261e; }
-.texto-riesgo { font-size: 12px; margin: 1px 0 6px 14px; }
-.texto-riesgo-bueno { color: #0e7d43; }
-.texto-riesgo-regular { color: #92650a; }
-.texto-riesgo-riesgoso { color: #b3261e; }
-body.modo-oscuro .punto-riesgo-bueno, body.modo-oscuro .texto-riesgo-bueno { background: #6ee0a5; color: #6ee0a5; }
-body.modo-oscuro .punto-riesgo-regular, body.modo-oscuro .texto-riesgo-regular { background: #f2cc6b; color: #f2cc6b; }
-body.modo-oscuro .punto-riesgo-riesgoso, body.modo-oscuro .texto-riesgo-riesgoso { background: #f19c95; color: #f19c95; }
 /* La tarjeta completa se atenúa un poco para que, al ver la lista de un
    vistazo, los clientes sin préstamo activo "pesen" visualmente menos que
    los que sí tienen crédito vigente. */
@@ -2244,20 +2228,13 @@ body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador
 }
 .tarjeta-cobrador-encabezado b { font-size: 13.5px; }
 .tarjeta-cobrador-encabezado small {
-  display: inline-block;
+  display: block;
   margin-top: 2px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .02em;
-  background: #e5f7ee;
-  color: #0e7d43;
+  font-size: 11px;
+  color: var(--text-muted);
 }
-.tarjeta-cobrador-encabezado[data-inactivo="true"] small,
-.tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small {
-  background: #eef1f0;
-  color: #7a8985;
+.tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado > span::before {
+  opacity: .5;
 }
 
 .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="true"] {
@@ -2274,6 +2251,22 @@ body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"
 body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="false"] {
   background: #103524; color: #6ee0a5;
 }
+
+/* Resumen arriba de la lista: "3 cobradores · 2 activos" */
+.resumen-cobradores {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eef1f0;
+}
+.resumen-cobradores .punto-separador { opacity: .5; }
+.resumen-cobradores .resumen-activos { color: #0e7d43; font-weight: 600; }
+body.modo-oscuro .resumen-cobradores { border-bottom-color: #26403c; }
+body.modo-oscuro .resumen-cobradores .resumen-activos { color: #6ee0a5; }
 
 /* Subtítulo "Permisos" dentro de cada tarjeta de la lista, arriba de los
    checkboxes (el formulario de "Agregar cobrador" ya trae su propio
@@ -2299,5 +2292,3 @@ body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"
 }
 body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos { border-top-color: #35514d; }
 body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos::before { background: #1e302e; }
-body.modo-oscuro .tarjeta-cobrador-encabezado small { background: #103524; color: #6ee0a5; }
-body.modo-oscuro .tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small { background: #26403c; color: #9db0ab; }

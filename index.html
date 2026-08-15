@@ -152,8 +152,8 @@
           <div id="lista-clientes-pagados"></div>
         </details>
 
-        <details style="margin-top:14px">
-          <summary>🗺️ Organizar rutas</summary>
+        <details id="detalle-organizar-rutas" style="margin-top:14px">
+          <summary>Organizar rutas</summary>
           <form onsubmit="crearRuta(event)" class="tarjeta-form">
             <input type="text" id="ruta-nombre" aria-label="Nombre de la ruta" placeholder="Nombre de la ruta (ej: Barrio Centro)" required>
             <input type="text" id="ruta-descripcion" aria-label="Descripción de la ruta" placeholder="Descripción (opcional)">
@@ -225,7 +225,7 @@
         <div id="resumen-mes"></div>
         <div id="comparacion-mes" class="comparacion-mes oculto"></div>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-cartera-riesgo', this, '⚠️ Ver cartera en riesgo', '⚠️ Ocultar cartera en riesgo')">⚠️ Ver cartera en riesgo</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-cartera-riesgo', this, 'Ver cartera en riesgo', 'Ocultar cartera en riesgo')">Ver cartera en riesgo</button>
         <div id="bloque-cartera-riesgo" class="oculto">
           <p class="texto-ayuda">Así está la cartera de créditos activos <strong>ahora mismo</strong> (no cambia según el período que estés mirando arriba): cuántos clientes y cuánta plata hay en cada nivel, según sus cuotas atrasadas — mismo criterio que ya ves en Clientes.</p>
           <div id="cartera-en-riesgo" class="resumen-destacado"></div>
@@ -235,19 +235,19 @@
         <div id="bloque-refinanciamientos" class="bloque-refinanciamientos oculto"></div>
 
         <div id="detalle-clientes-dia-envoltura" class="oculto">
-          <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('detalle-clientes-dia', this, '👥 Ver clientes del día', '👥 Ocultar clientes del día')">👥 Ver clientes del día</button>
+          <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('detalle-clientes-dia', this, 'Ver clientes del día', 'Ocultar clientes del día')">Ver clientes del día</button>
           <div id="detalle-clientes-dia" class="oculto"></div>
         </div>
 
         <p class="titulo-grupo-config">Detalle y herramientas</p>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-grafico-utilidad', this, '📊 Ver gráfico de utilidad', '📊 Ocultar gráfico de utilidad')">📊 Ver gráfico de utilidad</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-grafico-utilidad', this, 'Ver gráfico de utilidad', 'Ocultar gráfico de utilidad')">Ver gráfico de utilidad</button>
         <div id="bloque-grafico-utilidad" class="oculto">
           <p class="texto-ayuda">Utilidad por día (o por mes, si el período es un año o un rango largo). Toca o mantén presionada una barra para ver el monto exacto.</p>
           <div id="grafico-utilidad-reportes" class="grafico-utilidad"></div>
         </div>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-libro-diario', this, '📒 Ver flujo de caja día por día', '📒 Ocultar flujo de caja día por día')">📒 Ver flujo de caja día por día</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('bloque-libro-diario', this, 'Ver flujo de caja día por día', 'Ocultar flujo de caja día por día')">Ver flujo de caja día por día</button>
         <div id="bloque-libro-diario" class="oculto">
           <p class="texto-ayuda">Cada fila muestra la base con la que empezó ese día ("Base"), cuánto se prestó ("Préstamos"), cuánto se cobró ("Cobro"), los gastos, la utilidad real del día (solo interés, sin contar el capital que vuelve — se cuenta el día en que sale el efectivo, no el día de la primera cuota) y con cuánto cerró ese día ("Cierre" — es la Base del día siguiente). La columna "Utilidad acum." se reinicia a $0 al empezar cada ciclo (configurable en Configuración → Día de corte de utilidad; por defecto el día 1 de cada mes).</p>
           <div class="tabla-libro-diario-envoltura"><div id="libro-diario"></div></div>
@@ -256,17 +256,17 @@
           <div id="libro-diario-totales" class="libro-diario-totales"></div>
         </div>
 
-        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('reportes-exportar', this, '⬇️ Ver exportaciones y respaldo', '⬇️ Ocultar exportaciones y respaldo')">⬇️ Ver exportaciones y respaldo</button>
+        <button type="button" class="btn-ver-mas-inicio" onclick="toggleBloqueReportes('reportes-exportar', this, 'Ver exportaciones y respaldo', 'Ocultar exportaciones y respaldo')">Ver exportaciones y respaldo</button>
         <div id="reportes-exportar" class="oculto">
           <p class="texto-ayuda-export">Este botón baja el reporte que estás viendo arriba, en Excel: el resumen del período y, en su propia hoja, el mismo "Flujo de caja día por día" (base, préstamos, cobro, gasto, <strong>utilidad</strong> y cierre) que ves más abajo en pantalla — con montos formateados como dinero, para que se vea igual de presentable.</p>
-          <button type="button" onclick="exportarReportePeriodoExcel(event)" class="btn-excel">📊 Descargar flujo de caja y utilidad (Excel)</button>
+          <button type="button" onclick="exportarReportePeriodoExcel(event)" class="btn-excel">Descargar flujo de caja y utilidad (Excel)</button>
 
           <details class="detalle-movimientos-dia">
             <summary>▸ Más formas de exportar</summary>
             <p class="texto-ayuda-export">Estas son variantes para casos puntuales — el botón de arriba ya cubre lo que la mayoría necesita.</p>
-            <button type="button" class="btn-exportar-csv" onclick="exportarReporteCSV()">⬇️ Este mismo reporte, en CSV</button>
-            <button type="button" onclick="exportarResumenGeneralExcel(event)" class="btn-excel">📊 Resumen general (histórico completo, sin importar el período)</button>
-            <button type="button" onclick="exportarReporteDiarioExcel(event)" class="btn-excel">📊 Solo el día de hoy (o el día del reporte), con cada cliente</button>
+            <button type="button" class="btn-exportar-csv" onclick="exportarReporteCSV()">Este mismo reporte, en CSV</button>
+            <button type="button" onclick="exportarResumenGeneralExcel(event)" class="btn-excel">Resumen general (histórico completo, sin importar el período)</button>
+            <button type="button" onclick="exportarReporteDiarioExcel(event)" class="btn-excel">Solo el día de hoy (o el día del reporte), con cada cliente</button>
             <div class="exportaciones-csv">
               <button type="button" onclick="exportarCsv('pagos')">Pagos (CSV)</button>
               <button type="button" onclick="exportarCsv('cartera')">Cartera (CSV)</button>
@@ -275,14 +275,14 @@
             <details class="detalle-movimientos-dia">
               <summary>▸ Exportación completa (avanzada, para contabilidad)</summary>
               <p class="texto-ayuda-export">Un solo Excel con las 8 hojas de detalle: Clientes, Préstamos, Pagos, Gastos, Refinanciamientos, Libro diario, etc.</p>
-              <button type="button" onclick="exportarExcel(event)" class="btn-excel">📁 Exportar todo a Excel (.xlsx)</button>
+              <button type="button" onclick="exportarExcel(event)" class="btn-excel">Exportar todo a Excel (.xlsx)</button>
             </details>
           </details>
 
           <div class="bloque-respaldo-tecnico">
-            <p class="titulo-respaldo-tecnico">🔒 Copia de seguridad técnica</p>
+            <p class="titulo-respaldo-tecnico">Copia de seguridad técnica</p>
             <p class="texto-ayuda-export">Tu información ya vive segura en el servidor (Supabase) — esto no reemplaza eso, es una copia <strong>extra</strong> por si algún día necesitas restaurar todo manualmente. Archivo <strong>.json</strong>: no está pensado para abrirlo ni leerlo, solo guárdalo (por ejemplo en Google Drive) y listo.</p>
-            <button onclick="descargarRespaldo()" class="btn-respaldo">⬇️ Descargar copia de seguridad (.json)</button>
+            <button onclick="descargarRespaldo()" class="btn-respaldo">Descargar copia de seguridad (.json)</button>
           </div>
         </div>
 
@@ -294,26 +294,25 @@
         <div class="encabezado-config"><span class="icono-config">⚙</span><div><h3>Configuración</h3><p class="texto-ayuda">Personaliza tu espacio de trabajo y administra la app.</p></div></div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Uso diario</p>
-          <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono">◐</span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-pin" class="fila-config" onclick="configurarPin()"><span class="config-icono">🔒</span><span><b>Bloqueo con PIN</b><small>Pide un PIN cada vez que abras la app</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-push" class="fila-config" onclick="configurarNotificacionesPush()"><span class="config-icono">🔔</span><span><b>Notificaciones push</b><small>Avisa cuando una cuota vence mañana</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="toggleModoOscuro()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.2"/><path d="M10 2.8a7.2 7.2 0 010 14.4z" fill="currentColor" stroke="none"/></svg></span><span><b>Modo oscuro</b><small>Alterna el tema de la aplicación</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-pin" class="fila-config" onclick="configurarPin()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M6.5 9V6a3.5 3.5 0 017 0v3"/></svg></span><span><b>Bloqueo con PIN</b><small>Pide un PIN cada vez que abras la app</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-push" class="fila-config" onclick="configurarNotificacionesPush()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8a5 5 0 0110 0c0 3.5 1.2 4.8 1.2 4.8H3.8S5 11.5 5 8z"/><path d="M8.3 15.5a1.8 1.8 0 003.4 0"/></svg></span><span><b>Notificaciones push</b><small>Avisa cuando una cuota vence mañana</small></span><span class="config-chevron">›</span></button>
         </div>
         <div class="grupo-config">
           <p class="titulo-grupo-config">Gestión</p>
           <button type="button" class="fila-config" data-requiere-permiso="gestionar_usuarios" onclick="abrirGestionUsuarios()">
-            <span class="config-icono">👥</span>
+            <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.8"/><path d="M2.5 17c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="14.5" cy="7.5" r="2.2"/><path d="M13 12.2c2.2.4 3.7 2 3.7 4.8"/></svg></span>
             <span><b>Gestión de usuarios</b><small>Crea cobradores y decide qué puede hacer cada uno</small></span>
             <span class="config-chevron">›</span>
           </button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">▤</span><span><b>Préstamos activos</b><small>Consulta la cartera activa</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos')"><span class="config-icono">⌖</span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono">▥</span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono">🧮</span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono">💰</span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-corte-utilidad" class="fila-config" onclick="configurarDiaCorteUtilidad()"><span class="config-icono">📆</span><span><b>Día de corte de utilidad</b><small id="fila-config-corte-utilidad-detalle">Día 1 de cada mes (por defecto)</small></span><span class="config-chevron">›</span></button>
-          <button type="button" id="fila-config-inicio-semana" class="fila-config" onclick="configurarDiaInicioSemana()"><span class="config-icono">🗓️</span><span><b>Inicio de semana (reporte)</b><small id="fila-config-inicio-semana-detalle">Lunes a domingo (por defecto)</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos', false, { abrirRutas: true })"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h4a3 3 0 003-3v0a3 3 0 00-3-3H9a3 3 0 01-3-3v0a3 3 0 013-3h4"/></svg></span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M6.5 5.5h7M6.5 9h.01M10 9h.01M13.5 9h.01M6.5 12h.01M10 12h.01M13.5 12v3M6.5 15h4"/></svg></span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-capital" class="fila-config" onclick="configurarCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="15" height="10.5" rx="1.5"/><path d="M2.5 8.5h15"/><circle cx="14" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span><span><b>Cartera / capital inicial</b><small id="fila-config-capital-detalle">Con cuánto empezaste a operar el negocio</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-corte-utilidad" class="fila-config" onclick="configurarDiaCorteUtilidad()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/></svg></span><span><b>Día de corte de utilidad</b><small id="fila-config-corte-utilidad-detalle">Día 1 de cada mes (por defecto)</small></span><span class="config-chevron">›</span></button>
+          <button type="button" id="fila-config-inicio-semana" class="fila-config" onclick="configurarDiaInicioSemana()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="13" rx="1.5"/><path d="M3 8h14M7 2.5v3M13 2.5v3M7 12h6"/></svg></span><span><b>Inicio de semana (reporte)</b><small id="fila-config-inicio-semana-detalle">Lunes a domingo (por defecto)</small></span><span class="config-chevron">›</span></button>
           <div class="fila-config fila-config-select">
-            <span class="config-icono">📊</span>
+            <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span>
             <span><b>Reporte por defecto</b><small>Con cuál se abre Reportes cada vez</small></span>
             <select id="config-reporte-tipo-defecto" aria-label="Tipo de reporte por defecto" onchange="guardarTipoReporteDefecto(this.value)">
               <option value="dia">Diario</option>
@@ -323,13 +322,13 @@
               <option value="rango">Rango de fechas</option>
             </select>
           </div>
-          <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono">🔄</span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
+          <button type="button" class="fila-config" onclick="recalcularCajaDesdeCapitalInicial()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 5v4h-4M4 15v-4h4"/><path d="M5 8a6 6 0 019.5-3.2M15 12a6 6 0 01-9.5 3.2"/></svg></span><span><b>Recalcular caja con capital inicial</b><small>Ajusta los días de caja no cerrados desde la fecha de tu capital inicial</small></span><span class="config-chevron">›</span></button>
         </div>
         <div id="grupo-config-plataforma" class="grupo-config oculto">
           <p class="titulo-grupo-config">Plataforma</p>
           <button type="button" class="fila-config" onclick="abrirFormularioNuevoNegocio()">
-            <span class="config-icono">🏢</span>
-            <span><b>Crear cliente nuevo</b><small>Da de alta un negocio aparte, con acceso propio y datos separados</small></span>
+            <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="9" height="14" rx="1"/><path d="M7 6h.01M10 6h.01M7 9h.01M10 9h.01M7 12h.01M10 12h.01"/><path d="M13 8h3v9h-3"/></svg></span>
+            <span><b>Crear negocio nuevo</b><small>Da de alta un negocio aparte, con acceso propio y datos separados — solo para ti como administrador de la plataforma</small></span>
             <span class="config-chevron">›</span>
           </button>
         </div>
