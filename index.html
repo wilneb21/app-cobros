@@ -199,7 +199,7 @@
 
         <div id="tarjeta-capital-inicial" class="tarjeta-capital-inicial oculto">
           <div><span class="etiqueta-capital-inicial">Cartera inicial</span><strong id="capital-inicial-monto">$0</strong><small id="capital-inicial-fecha"></small></div>
-          <button type="button" class="link-editar-base" onclick="configurarCapitalInicial()" title="Corregir cartera inicial">✏️</button>
+          <button type="button" class="link-editar-base" onclick="configurarCapitalInicial()" title="Corregir cartera inicial">Editar</button>
         </div>
 
         <select id="reporte-tipo" aria-label="Tipo de reporte" onchange="cambiarTipoReporte()">
@@ -299,11 +299,9 @@
           <p class="titulo-grupo-config">Gestión</p>
           <button type="button" class="fila-config" data-requiere-permiso="gestionar_usuarios" onclick="abrirGestionUsuarios()">
             <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.8"/><path d="M2.5 17c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="14.5" cy="7.5" r="2.2"/><path d="M13 12.2c2.2.4 3.7 2 3.7 4.8"/></svg></span>
-            <span><b>Gestión de usuarios</b><small>Crea cobradores y decide qué puede hacer cada uno</small></span>
+            <span><b>Gestión de cobradores</b><small>Crea cobradores y decide qué puede hacer cada uno</small></span>
             <span class="config-chevron">›</span>
           </button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('prestamos', false, { abrirRutas: true })"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h4a3 3 0 003-3v0a3 3 0 00-3-3H9a3 3 0 01-3-3v0a3 3 0 013-3h4"/></svg></span><span><b>Rutas</b><small>Organiza tus zonas de cobro</small></span><span class="config-chevron">›</span></button>
-          <button type="button" class="fila-config" onclick="mostrarSeccion('reportes')"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9M10 16V4M16 16v-6"/></svg></span><span><b>Reportes y respaldo</b><small>Revisa resultados y exporta datos</small></span><span class="config-chevron">›</span></button>
           <button type="button" class="fila-config" onclick="editarBaseCaja()"><span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M6.5 5.5h7M6.5 9h.01M10 9h.01M13.5 9h.01M6.5 12h.01M10 12h.01M13.5 12v3M6.5 15h4"/></svg></span><span><b>Corregir base de caja de hoy</b><small>Ajusta el efectivo inicial con el que abrió la caja hoy</small></span><span class="config-chevron">›</span></button>
         </div>
         <div class="grupo-config">
@@ -337,6 +335,11 @@
           <button type="button" class="fila-config" onclick="abrirFormularioNuevoNegocio()">
             <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="9" height="14" rx="1"/><path d="M7 6h.01M10 6h.01M7 9h.01M10 9h.01M7 12h.01M10 12h.01"/><path d="M13 8h3v9h-3"/></svg></span>
             <span><b>Crear negocio nuevo</b><small>Da de alta un negocio aparte, con acceso propio y datos separados — solo para ti como administrador de la plataforma</small></span>
+            <span class="config-chevron">›</span>
+          </button>
+          <button type="button" class="fila-config" onclick="abrirListaNegocios()">
+            <span class="config-icono"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="1.5"/><path d="M6.5 7.5h7M6.5 10.5h7M6.5 13.5h4"/></svg></span>
+            <span><b>Mis clientes</b><small>Los negocios que ya has creado, todos en una lista</small></span>
             <span class="config-chevron">›</span>
           </button>
         </div>
@@ -551,10 +554,18 @@
 
   <div id="modal-usuarios" class="modal-overlay oculto">
     <div class="modal-caja">
-      <div class="detalle-header"><h3>👥 Gestión de usuarios</h3><button class="btn-cerrar-detalle" onclick="cerrarGestionUsuarios()" aria-label="Cerrar gestión de usuarios">✕</button></div>
-      <p class="texto-ayuda">Aquí puedes crear cobradores nuevos y decidir, con checkboxes, qué puede ver o hacer cada uno.</p>
-      <button type="button" style="width:100%;margin-bottom:16px" onclick="abrirFormularioNuevoCobrador()">+ Agregar cobrador</button>
+      <div class="detalle-header"><h3>🧑‍💼 Gestión de cobradores</h3><button class="btn-cerrar-detalle" onclick="cerrarGestionUsuarios()" aria-label="Cerrar gestión de cobradores">✕</button></div>
+      <p class="texto-ayuda">Toca un cobrador para ver o cambiar sus permisos.</p>
+      <button type="button" onclick="abrirFormularioNuevoCobrador()">+ Agregar cobrador</button>
       <div id="lista-cobradores"></div>
+    </div>
+  </div>
+
+  <div id="modal-negocios" class="modal-overlay oculto">
+    <div class="modal-caja">
+      <div class="detalle-header"><h3>📋 Mis clientes</h3><button class="btn-cerrar-detalle" onclick="cerrarModalConHistorial('modal-negocios')" aria-label="Cerrar lista de clientes">✕</button></div>
+      <p class="texto-ayuda">Los negocios que has creado al vender la app, cada uno con acceso y datos separados.</p>
+      <div id="lista-negocios"></div>
     </div>
   </div>
 </body>

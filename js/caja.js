@@ -177,24 +177,35 @@ async function cargarCajaDiaria(fecha) {
       }).join("")}
     </div>`;
 
+  // --- APORTES Y RETIROS: el título grande "Aportes y retiros propios" no
+  // hacía falta — con que los botones digan claramente "Aporte" y "Retiro"
+  // ya se entiende. El total del día (si no es $0) se muestra junto a la
+  // lista, sin encabezado extra.
+  const mostrarBotonesAporte = esHoy && caja.data && (automatica || !hayConteo);
+  const seccionAportes = (!esHoy && listaAportes.length === 0) ? "" : `
+    <div class="caja-aportes-seccion">
+      ${aportesDia !== 0 ? `<div class="caja-aportes-total">Aportes y retiros: <b class="${aportesDia < 0 ? "tono-peligro-texto" : "tono-exito-texto"}">${aportesDia < 0 ? "-" : "+"}${formatoPesos(Math.abs(aportesDia))}</b></div>` : ""}
+      ${listaAportesHtml}
+      ${mostrarBotonesAporte ? `
+        <div class="fila-botones-aporte">
+          <button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Aporte</button>
+          <button type="button" class="btn-aporte-propio btn-retiro-aporte" onclick="retirarAportePropio()">🔻 Retiro</button>
+        </div>` : ""}
+    </div>`;
+
   contenedor.innerHTML = `
     <div class="caja-cabecera"><div><span>Caja diaria</span><strong>${!caja.data ? "Sin abrir" : !esHoy ? "Cerrada" : automatica ? (hayConteo ? "🧮 Automática · ✅ Verificada hoy" : "🧮 Automática · ⏳ Sin verificar hoy") : "Jornada en curso"}</strong></div>${botonAccion}</div>
     <div class="caja-subcabecera">${encabezadoFecha}${botonReabrir}</div>
     ${avisoOffline}
     ${avisoRacha}
-    <div class="caja-metricas"><span>Base <b>${formatoPesos(esperado)}</b></span><span>Cobros <b>${formatoPesos(cobros)}</b></span>${aportesDia !== 0 ? `<span>Aporte propio <b class="${aportesDia < 0 ? "tono-peligro-texto" : ""}">${aportesDia < 0 ? "-" : "+"}${formatoPesos(Math.abs(aportesDia))}</b></span>` : ""}<span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
+    <div class="caja-metricas"><span>Base <b>${formatoPesos(esperado)}</b></span><span>Cobros <b>${formatoPesos(cobros)}</b></span><span>Prestado (efectivo) <b>-${formatoPesos(prestado)}</b></span><span>Gastos <b>-${formatoPesos(gastosDia)}</b></span></div>
     ${hayConteo ? `<div class="caja-total">Contado: <strong>${formatoPesos(cierre)}</strong>${automatica ? ` <small>(al momento de contar — si registras más cobros/gastos después, puede quedar desactualizado)</small>` : ""}</div>` : ""}
     ${hayConteo ? `
       <div class="caja-descuadre ${descuadre === 0 ? "cuadrada" : descuadre > 0 ? "sobrante" : "faltante"}">
         ${descuadre === 0 ? "✅ Caja cuadrada — el conteo físico coincide con lo esperado" : descuadre > 0 ? `🔵 Sobrante de ${formatoPesos(descuadre)} — contaste más efectivo del esperado` : `🔴 Faltante de ${formatoPesos(Math.abs(descuadre))} — contaste menos efectivo del esperado`}
       </div>` : ""}
     ${movimientosHtml}
-    ${listaAportesHtml}
-    ${esHoy && caja.data && (automatica || !hayConteo) ? `
-      <div class="fila-botones-aporte">
-        <button type="button" class="btn-aporte-propio" onclick="agregarAportePropio()">➕ Agregar efectivo propio</button>
-        <button type="button" class="btn-aporte-propio btn-retiro-aporte" onclick="retirarAportePropio()">🔻 Retirar efectivo propio</button>
-      </div>` : ""}`;
+    ${seccionAportes}`;
 }
 
 // El botón "Ver otro día" no es el propio <input type="date"> (que queda

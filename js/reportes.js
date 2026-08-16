@@ -312,22 +312,37 @@ async function cargarLibroDiario(inicio, fin) {
   }
 
   contenedor.innerHTML = `
-    <div class="fila-libro-diario fila-libro-diario-cabecera">
-      <span>Fecha</span><span>Base</span><span>Préstamos</span><span>Cobro</span><span>Gasto</span><span>Aportes</span><span>Utilidad</span><span>Utilidad acum.</span><span>Utilidad %</span><span>Cierre</span>
-    </div>
-    ${filas.map(f => `
-      <div class="fila-libro-diario">
-        <span>${formatoFecha(f.fecha)}</span>
-        <span>${formatoPesos(f.base)}</span>
-        <span>${f.prestado > 0 ? "-" + formatoPesos(f.prestado) : formatoPesos(0)}</span>
-        <span>${formatoPesos(f.cobro)}</span>
-        <span>${f.gasto > 0 ? "-" + formatoPesos(f.gasto) : formatoPesos(0)}</span>
-        <span class="${f.aporte > 0 ? "tono-exito-texto" : f.aporte < 0 ? "tono-peligro-texto" : ""}">${f.aporte === 0 ? formatoPesos(0) : (f.aporte > 0 ? "+" : "") + formatoPesos(f.aporte)}</span>
-        <span class="${f.utilidad >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidad)}</span>
-        <span class="${f.utilidadAcumulada >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidadAcumulada)}</span>
-        <span>${f.utilidadPct.toFixed(1)}%</span>
-        <span><b>${formatoPesos(f.cierre)}</b></span>
-      </div>`).join("")}`;
+    <table class="tabla-libro-diario">
+      <thead>
+        <tr>
+          <th class="col-fecha-libro">Fecha</th>
+          <th>Base</th>
+          <th>Préstamos</th>
+          <th>Cobro</th>
+          <th>Gasto</th>
+          <th>Aportes/<br>Retiros</th>
+          <th>Utilidad</th>
+          <th>Utilidad<br>acum.</th>
+          <th>Utilidad<br>%</th>
+          <th>Cierre</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map(f => `
+          <tr>
+            <td class="col-fecha-libro">${formatoFecha(f.fecha)}</td>
+            <td>${formatoPesos(f.base)}</td>
+            <td class="${f.prestado > 0 ? "tono-peligro-texto" : ""}">${f.prestado > 0 ? "-" + formatoPesos(f.prestado) : formatoPesos(0)}</td>
+            <td class="tono-exito-texto">${formatoPesos(f.cobro)}</td>
+            <td class="${f.gasto > 0 ? "tono-peligro-texto" : ""}">${f.gasto > 0 ? "-" + formatoPesos(f.gasto) : formatoPesos(0)}</td>
+            <td class="${f.aporte > 0 ? "tono-exito-texto" : f.aporte < 0 ? "tono-peligro-texto" : ""}">${f.aporte === 0 ? formatoPesos(0) : (f.aporte > 0 ? "+" : "") + formatoPesos(f.aporte)}</td>
+            <td class="${f.utilidad >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidad)}</td>
+            <td class="${f.utilidadAcumulada >= 0 ? "tono-exito-texto" : "tono-peligro-texto"}">${formatoPesos(f.utilidadAcumulada)}</td>
+            <td>${f.utilidadPct.toFixed(1)}%</td>
+            <td class="col-cierre-libro"><b>${formatoPesos(f.cierre)}</b></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
 
   // Lista de "¿para qué fue?" de cada aporte/retiro del período — la tabla de
   // arriba solo muestra el monto por día, aquí se ve el detalle con su nota.

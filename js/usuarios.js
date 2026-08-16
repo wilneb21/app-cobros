@@ -164,6 +164,70 @@ async function crearNegocioClienteNuevo() {
   }
 }
 
+// ---------- PANTALLA "MIS CLIENTES" (lista de negocios creados) ----------
+
+async function abrirListaNegocios() {
+  document.getElementById("modal-negocios").classList.remove("oculto");
+  empujarEstadoModal("modal-negocios");
+  await cargarListaNegocios();
+}
+
+async function cargarListaNegocios() {
+  const cont = document.getElementById("lista-negocios");
+  cont.innerHTML = `<div class="cargando">⏳ Cargando...</div>`;
+
+  const { data, error } = await supabaseClient.functions.invoke("listar-negocios-cliente");
+
+  if (error) {
+    let detalle = error.message;
+    try {
+      const cuerpo = await error.context.json();
+      if (cuerpo?.error) detalle = cuerpo.error;
+    } catch { /* nos quedamos con el mensaje genérico */ }
+    cont.innerHTML = `<p class="texto-ayuda">No se pudo cargar la lista: ${escaparHtml(detalle)}</p>`;
+    return;
+  }
+  if (data?.error) {
+    cont.innerHTML = `<p class="texto-ayuda">${escaparHtml(data.error)}</p>`;
+    return;
+  }
+
+  const negocios = data?.negocios || [];
+  if (!negocios.length) {
+    cont.innerHTML = `<p class="texto-ayuda">Todavía no has creado ningún cliente. Usa "Crear negocio nuevo" para el primero.</p>`;
+    return;
+  }
+
+  const resumen = document.createElement("div");
+  resumen.className = "resumen-cobradores";
+  resumen.innerHTML = `<span>${negocios.length} negocio${negocios.length === 1 ? "" : "s"} creado${negocios.length === 1 ? "" : "s"}</span>`;
+
+  cont.innerHTML = "";
+  cont.appendChild(resumen);
+  negocios.forEach(n => cont.appendChild(crearTarjetaNegocio(n)));
+}
+
+function crearTarjetaNegocio(n) {
+  const tarjeta = document.createElement("div");
+  tarjeta.className = "tarjeta-negocio";
+  const fecha = n.creado_en
+    ? new Date(n.creado_en).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+    : "";
+  tarjeta.innerHTML = `
+    <div class="tarjeta-negocio-encabezado">
+      <span class="tarjeta-negocio-icono">🏢</span>
+      <span>
+        <b>${escaparHtml(n.nombre || n.dueño_nombre || "Negocio sin nombre")}</b>
+        <small>${escaparHtml(n.dueño_correo || "sin correo")}${fecha ? " · Desde " + fecha : ""}</small>
+      </span>
+    </div>
+    <div class="tarjeta-negocio-pie">
+      <span>👤 ${escaparHtml(n.dueño_nombre || "Dueño sin nombre")}</span>
+      <span>🧑‍💼 ${n.total_cobradores} cobrador${n.total_cobradores === 1 ? "" : "es"} (${n.cobradores_activos} activo${n.cobradores_activos === 1 ? "" : "s"})</span>
+    </div>`;
+  return tarjeta;
+}
+
 // ---------- PANTALLA "GESTIÓN DE USUARIOS" ----------
 
 async function abrirGestionUsuarios() {
@@ -224,8 +288,8 @@ async function cargarListaCobradores() {
 }
 
 function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
-  const tarjeta = document.createElement("div");
-  tarjeta.className = "tarjeta-cobrador";
+  const detalle = document.createElement("details");
+  detalle.className = "tarjeta-cobrador";
 
   const checkboxesHtml = CATALOGO_PERMISOS.map(p => `
     <label class="fila-permiso">
@@ -239,27 +303,36 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
     ? new Date(miembro.creado_en).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
     : "";
 
-  tarjeta.innerHTML = `
-    <div class="tarjeta-cobrador-encabezado">
-      <span>
-        <b>${nombre}</b>
+  // Solo el nombre queda visible en la lista (con un punto de color según
+  // esté activo/desactivado) — todo lo demás (correo, permisos, el botón
+  // de desactivar) se ve al tocar el nombre, para que la lista no se
+  // sienta interminable apenas tienes varios cobradores.
+  detalle.innerHTML = `
+    <summary class="tarjeta-cobrador-resumen">
+      <span class="punto-estado-cobrador ${miembro.activo ? "activo" : "inactivo"}" title="${miembro.activo ? "Activo" : "Desactivado"}"></span>
+      <b>${nombre}</b>
+      <span class="tarjeta-cobrador-flecha">›</span>
+    </summary>
+    <div class="tarjeta-cobrador-cuerpo">
+      <div class="tarjeta-cobrador-encabezado">
         <small>${correo}${correo && fechaCreacion ? " · " : ""}${fechaCreacion ? "Desde " + fechaCreacion : ""}</small>
-      </span>
-      <button type="button" class="btn-secundario" data-accion="toggle-activo" data-miembro="${miembro.id}" data-activo="${miembro.activo}">
-        ${miembro.activo ? "Desactivar" : "Reactivar"}
-      </button>
-    </div>
-    <div class="tarjeta-cobrador-permisos">${checkboxesHtml}</div>`;
+        <button type="button" class="btn-secundario" data-accion="toggle-activo" data-miembro="${miembro.id}" data-activo="${miembro.activo}">
+          ${miembro.activo ? "Desactivar" : "Reactivar"}
+        </button>
+      </div>
+      <p class="titulo-grupo-config" style="margin-top:10px">Permisos</p>
+      <div class="tarjeta-cobrador-permisos">${checkboxesHtml}</div>
+    </div>`;
 
-  tarjeta.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+  detalle.querySelectorAll('input[type="checkbox"]').forEach(chk => {
     chk.addEventListener("change", () => cambiarPermisoCobrador(chk.dataset.miembro, chk.dataset.permiso, chk.checked));
   });
-  tarjeta.querySelector('[data-accion="toggle-activo"]').addEventListener("click", (e) => {
+  detalle.querySelector('[data-accion="toggle-activo"]').addEventListener("click", (e) => {
     const btn = e.currentTarget;
     cambiarEstadoCobrador(btn.dataset.miembro, btn.dataset.activo !== "true");
   });
 
-  return tarjeta;
+  return detalle;
 }
 
 // Prender/apagar un permiso puntual. No necesita Edge Function: la
