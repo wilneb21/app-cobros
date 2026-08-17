@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     // Perfil legible (nombre + correo), igual que se hace para cada
     // cobrador — así "Gestión de usuarios" puede mostrar quién es quién
     // sin depender de auth.users, que el navegador no puede leer.
-    await admin.from("perfiles").upsert({
+    const { error: errorPerfil } = await admin.from("perfiles").upsert({
       id: idDueño,
       negocio_id: negocio.id,
       nombre: nombre_negocio ?? correo,
@@ -103,7 +103,9 @@ Deno.serve(async (req) => {
       negocio_id: negocio.id,
       user_id: idDueño,
       correo,
-      mensaje: "Negocio creado. Ya puedes entregarle el correo y la contraseña a tu cliente.",
+      mensaje: errorPerfil
+        ? "Negocio creado, pero no se pudo guardar el nombre/correo del dueño (va a aparecer 'sin nombre' en Mis clientes): " + errorPerfil.message
+        : "Negocio creado. Ya puedes entregarle el correo y la contraseña a tu cliente.",
     });
   } catch (excepcion) {
     return respuesta({ error: "Error inesperado: " + (excepcion as Error).message }, 500);

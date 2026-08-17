@@ -136,12 +136,23 @@ Deno.serve(async (req) => {
     // app — el user_metadata de Auth que ya llenamos arriba NO se puede
     // leer desde el navegador, así que sin esto la lista de cobradores
     // no tendría forma de mostrar quién es quién.
-    await admin.from("perfiles").upsert({
+    const { error: errorPerfil } = await admin.from("perfiles").upsert({
       id: idUsuarioCobrador,
       negocio_id,
       nombre: nombre ?? correo,
       correo,
     });
+    if (errorPerfil) {
+      // No revertimos la creación del cobrador por esto (ya puede iniciar
+      // sesión perfectamente) — pero si esto falla, la lista lo muestra
+      // como "Cobrador sin nombre", así que es importante saber por qué.
+      return respuesta({
+        ok: true,
+        user_id: idUsuarioCobrador,
+        miembro_id: miembro.id,
+        advertencia: "El cobrador se creó y ya puede iniciar sesión, pero no se pudo guardar su nombre/correo: " + errorPerfil.message,
+      });
+    }
 
     return respuesta({ ok: true, user_id: idUsuarioCobrador, miembro_id: miembro.id });
   } catch (excepcion) {

@@ -224,8 +224,44 @@ function crearTarjetaNegocio(n) {
     <div class="tarjeta-negocio-pie">
       <span>👤 ${escaparHtml(n.dueño_nombre || "Dueño sin nombre")}</span>
       <span>🧑‍💼 ${n.total_cobradores} cobrador${n.total_cobradores === 1 ? "" : "es"} (${n.cobradores_activos} activo${n.cobradores_activos === 1 ? "" : "s"})</span>
+      <button type="button" class="btn-secundario" data-accion="editar-negocio">✏️ Editar</button>
     </div>`;
+  tarjeta.querySelector('[data-accion="editar-negocio"]').addEventListener("click", () => {
+    editarPerfilNegocio(n.id, n.dueño_id, n.dueño_nombre || "", n.dueño_correo || "");
+  });
   return tarjeta;
+}
+
+// Corrige el nombre/correo del dueño de un negocio ya creado (hace falta
+// sobre todo para los que quedaron "sin nombre" por el mismo bug que
+// tenían los cobradores).
+async function editarPerfilNegocio(negocioId, dueñoId, nombreActual, correoActual) {
+  const nuevoNombre = prompt("Nombre del negocio/cliente:", nombreActual);
+  if (nuevoNombre === null) return;
+  const nuevoCorreo = prompt("Correo del dueño (solo para mostrarlo en la lista, no cambia el correo con el que inicia sesión):", correoActual);
+  if (nuevoCorreo === null) return;
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("actualizar-perfil-negocio", {
+      body: { dueño_id: dueñoId, negocio_id: negocioId, nombre: nuevoNombre, correo: nuevoCorreo },
+    });
+    if (error) {
+      let detalle = error.message;
+      try {
+        const cuerpo = await error.context.json();
+        if (cuerpo?.error) detalle = cuerpo.error;
+      } catch { /* nos quedamos con el mensaje genérico */ }
+      mostrarAlerta("No se pudo guardar: " + detalle);
+      return;
+    }
+    if (data?.error) {
+      mostrarAlerta("No se pudo guardar: " + data.error);
+      return;
+    }
+    await cargarListaNegocios();
+  } catch (excepcion) {
+    mostrarAlerta("No se pudo conectar con el servidor: " + excepcion.message);
+  }
 }
 
 // ---------- PANTALLA "GESTIÓN DE USUARIOS" ----------
@@ -294,6 +330,7 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
   const checkboxesHtml = CATALOGO_PERMISOS.map(p => `
     <label class="fila-permiso">
       <input type="checkbox" data-miembro="${miembro.id}" data-permiso="${p.clave}" ${permisosActivos.has(p.clave) ? "checked" : ""}>
+      <span class="check-visual" aria-hidden="true"></span>
       <span><b>${p.etiqueta}</b><small>${p.detalle}</small></span>
     </label>`).join("");
 
@@ -316,8 +353,14 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
     <div class="tarjeta-cobrador-cuerpo">
       <div class="tarjeta-cobrador-encabezado">
         <small>${correo}${correo && fechaCreacion ? " · " : ""}${fechaCreacion ? "Desde " + fechaCreacion : ""}</small>
+        <button type="button" class="btn-secundario" data-accion="editar-nombre" data-miembro-user="${miembro.user_id}">
+          ✏️ Nombre
+        </button>
         <button type="button" class="btn-secundario" data-accion="toggle-activo" data-miembro="${miembro.id}" data-activo="${miembro.activo}">
           ${miembro.activo ? "Desactivar" : "Reactivar"}
+        </button>
+        <button type="button" class="btn-secundario btn-peligro" data-accion="eliminar-cobrador" data-miembro="${miembro.id}" data-nombre="${nombre}">
+          🗑️ Eliminar
         </button>
       </div>
       <p class="titulo-grupo-config" style="margin-top:10px">Permisos</p>
@@ -331,8 +374,66 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
     const btn = e.currentTarget;
     cambiarEstadoCobrador(btn.dataset.miembro, btn.dataset.activo !== "true");
   });
+  detalle.querySelector('[data-accion="editar-nombre"]').addEventListener("click", (e) => {
+    editarNombreCobrador(e.currentTarget.dataset.miembroUser, perfil?.nombre || "", perfil?.correo || correo);
+  });
+  detalle.querySelector('[data-accion="eliminar-cobrador"]').addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    eliminarCobrador(btn.dataset.miembro, btn.dataset.nombre);
+  });
 
   return detalle;
+}
+
+// Permite ponerle (o corregirle) el nombre y correo a un cobrador que ya
+// existe — hace falta sobre todo para los que se crearon antes de que
+// esto se guardara bien y quedaron como "Cobrador sin nombre".
+async function editarNombreCobrador(userId, nombreActual, correoActual) {
+  const nuevoNombre = prompt("Nombre del cobrador:", nombreActual || "");
+  if (nuevoNombre === null) return; // canceló
+  const nuevoCorreo = prompt("Correo del cobrador (solo para mostrarlo en la lista, no cambia el correo con el que inicia sesión):", correoActual || "");
+  if (nuevoCorreo === null) return; // canceló
+
+  const { error } = await supabaseClient
+    .from("perfiles")
+    .upsert({ id: userId, negocio_id: window.sesionActual.negocioId, nombre: nuevoNombre.trim() || null, correo: nuevoCorreo.trim() || null });
+
+  if (error) {
+    mostrarAlerta("No se pudo guardar: " + error.message);
+    return;
+  }
+  await cargarListaCobradores();
+}
+
+// Elimina POR COMPLETO a un cobrador (cuenta, permisos, vínculo con el
+// negocio). Es distinto de "Desactivar": esto no se puede deshacer, así
+// que primero se confirma con el usuario.
+async function eliminarCobrador(miembroId, nombre) {
+  const confirmado = confirm(`¿Eliminar a "${nombre}" por completo?\n\nEsto borra su acceso, sus permisos y su cuenta. No se puede deshacer. Si solo quieres quitarle el acceso por ahora, usa "Desactivar" en vez de esto.`);
+  if (!confirmado) return;
+
+  try {
+    const { data, error } = await supabaseClient.functions.invoke("eliminar-cobrador", {
+      body: { miembro_id: miembroId },
+    });
+    if (error) {
+      let detalle = error.message;
+      try {
+        const cuerpo = await error.context.json();
+        if (cuerpo?.error) detalle = cuerpo.error;
+      } catch { /* nos quedamos con el mensaje genérico si no se puede leer el detalle */ }
+      mostrarAlerta("No se pudo eliminar: " + detalle);
+      return;
+    }
+    if (data?.error) {
+      mostrarAlerta("No se pudo eliminar: " + data.error);
+      return;
+    }
+    mostrarAlerta(`✅ "${nombre}" fue eliminado.`);
+    await cargarListaCobradores();
+  } catch (excepcion) {
+    mostrarAlerta("No se pudo conectar con el servidor: " + excepcion.message);
+  }
 }
 
 // Prender/apagar un permiso puntual. No necesita Edge Function: la
@@ -359,6 +460,7 @@ function abrirFormularioNuevoCobrador() {
   const checkboxesHtml = CATALOGO_PERMISOS.map(p => `
     <label class="fila-permiso">
       <input type="checkbox" id="permiso-nuevo-${p.clave}" value="${p.clave}">
+      <span class="check-visual" aria-hidden="true"></span>
       <span><b>${p.etiqueta}</b><small>${p.detalle}</small></span>
     </label>`).join("");
 
@@ -418,7 +520,7 @@ async function crearCobradorNuevo() {
     }
 
     cerrarModalGenerico();
-    mostrarAlerta("✅ Cobrador creado. Ya puede iniciar sesión con el correo y contraseña que le diste.");
+    mostrarAlerta(data?.advertencia ? "⚠️ " + data.advertencia : "✅ Cobrador creado. Ya puede iniciar sesión con el correo y contraseña que le diste.");
     await cargarListaCobradores();
   } catch (excepcion) {
     elError.textContent = "No se pudo conectar con el servidor: " + excepcion.message;

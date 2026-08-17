@@ -429,49 +429,6 @@ button.secundario {
   margin-top: 6px;
 }
 
-/* --- "Pendientes por cobrar hoy": tarjeta con badge, no el <details> plano ---
-   Comparte la clase .detalle-movimientos-dia con otros dos bloques (caja y
-   reportes), así que todo esto va con el id único #detalle-pendientes-hoy
-   para no cambiarles el estilo a esos otros. */
-#detalle-pendientes-hoy { margin: 10px 0 6px; }
-#detalle-pendientes-hoy > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--card);
-  border: 1px solid var(--tint-border);
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-weight: 600;
-  font-size: 13.5px;
-  color: var(--text);
-}
-#detalle-pendientes-hoy > summary::-webkit-details-marker { display: none; }
-#detalle-pendientes-hoy .lado-resumen-pendientes { display: flex; align-items: center; gap: 8px; }
-#detalle-pendientes-hoy .badge-pendientes {
-  background: #fdeaea;
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 9px;
-  border-radius: 999px;
-  min-width: 18px;
-  text-align: center;
-}
-#detalle-pendientes-hoy .badge-pendientes.badge-pendientes-cero {
-  background: #e5f7ee;
-  color: #0e7d43;
-}
-#detalle-pendientes-hoy .flecha-resumen-pendientes {
-  color: var(--text-muted);
-  font-size: 15px;
-  transition: transform .2s ease;
-}
-#detalle-pendientes-hoy[open] .flecha-resumen-pendientes { transform: rotate(90deg); }
-body.modo-oscuro #detalle-pendientes-hoy > summary { background: #1e302e; border-color: #35514d; color: #eafffb; }
-body.modo-oscuro #detalle-pendientes-hoy .badge-pendientes { background: rgba(220,38,38,.18); color: #ffb4b4; }
-body.modo-oscuro #detalle-pendientes-hoy .badge-pendientes.badge-pendientes-cero { background: rgba(18,138,92,.18); color: #6ee7b7; }
-
 .fila-movimiento {
   display: flex;
   justify-content: space-between;
@@ -1070,15 +1027,11 @@ body.modo-oscuro .grupo-ruta-titulo { color: #8fe0d0; border-color: #3a4152; }
 .check-destacado { background: #e7f2f0; padding: 10px; border-radius: 9px; margin: 7px 0; }
 .campos-anidados { border-left: 3px solid var(--primary); padding-left: 10px; }
 
-.caja-diaria { margin: 12px 0 2px; border-radius: 14px; overflow: hidden; box-shadow: 0 5px 14px rgba(8,92,82,.06); }
+.caja-diaria { margin: 12px 0 2px; }
 .caja-cabecera { display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: white; padding: 12px 14px; border-radius: 14px 14px 0 0; }
 .caja-cabecera span, .caja-cabecera strong { display: block; font-size: 12px; }.caja-cabecera strong { font-size: 15px; }.caja-cabecera button { width: auto; margin: 0; padding: 7px 10px; font-size: 11px; background: #334155; }
 .btn-contar-caja-auto { width: auto; margin: 0; padding: 7px 10px; font-size: 11px; background: #334155; color: white; border: none; border-radius: 8px; }
 .caja-metricas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: #e2e8f0; }.caja-metricas span { background: var(--card); padding: 9px 12px; font-size: 11px; color: var(--text-muted); }.caja-metricas b { display: block; color: var(--text); font-size: 13px; }
-.caja-aportes-seccion { background: var(--card); border-top: 1px solid rgba(8,92,82,.08); padding: 10px 12px 12px; }
-.caja-aportes-total { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
-.caja-aportes-total b { font-size: 13px; }
-body.modo-oscuro .caja-aportes-seccion { border-top-color: #34384d; }
 .caja-total { background: var(--card); padding: 11px 12px; border-radius: 0 0 14px 14px; font-size: 12px; color: var(--text-muted); }.caja-total strong { color: var(--success); }.caja-aviso { background: #fff9e6; padding: 10px; border-radius: 10px; font-size: 12px; color: #6b5a00; }
 
 .tarjeta-cuenta { display: flex; align-items: center; gap: 8px; border-left: 4px solid var(--primary); position: relative; }.tarjeta-cuenta-contenido { display: flex; flex: 1; min-width: 0; justify-content: space-between; align-items: center; cursor: pointer; }.cuenta-saldo { text-align: right; }.cuenta-saldo small, .cuenta-saldo span { display: block; font-size: 10px; color: var(--text-muted); }.cuenta-saldo b { display: block; color: var(--primary-dark); font-size: 15px; }
@@ -1527,26 +1480,10 @@ body.modo-oscuro .caja-descuadre.faltante { background: #3a1414; }
 
 .caja-subcabecera { background: var(--card); padding: 4px 12px; font-size: 11px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .link-ver-otro-dia { background: none; border: none; color: var(--primary); font-size: 11px; padding: 2px 0; text-decoration: underline; cursor: pointer; }
-
-/* "Ver otro día" en Caja: el botón visible llama a abrirSelectorOtroDia(),
-   que abre por código el <input type="date"> de aquí abajo — se mantiene
-   fuera de la vista pero "renderizado" (no display:none), que es lo que
-   piden los navegadores para poder abrirlo con showPicker(). */
-.wrapper-otro-dia { position: relative; display: inline-block; }
-.wrapper-otro-dia .input-fecha-otro-dia {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  border: 0;
-  padding: 0;
-  margin: -1px;
-}
 .caja-fecha-vista { font-weight: 700; color: var(--text-muted); }
 .caja-aviso-offline { background: #fff9e6; color: #6b5a00; font-size: 11px; padding: 8px 10px; margin: 0; }
-.link-editar-base { background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--primary); padding: 0 0 0 4px; text-decoration: underline; }
-.caja-lista-aportes { padding: 2px 0 4px; }
+.link-editar-base { background: none; border: none; cursor: pointer; font-size: 11px; padding: 0 0 0 4px; }
+.caja-lista-aportes { background: var(--card); padding: 4px 12px 8px; }
 .fila-aporte { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); padding: 3px 0; }
 .acciones-aporte span { cursor: pointer; padding: 0 4px; }
 body.modo-oscuro .caja-subcabecera { border-color: #34384d; }
@@ -1715,59 +1652,9 @@ body.modo-oscuro .grupo-prestamo-historial { border-color: #34384d; }
 .tabla-libro-diario-envoltura {
   overflow-x: auto;
   border-radius: 14px;
-  border: 1px solid rgba(8,92,82,.1);
+  border: 1px solid rgba(8,92,82,.08);
   margin-bottom: 10px;
-  box-shadow: 0 5px 14px rgba(8,92,82,.05);
 }
-.tabla-libro-diario {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-}
-.tabla-libro-diario th, .tabla-libro-diario td {
-  padding: 9px 11px;
-  text-align: right;
-  white-space: nowrap;
-}
-.tabla-libro-diario thead th {
-  background: rgba(8,92,82,.09);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .3px;
-  line-height: 1.35;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-.tabla-libro-diario tbody tr:nth-child(even) { background: rgba(8,92,82,.025); }
-.tabla-libro-diario tbody tr:hover { background: rgba(8,92,82,.06); }
-.tabla-libro-diario tbody td { border-bottom: 1px solid rgba(8,92,82,.06); }
-.tabla-libro-diario tbody tr:last-child td { border-bottom: none; }
-.col-fecha-libro {
-  text-align: left;
-  font-weight: 700;
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--card);
-  box-shadow: 1px 0 0 rgba(8,92,82,.1);
-}
-.tabla-libro-diario thead .col-fecha-libro { z-index: 3; background: rgba(8,92,82,.09); }
-.tabla-libro-diario tbody tr:nth-child(even) .col-fecha-libro { background: #f4f9f8; }
-.col-cierre-libro { background: rgba(8,92,82,.045); font-weight: 800; }
-body.modo-oscuro .tabla-libro-diario thead th { background: #262b45; }
-body.modo-oscuro .tabla-libro-diario thead .col-fecha-libro { background: #262b45; }
-body.modo-oscuro .tabla-libro-diario tbody tr:nth-child(even) { background: rgba(255,255,255,.03); }
-body.modo-oscuro .tabla-libro-diario tbody tr:nth-child(even) .col-fecha-libro { background: #1c2033; }
-body.modo-oscuro .col-fecha-libro { background: var(--card); }
-body.modo-oscuro .col-cierre-libro { background: rgba(129,140,248,.08); }
-body.modo-oscuro .tabla-libro-diario tbody td { border-bottom-color: #34384d; }
-body.modo-oscuro .tabla-libro-diario-envoltura { border-color: #34384d; }
-
 .fila-libro-diario {
   display: grid;
   grid-template-columns: 88px 90px 90px 90px 90px 90px 90px 74px 100px 100px;
@@ -2000,91 +1887,12 @@ body.modo-oscuro .opcion-modal-prestar.existente { background: rgba(12,125,112,.
 .perfil-config strong { display: block; font-size: 13px; word-break: break-all; }
 .perfil-config small { color: var(--text-muted); font-size: 11px; }
 body.modo-oscuro .perfil-config { background: #1e302e; border-color: #35514d; }
-/* --- Gestión de cobradores (roles y permisos) --- */
-.tarjeta-cobrador { background: #fff; border: 1px solid #d3e8e3; border-radius: 16px; padding: 14px; margin-bottom: 10px; box-shadow: 0 5px 14px rgba(8,92,82,.05); transition: box-shadow .15s ease, border-color .15s ease; }
-.tarjeta-cobrador:hover { box-shadow: 0 6px 18px rgba(8,92,82,.1); border-color: #b7ddd4; }
-
-/* Cada cobrador es un <details>: en la lista solo se ve el nombre (con un
-   punto de color según esté activo o no) — todo lo demás aparece al
-   tocarlo, para que la lista no se sienta interminable con varios
-   cobradores. */
-.tarjeta-cobrador-resumen {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-.tarjeta-cobrador-resumen::-webkit-details-marker { display: none; }
-.tarjeta-cobrador-resumen b {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.punto-estado-cobrador { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.punto-estado-cobrador.activo { background: #0e7d43; }
-.punto-estado-cobrador.inactivo { background: #b3402e; }
-.tarjeta-cobrador-flecha { margin-left: auto; flex: none; color: var(--text-muted); font-weight: 400; transition: transform .2s ease; }
-.tarjeta-cobrador[open] .tarjeta-cobrador-flecha { transform: rotate(90deg); }
-.tarjeta-cobrador-cuerpo { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef1f0; }
-body.modo-oscuro .tarjeta-cobrador-cuerpo { border-top-color: #35514d; }
-
-.tarjeta-cobrador-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.tarjeta-cobrador-encabezado small {
-  color: var(--text-muted);
-  font-size: 11px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tarjeta-cobrador-encabezado .btn-secundario { flex: none; }
+/* --- Gestión de usuarios (roles y permisos) --- */
+.tarjeta-cobrador { background: #fff; border: 1px solid #d3e8e3; border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: 0 5px 14px rgba(8,92,82,.05); }
+.tarjeta-cobrador-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.tarjeta-cobrador-encabezado b { display: block; font-size: 13px; }
+.tarjeta-cobrador-encabezado small { color: var(--text-muted); font-size: 11px; }
 .tarjeta-cobrador-permisos { display: flex; flex-direction: column; gap: 8px; }
-
-/* Resumen arriba de la lista: "3 cobradores · 2 activos" */
-.resumen-cobradores {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eef1f0;
-}
-.resumen-cobradores .punto-separador { opacity: .5; }
-.resumen-cobradores .resumen-activos { color: #0e7d43; font-weight: 600; }
-body.modo-oscuro .resumen-cobradores { border-bottom-color: #26403c; }
-body.modo-oscuro .resumen-cobradores .resumen-activos { color: #6ee0a5; }
-
-/* --- "Mis clientes": lista de negocios creados --- */
-.tarjeta-negocio {
-  background: var(--card);
-  border: 1px solid #d3e8e3;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 10px;
-}
-.tarjeta-negocio-encabezado { display: flex; align-items: center; gap: 10px; }
-.tarjeta-negocio-icono {
-  width: 34px; height: 34px; flex: none;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 10px; background: #e7f2f0; font-size: 15px;
-}
-.tarjeta-negocio-encabezado b { font-size: 13.5px; display: block; }
-.tarjeta-negocio-encabezado small { font-size: 11px; color: var(--text-muted); }
-.tarjeta-negocio-pie {
-  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
-  margin-top: 10px; padding-top: 10px; border-top: 1px solid #eef1f0;
-  font-size: 11px; color: var(--text-muted);
-}
-body.modo-oscuro .tarjeta-negocio { background: #1e302e; border-color: #35514d; }
-body.modo-oscuro .tarjeta-negocio-icono { background: rgba(12,125,112,.18); }
-body.modo-oscuro .tarjeta-negocio-pie { border-top-color: #26403c; }
 /* --- Fila de permiso: rediseñada con grid (no flex) ---
    El bug que rompía el texto letra por letra venía de aquí: el <span> con
    el título/descripción de cada permiso nunca tenía min-width definido
@@ -2094,7 +1902,7 @@ body.modo-oscuro .tarjeta-negocio-pie { border-top-color: #26403c; }
    sabe exactamente cuánto ancho tiene disponible. */
 .fila-permiso {
   display: grid;
-  grid-template-columns: 20px 1fr;
+  grid-template-columns: minmax(0, 20px) 1fr;
   column-gap: 10px;
   align-items: start;
   padding: 10px 8px;
@@ -2103,14 +1911,43 @@ body.modo-oscuro .tarjeta-negocio-pie { border-top-color: #26403c; }
 }
 .fila-permiso:hover { background: #f2f8f7; }
 .fila-permiso input[type="checkbox"] {
-  grid-column: 1;
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fila-permiso .check-visual {
+  box-sizing: border-box;
   width: 17px;
   height: 17px;
-  margin: 2px 0 0;
-  flex: none;
+  min-width: 17px;
+  max-width: 17px;
+  margin-top: 2px;
+  border: 1.5px solid #c9d6d3;
+  border-radius: 4px;
+  background: #fff;
+  position: relative;
 }
+.fila-permiso input[type="checkbox"]:checked + .check-visual {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.fila-permiso input[type="checkbox"]:checked + .check-visual::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+body.modo-oscuro .fila-permiso .check-visual { background: #1e302e; border-color: #35514d; }
 .fila-permiso > span {
-  grid-column: 2;
   min-width: 0;
   overflow-wrap: normal;
   word-break: normal;
@@ -2118,6 +1955,8 @@ body.modo-oscuro .tarjeta-negocio-pie { border-top-color: #26403c; }
 .fila-permiso b { display: block; font-size: 12px; }
 .fila-permiso small { display: block; color: var(--text-muted); font-size: 10px; margin-top: 1px; }
 .btn-secundario { background: #e7f2f0; color: #085c52; border: none; border-radius: 10px; padding: 7px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.btn-secundario.btn-peligro { background: #fdeaea; color: #b3261e; }
+body.modo-oscuro .btn-secundario.btn-peligro { background: #3a1414; color: #f19c95; }
 body.modo-oscuro .tarjeta-cobrador { background: #1e302e; border-color: #35514d; }
 body.modo-oscuro .fila-permiso:hover { background: #24413d; }
 body.modo-oscuro .btn-secundario { background: #24413d; color: #b7e4da; }
@@ -2240,11 +2079,6 @@ body.modo-oscuro .btn-secundario { background: #24413d; color: #b7e4da; }
 #modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso:last-child {
   border-bottom: none;
 }
-#modal-generico:has(.tarjeta-cobrador-permisos) .fila-permiso input[type="checkbox"] {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--primary);
-}
 
 /* Pie con jerarquía clara: un botón principal, uno secundario (no dos
    verdes idénticos apilados, que es lo que hacía sentir el modal genérico) */
@@ -2297,7 +2131,6 @@ body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador
   width: 92%;
   padding: 0;
   text-align: left;
-  overflow-x: hidden;
 }
 
 #modal-usuarios .detalle-header {
@@ -2337,7 +2170,6 @@ body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador
 
 #lista-cobradores {
   padding: 0 22px 22px;
-  overflow-x: hidden;
 }
 #lista-cobradores .cargando,
 #lista-cobradores .texto-ayuda {
@@ -2370,13 +2202,20 @@ body.modo-oscuro #modal-generico:has(.tarjeta-cobrador-permisos) #nuevo-cobrador
 }
 .tarjeta-cobrador-encabezado b { font-size: 13.5px; }
 .tarjeta-cobrador-encabezado small {
-  display: block;
+  display: inline-block;
   margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: #e5f7ee;
+  color: #0e7d43;
 }
-.tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado > span::before {
-  opacity: .5;
+.tarjeta-cobrador-encabezado[data-inactivo="true"] small,
+.tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small {
+  background: #eef1f0;
+  color: #7a8985;
 }
 
 .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="true"] {
@@ -2393,22 +2232,6 @@ body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"
 body.modo-oscuro .tarjeta-cobrador-encabezado button[data-accion="toggle-activo"][data-activo="false"] {
   background: #103524; color: #6ee0a5;
 }
-
-/* Resumen arriba de la lista: "3 cobradores · 2 activos" */
-.resumen-cobradores {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eef1f0;
-}
-.resumen-cobradores .punto-separador { opacity: .5; }
-.resumen-cobradores .resumen-activos { color: #0e7d43; font-weight: 600; }
-body.modo-oscuro .resumen-cobradores { border-bottom-color: #26403c; }
-body.modo-oscuro .resumen-cobradores .resumen-activos { color: #6ee0a5; }
 
 /* Subtítulo "Permisos" dentro de cada tarjeta de la lista, arriba de los
    checkboxes (el formulario de "Agregar cobrador" ya trae su propio
@@ -2434,3 +2257,29 @@ body.modo-oscuro .resumen-cobradores .resumen-activos { color: #6ee0a5; }
 }
 body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos { border-top-color: #35514d; }
 body.modo-oscuro #modal-usuarios .tarjeta-cobrador-permisos::before { background: #1e302e; }
+body.modo-oscuro .tarjeta-cobrador-encabezado small { background: #103524; color: #6ee0a5; }
+body.modo-oscuro .tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-encabezado small { background: #26403c; color: #9db0ab; }
+/* "Mis clientes" (Configuración → Plataforma) no tenía ningún estilo
+   propio todavía — quedaba como texto plano apilado. Le doy la forma de
+   tarjeta mínima que ya usa el resto de la app. */
+.tarjeta-negocio {
+  background: var(--card);
+  border: 1px solid #e5e9e8;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.tarjeta-negocio-encabezado { display: flex; align-items: center; gap: 10px; }
+.tarjeta-negocio-icono {
+  width: 36px; height: 36px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; background: var(--tint); font-size: 15px;
+}
+.tarjeta-negocio-encabezado b { display: block; font-size: 13.5px; }
+.tarjeta-negocio-encabezado small { color: var(--text-muted); font-size: 11px; }
+.tarjeta-negocio-pie {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 8px; margin-top: 10px; font-size: 11px; color: var(--text-muted);
+}
+.tarjeta-negocio-pie .btn-secundario { margin-left: auto; }
+body.modo-oscuro .tarjeta-negocio { border-color: #2a3634; }

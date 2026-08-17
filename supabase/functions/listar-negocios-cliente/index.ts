@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       const cobradores = (miembros || []).filter((m) => m.negocio_id === n.id);
       return {
         id: n.id,
+        dueño_id: n.dueño_id,
         nombre: n.nombre ?? null,
         dueño_nombre: perfil?.nombre ?? null,
         dueño_correo: perfil?.correo ?? null,
