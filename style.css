@@ -1409,6 +1409,15 @@ body { background: radial-gradient(circle at 100% 0, #e7f2f0 0, transparent 29%)
 .progreso-cobro-cabecera { color: var(--text); font-size: 13px; }.progreso-cobro-cabecera b { color: #0c7d70; font-size: 17px; }
 .progreso-cobro-valores { margin: 13px 0 11px; }.progreso-cobro-valores span:last-child { text-align: right; }.progreso-cobro-valores small, .progreso-cobro-valores b { display: block; }.progreso-cobro-valores small { color: var(--text-muted); font-size: 10px; }.progreso-cobro-valores b { color: var(--text); font-size: 15px; }
 .progreso-cobro-fondo { height: 13px; overflow: hidden; border-radius: 99px; background: #e7f2f0; }.progreso-cobro-fondo div { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0c7d70, #2f9c8c); transition: width .3s ease; }
+
+/* Las dos filas separadas (clientes / dinero) que reemplazan el único %
+   mezclado de antes */
+.progreso-cobro-fila { margin-bottom: 14px; }
+.progreso-cobro-fila-ultima { margin-bottom: 0; }
+.progreso-cobro-fila .progreso-cobro-cabecera { font-size: 12px; color: var(--text-muted); margin-bottom: 7px; }
+.progreso-cobro-fila .progreso-cobro-cabecera b { color: var(--text); font-size: 14px; font-weight: 600; }
+.progreso-cobro-fila .progreso-cobro-cabecera b small { color: var(--text-muted); font-size: 11px; font-weight: 400; }
+.progreso-cobro-fondo.mini { height: 8px; }
 .acciones-rapidas-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
 .acciones-rapidas .accion-rapida { display: block; min-height: 123px; margin: 0; padding: 14px; color: var(--text); text-align: left; border: 1px solid transparent; box-shadow: none; }
 .accion-rapida span, .accion-rapida b, .accion-rapida small { display: block; }.accion-rapida span { display: grid; place-items: center; width: 38px; height: 38px; margin-bottom: 10px; border-radius: 12px; font-size: 21px; }.accion-rapida b { font-size: 12px; }.accion-rapida small { margin-top: 3px; color: var(--text-muted); font-size: 9px; font-weight: 500; }
@@ -1479,6 +1488,21 @@ body.modo-oscuro .caja-descuadre.sobrante { background: #17233f; }
 body.modo-oscuro .caja-descuadre.faltante { background: #3a1414; }
 
 .caja-subcabecera { background: var(--card); padding: 4px 12px; font-size: 11px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wrapper-otro-dia { position: relative; display: inline-flex; }
+/* El <input type="date"> real se queda invisible: solo sirve para que el
+   navegador abra su calendario nativo cuando el botón "Ver otro día" lo
+   activa por código (ver abrirSelectorOtroDia() en caja.js). Antes faltaba
+   este CSS, así que se veían los dos controles de fecha a la vez. */
+.input-fecha-otro-dia {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
+  padding: 0;
+  pointer-events: none;
+}
 .link-ver-otro-dia { background: none; border: none; color: var(--primary); font-size: 11px; padding: 2px 0; text-decoration: underline; cursor: pointer; }
 .caja-fecha-vista { font-weight: 700; color: var(--text-muted); }
 .caja-aviso-offline { background: #fff9e6; color: #6b5a00; font-size: 11px; padding: 8px 10px; margin: 0; }
@@ -2268,18 +2292,45 @@ body.modo-oscuro .tarjeta-cobrador:has([data-activo="false"]) .tarjeta-cobrador-
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 10px;
+  overflow: hidden;
 }
-.tarjeta-negocio-encabezado { display: flex; align-items: center; gap: 10px; }
+.tarjeta-negocio-encabezado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tarjeta-negocio-icono {
   width: 36px; height: 36px; flex: none;
   display: flex; align-items: center; justify-content: center;
   border-radius: 10px; background: var(--tint); font-size: 15px;
 }
-.tarjeta-negocio-encabezado b { display: block; font-size: 13.5px; }
-.tarjeta-negocio-encabezado small { color: var(--text-muted); font-size: 11px; }
+.tarjeta-negocio-info { flex: 1 1 130px; min-width: 0; }
+.tarjeta-negocio-encabezado b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tarjeta-negocio-encabezado small { display: block; color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tarjeta-negocio-pie {
   display: flex; align-items: center; flex-wrap: wrap;
   gap: 8px; margin-top: 10px; font-size: 11px; color: var(--text-muted);
 }
 .tarjeta-negocio-pie .btn-secundario { margin-left: auto; }
 body.modo-oscuro .tarjeta-negocio { border-color: #2a3634; }
+
+/* --- Suscripción de cada negocio (Configuración → Plataforma → Mis clientes) --- */
+.tarjeta-negocio-suscripcion { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eef1f0; }
+.pill-estado {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+  background: #e5f7ee; color: #0e7d43;
+}
+.pill-estado.pill-inactivo { background: #fdeaea; color: #b3261e; }
+.pill-estado.pill-alerta { background: #fff4e0; color: #b45309; }
+.tarjeta-negocio-suscripcion-botones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tarjeta-negocio-suscripcion-botones .btn-secundario { flex: 1 1 auto; white-space: nowrap; }
+body.modo-oscuro .tarjeta-negocio-suscripcion { border-color: #2a3634; }
+body.modo-oscuro .pill-estado { background: #103524; color: #6ee0a5; }
+body.modo-oscuro .pill-estado.pill-inactivo { background: #3a1414; color: #f19c95; }
+body.modo-oscuro .pill-estado.pill-alerta { background: #3a2a10; color: #f0c37a; }
+
+/* Tarjeta de negocio ahora es un solo renglón clicable (abre el detalle
+   en modal), en vez del "larguero" con todos los botones sueltos. */
+.tarjeta-negocio { cursor: pointer; transition: background .1s; }
+.tarjeta-negocio:hover, .tarjeta-negocio:focus-visible { background: #f2f8f7; }
+.tarjeta-negocio .tarjeta-negocio-encabezado { gap: 10px; }
+.tarjeta-negocio .pill-estado { margin-left: auto; flex: none; white-space: nowrap; }
+body.modo-oscuro .tarjeta-negocio:hover, body.modo-oscuro .tarjeta-negocio:focus-visible { background: #1e302e; }
+.detalle-suscripcion { background: var(--tint); border-radius: 12px; padding: 12px; margin-top: 10px; text-align: center; }

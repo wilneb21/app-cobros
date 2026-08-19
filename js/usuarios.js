@@ -11,6 +11,7 @@
 // la base de datos (tabla permisos_miembro). Si el día de mañana agregas un
 // permiso nuevo en el SQL, agrégalo aquí también con su nombre en español.
 const CATALOGO_PERMISOS = [
+  { clave: "ver_clientes", etiqueta: "Ver clientes, préstamos y pagos", detalle: "Sin este permiso no ve ni puede gestionar ningún cliente. Es el permiso base — casi siempre debe estar marcado." },
   { clave: "ver_reportes", etiqueta: "Ver reportes", detalle: "Reportes de caja, ganancia y resultados del negocio" },
   { clave: "ver_capital", etiqueta: "Ver capital", detalle: "Ver el capital inicial y los aportes" },
   { clave: "editar_capital", etiqueta: "Editar capital", detalle: "Registrar aportes y cambiar el capital inicial" },
@@ -19,7 +20,7 @@ const CATALOGO_PERMISOS = [
   { clave: "eliminar_pagos", etiqueta: "Eliminar pagos", detalle: "Borrar un pago ya registrado" },
   { clave: "eliminar_prestamos", etiqueta: "Eliminar préstamos", detalle: "Borrar un préstamo ya registrado" },
   { clave: "gestionar_rutas", etiqueta: "Gestionar rutas", detalle: "Crear, editar o borrar rutas" },
-  { clave: "ver_todas_las_rutas", etiqueta: "Ver todas las rutas", detalle: "Sin este permiso, solo ve las rutas que le asignes" },
+  { clave: "ver_todas_las_rutas", etiqueta: "Ver todas las rutas", detalle: "Con \"Ver clientes\" marcado: sin este permiso, solo ve las rutas (y sus clientes) que le asignes" },
   { clave: "gestionar_caja", etiqueta: "Gestionar caja diaria", detalle: "Abrir/cerrar caja y ajustar la base del día" },
   { clave: "gestionar_usuarios", etiqueta: "Gestionar usuarios", detalle: "Crear cobradores y cambiarles sus permisos (úsalo con cuidado)" },
 ];
@@ -210,26 +211,155 @@ async function cargarListaNegocios() {
 function crearTarjetaNegocio(n) {
   const tarjeta = document.createElement("div");
   tarjeta.className = "tarjeta-negocio";
+  tarjeta.setAttribute("role", "button");
+  tarjeta.setAttribute("tabindex", "0");
   const fecha = n.creado_en
     ? new Date(n.creado_en).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
     : "";
+  const estado = calcularEstadoSuscripcion(n);
+
   tarjeta.innerHTML = `
     <div class="tarjeta-negocio-encabezado">
       <span class="tarjeta-negocio-icono">🏢</span>
-      <span>
+      <span class="tarjeta-negocio-info">
         <b>${escaparHtml(n.nombre || n.dueño_nombre || "Negocio sin nombre")}</b>
         <small>${escaparHtml(n.dueño_correo || "sin correo")}${fecha ? " · Desde " + fecha : ""}</small>
       </span>
-    </div>
-    <div class="tarjeta-negocio-pie">
-      <span>👤 ${escaparHtml(n.dueño_nombre || "Dueño sin nombre")}</span>
-      <span>🧑‍💼 ${n.total_cobradores} cobrador${n.total_cobradores === 1 ? "" : "es"} (${n.cobradores_activos} activo${n.cobradores_activos === 1 ? "" : "s"})</span>
-      <button type="button" class="btn-secundario" data-accion="editar-negocio">✏️ Editar</button>
+      <span class="pill-estado ${estado.clase}">${estado.textoCorto}</span>
     </div>`;
-  tarjeta.querySelector('[data-accion="editar-negocio"]').addEventListener("click", () => {
+
+  tarjeta.addEventListener("click", () => abrirDetalleNegocio(n));
+  tarjeta.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirDetalleNegocio(n); } });
+  return tarjeta;
+}
+
+// Calcula, en un solo lugar, cómo está la suscripción de un negocio — el
+// contador de días se recalcula cada vez que se pinta la pantalla, así
+// que baja solo día a día sin que haya que guardar ni actualizar nada.
+function calcularEstadoSuscripcion(n) {
+  const hoy = obtenerFechaLocal();
+  if (n.activo === false) {
+    return { clase: "pill-inactivo", textoCorto: "⏸️ Suspendido", textoLargo: "Suspendido a mano — este negocio no puede entrar hasta que lo reactives." };
+  }
+  if (!n.plan_vence_en) {
+    return { clase: "pill-activo", textoCorto: "♾️ Sin vencimiento", textoLargo: "Sin fecha de vencimiento — tiene acceso indefinido." };
+  }
+  const dias = Math.ceil((new Date(n.plan_vence_en + "T00:00:00") - new Date(hoy + "T00:00:00")) / 86400000);
+  if (dias < 0) {
+    return { clase: "pill-inactivo", textoCorto: "⛔ Vencido", textoLargo: `Venció hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"} (${formatearFechaCorta(n.plan_vence_en)}).` };
+  }
+  if (dias === 0) {
+    return { clase: "pill-alerta", textoCorto: "⚠️ Vence hoy", textoLargo: "Vence hoy — renueva para que no se quede sin acceso mañana." };
+  }
+  return {
+    clase: dias <= 5 ? "pill-alerta" : "pill-activo",
+    textoCorto: `${dias} día${dias === 1 ? "" : "s"}`,
+    textoLargo: `Vigente hasta el ${formatearFechaCorta(n.plan_vence_en)} — quedan ${dias} día${dias === 1 ? "" : "s"}.`,
+  };
+}
+
+// ---------- MODAL DE DETALLE: se abre al hacer clic en una tarjeta ----------
+
+function abrirDetalleNegocio(n) {
+  const estado = calcularEstadoSuscripcion(n);
+  const cont = document.getElementById("modal-generico-contenido");
+  cont.innerHTML = `
+    <div class="detalle-header"><h3>🏢 ${escaparHtml(n.nombre || n.dueño_nombre || "Negocio sin nombre")}</h3><button class="btn-cerrar-detalle" onclick="cerrarModalGenerico()" aria-label="Cerrar">✕</button></div>
+    <p class="texto-ayuda">${escaparHtml(n.dueño_correo || "sin correo")}</p>
+    <p class="texto-ayuda">👤 ${escaparHtml(n.dueño_nombre || "Dueño sin nombre")} · 🧑‍💼 ${n.total_cobradores} cobrador${n.total_cobradores === 1 ? "" : "es"} (${n.cobradores_activos} activo${n.cobradores_activos === 1 ? "" : "s"})</p>
+
+    <div class="detalle-suscripcion">
+      <span class="pill-estado ${estado.clase}" style="font-size:13px;padding:6px 14px">${estado.textoCorto}</span>
+      <p class="texto-ayuda" style="margin-top:8px">${estado.textoLargo}</p>
+    </div>
+
+    <p class="titulo-grupo-config" style="margin-top:14px">Suscripción</p>
+    <div class="tarjeta-negocio-suscripcion-botones">
+      <button type="button" class="btn-secundario" data-accion="mas-1-mes">+1 mes</button>
+      <button type="button" class="btn-secundario" data-accion="mas-1-anio">+1 año</button>
+      <button type="button" class="btn-secundario" data-accion="quitar-vencimiento">Sin vencimiento</button>
+      <button type="button" class="btn-secundario" data-accion="${n.activo === false ? "reactivar" : "suspender"}">${n.activo === false ? "▶️ Reactivar" : "⏸️ Suspender"}</button>
+    </div>
+
+    <div class="modal-botones" style="margin-top:16px">
+      <button type="button" class="btn-secundario" style="width:100%" data-accion="editar-negocio">✏️ Editar nombre/correo</button>
+    </div>
+    <div class="modal-botones" style="margin-top:8px">
+      <button type="button" class="btn-eliminar" style="width:100%" data-accion="eliminar-negocio">🗑️ Eliminar negocio</button>
+    </div>`;
+  document.getElementById("modal-generico").classList.remove("oculto");
+
+  cont.querySelector('[data-accion="editar-negocio"]').addEventListener("click", () => {
     editarPerfilNegocio(n.id, n.dueño_id, n.dueño_nombre || "", n.dueño_correo || "");
   });
-  return tarjeta;
+  cont.querySelector('[data-accion="eliminar-negocio"]').addEventListener("click", () => {
+    eliminarNegocioCliente(n.id, n.nombre || n.dueño_nombre || "");
+  });
+  cont.querySelector('[data-accion="mas-1-mes"]').addEventListener("click", () => {
+    actualizarSuscripcionNegocio(n.id, { plan_vence_en: sumarMesesAFecha(n.plan_vence_en, 1) });
+  });
+  cont.querySelector('[data-accion="mas-1-anio"]').addEventListener("click", () => {
+    actualizarSuscripcionNegocio(n.id, { plan_vence_en: sumarMesesAFecha(n.plan_vence_en, 12) });
+  });
+  cont.querySelector('[data-accion="quitar-vencimiento"]').addEventListener("click", () => {
+    actualizarSuscripcionNegocio(n.id, { plan_vence_en: null });
+  });
+  const btnSuspenderReactivar = cont.querySelector('[data-accion="suspender"], [data-accion="reactivar"]');
+  btnSuspenderReactivar.addEventListener("click", () => {
+    actualizarSuscripcionNegocio(n.id, { activo: n.activo === false });
+  });
+}
+
+// "+1 mes" / "+1 año" siempre suman a partir de HOY si ya venció o no
+// tenía fecha, o a partir de la fecha que ya tenía si todavía es futura
+// (para poder ir sumando varios meses seguidos sin perder lo ya pagado).
+function sumarMesesAFecha(fechaBase, meses) {
+  const hoy = obtenerFechaLocal();
+  const partirDe = (fechaBase && fechaBase >= hoy) ? fechaBase : hoy;
+  const fecha = new Date(partirDe + "T00:00:00");
+  fecha.setMonth(fecha.getMonth() + meses);
+  return fecha.toISOString().slice(0, 10);
+}
+
+function formatearFechaCorta(fechaIso) {
+  return new Date(fechaIso + "T00:00:00").toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
+}
+
+async function actualizarSuscripcionNegocio(negocioId, cambios) {
+  const { data, error } = await supabaseClient.functions.invoke("actualizar-suscripcion-negocio", {
+    body: { negocio_id: negocioId, ...cambios },
+  });
+  if (error || data?.error) {
+    let detalle = data?.error;
+    if (!detalle) {
+      try { detalle = (await error.context.json())?.error; } catch { detalle = error.message; }
+    }
+    mostrarAlerta("No se pudo actualizar la suscripción: " + detalle);
+    return;
+  }
+  cerrarModalGenerico();
+  await cargarListaNegocios();
+}
+
+async function eliminarNegocioCliente(negocioId, nombreNegocio) {
+  const nombreEscrito = prompt(
+    `⚠️ Esto borra POR COMPLETO el negocio "${nombreNegocio}": todos sus clientes, préstamos, pagos, gastos, rutas, caja, y las cuentas del dueño y sus cobradores. No se puede deshacer.\n\nPara confirmar, escribe exactamente el nombre del negocio: "${nombreNegocio}"`
+  );
+  if (nombreEscrito === null) return;
+
+  const { data, error } = await supabaseClient.functions.invoke("eliminar-negocio-cliente", {
+    body: { negocio_id: negocioId, confirmacion_nombre: nombreEscrito },
+  });
+  if (error || data?.error) {
+    let detalle = data?.error;
+    if (!detalle) {
+      try { detalle = (await error.context.json())?.error; } catch { detalle = error.message; }
+    }
+    mostrarAlerta("No se pudo eliminar: " + detalle);
+    return;
+  }
+  mostrarAlerta("✅ " + (data?.mensaje || "Negocio eliminado."));
+  await cargarListaNegocios();
 }
 
 // Corrige el nombre/correo del dueño de un negocio ya creado (hace falta
@@ -305,6 +435,11 @@ async function cargarListaCobradores() {
     .from("perfiles").select("id, nombre, correo").in("id", miembros.map(m => m.user_id));
   const perfilPorUserId = new Map((perfiles || []).map(p => [p.id, p]));
 
+  // Rutas del negocio, para poder asignárselas a cada cobrador desde su
+  // propia tarjeta (qué ruta(s) trabaja cada quien).
+  const { data: rutas } = await supabaseClient
+    .from("rutas").select("id, nombre, cobrador_id").eq("negocio_id", window.sesionActual.negocioId).order("nombre");
+
   // Activos primero (con lo que trabajas día a día), luego los
   // desactivados — y dentro de cada grupo, el más nuevo arriba.
   const ordenados = [...miembros].sort((a, b) => (b.activo === a.activo ? 0 : b.activo ? 1 : -1));
@@ -319,11 +454,11 @@ async function cargarListaCobradores() {
   ordenados.forEach(miembro => {
     const permisosDeEste = new Set((todosLosPermisos || []).filter(p => p.miembro_id === miembro.id).map(p => p.permiso));
     const perfil = perfilPorUserId.get(miembro.user_id);
-    cont.appendChild(crearTarjetaCobrador(miembro, permisosDeEste, perfil));
+    cont.appendChild(crearTarjetaCobrador(miembro, permisosDeEste, perfil, rutas || []));
   });
 }
 
-function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
+function crearTarjetaCobrador(miembro, permisosActivos, perfil, rutas) {
   const detalle = document.createElement("details");
   detalle.className = "tarjeta-cobrador";
 
@@ -339,6 +474,18 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
   const fechaCreacion = miembro.creado_en
     ? new Date(miembro.creado_en).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
     : "";
+
+  // Qué rutas tiene asignadas este cobrador (para marcarle el check) — una
+  // ruta solo puede tener un cobrador a la vez, así que si la marcas para
+  // uno, se la quita automáticamente a quien la tuviera antes.
+  const rutasHtml = rutas.length === 0
+    ? `<p class="texto-ayuda">Todavía no has creado ninguna ruta.</p>`
+    : rutas.map(r => `
+        <label class="fila-permiso">
+          <input type="checkbox" data-ruta="${r.id}" data-miembro-user="${miembro.user_id}" ${r.cobrador_id === miembro.user_id ? "checked" : ""}>
+          <span class="check-visual" aria-hidden="true"></span>
+          <span><b>${escaparHtml(r.nombre)}</b>${r.cobrador_id && r.cobrador_id !== miembro.user_id ? `<small>Ahora mismo es de otro cobrador — se la quitas si marcas aquí</small>` : ""}</span>
+        </label>`).join("");
 
   // Solo el nombre queda visible en la lista (con un punto de color según
   // esté activo/desactivado) — todo lo demás (correo, permisos, el botón
@@ -365,10 +512,15 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
       </div>
       <p class="titulo-grupo-config" style="margin-top:10px">Permisos</p>
       <div class="tarjeta-cobrador-permisos">${checkboxesHtml}</div>
+      <p class="titulo-grupo-config" style="margin-top:10px">Rutas asignadas</p>
+      <div class="tarjeta-cobrador-permisos">${rutasHtml}</div>
     </div>`;
 
-  detalle.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+  detalle.querySelectorAll('input[type="checkbox"][data-permiso]').forEach(chk => {
     chk.addEventListener("change", () => cambiarPermisoCobrador(chk.dataset.miembro, chk.dataset.permiso, chk.checked));
+  });
+  detalle.querySelectorAll('input[type="checkbox"][data-ruta]').forEach(chk => {
+    chk.addEventListener("change", () => asignarRutaCobrador(chk.dataset.ruta, chk.checked ? chk.dataset.miembroUser : null));
   });
   detalle.querySelector('[data-accion="toggle-activo"]').addEventListener("click", (e) => {
     const btn = e.currentTarget;
@@ -383,6 +535,19 @@ function crearTarjetaCobrador(miembro, permisosActivos, perfil) {
   });
 
   return detalle;
+}
+
+// Le pone (o le quita) una ruta a un cobrador. Como una ruta solo puede
+// tener un cobrador a la vez, mandar un user_id nuevo simplemente
+// reemplaza al anterior — por eso recargamos toda la lista después, para
+// que se vea reflejado en ambas tarjetas (a quien se la quitaste y a
+// quien se la diste).
+async function asignarRutaCobrador(rutaId, userId) {
+  const { error } = await supabaseClient.from("rutas").update({ cobrador_id: userId }).eq("id", rutaId);
+  if (error) {
+    mostrarAlerta("No se pudo asignar la ruta: " + error.message);
+  }
+  await cargarListaCobradores();
 }
 
 // Permite ponerle (o corregirle) el nombre y correo a un cobrador que ya
@@ -456,13 +621,24 @@ async function cambiarEstadoCobrador(miembroId, activo) {
 
 // ---------- FORMULARIO "AGREGAR COBRADOR" ----------
 
-function abrirFormularioNuevoCobrador() {
+async function abrirFormularioNuevoCobrador() {
   const checkboxesHtml = CATALOGO_PERMISOS.map(p => `
     <label class="fila-permiso">
       <input type="checkbox" id="permiso-nuevo-${p.clave}" value="${p.clave}">
       <span class="check-visual" aria-hidden="true"></span>
       <span><b>${p.etiqueta}</b><small>${p.detalle}</small></span>
     </label>`).join("");
+
+  const { data: rutas } = await supabaseClient
+    .from("rutas").select("id, nombre, cobrador_id").eq("negocio_id", window.sesionActual.negocioId).order("nombre");
+  const rutasHtml = !rutas || rutas.length === 0
+    ? `<p class="texto-ayuda">Todavía no has creado ninguna ruta — puedes asignarle rutas después desde su tarjeta.</p>`
+    : rutas.map(r => `
+        <label class="fila-permiso">
+          <input type="checkbox" id="ruta-nueva-${r.id}" value="${r.id}">
+          <span class="check-visual" aria-hidden="true"></span>
+          <span><b>${escaparHtml(r.nombre)}</b>${r.cobrador_id ? `<small>Ahora mismo tiene otro cobrador — se la quitarías si la marcas</small>` : ""}</span>
+        </label>`).join("");
 
   const cont = document.getElementById("modal-generico-contenido");
   cont.innerHTML = `
@@ -473,6 +649,8 @@ function abrirFormularioNuevoCobrador() {
     <input type="password" id="nuevo-cobrador-clave" placeholder="Contraseña temporal (mínimo 6 caracteres)">
     <p class="titulo-grupo-config" style="margin-top:12px">Permisos iniciales</p>
     <div class="tarjeta-cobrador-permisos">${checkboxesHtml}</div>
+    <p class="titulo-grupo-config" style="margin-top:12px">Rutas que va a atender</p>
+    <div class="tarjeta-cobrador-permisos">${rutasHtml}</div>
     <p id="nuevo-cobrador-error" class="mensaje-modal"></p>
     <div class="modal-botones">
       <button class="btn-modal-confirmar" id="btn-crear-cobrador" style="width:100%">Crear cobrador</button>
@@ -495,6 +673,7 @@ async function crearCobradorNuevo() {
     return;
   }
   const permisos = CATALOGO_PERMISOS.map(p => p.clave).filter(clave => document.getElementById("permiso-nuevo-" + clave).checked);
+  const ruta_ids = Array.from(document.querySelectorAll('[id^="ruta-nueva-"]:checked')).map(el => Number(el.value));
 
   boton.disabled = true;
   boton.textContent = "Creando...";
@@ -502,7 +681,7 @@ async function crearCobradorNuevo() {
 
   try {
     const { data, error } = await supabaseClient.functions.invoke("crear-cobrador", {
-      body: { negocio_id: window.sesionActual.negocioId, nombre, correo, contraseña: clave, permisos },
+      body: { negocio_id: window.sesionActual.negocioId, nombre, correo, contraseña: clave, permisos, ruta_ids },
     });
 
     if (error) {

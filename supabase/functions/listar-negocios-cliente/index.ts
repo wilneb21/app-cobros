@@ -73,6 +73,8 @@ Deno.serve(async (req) => {
         dueño_nombre: perfil?.nombre ?? null,
         dueño_correo: perfil?.correo ?? null,
         creado_en: n.creado_en ?? n.created_at ?? null,
+        activo: n.activo,
+        plan_vence_en: n.plan_vence_en ?? null,
         total_cobradores: cobradores.length,
         cobradores_activos: cobradores.filter((m) => m.activo).length,
       };

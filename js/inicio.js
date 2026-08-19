@@ -55,17 +55,30 @@ async function cargarResumenDia() {
 
   const { data: pagosDelDia } = await supabaseClient.from("pagos").select("prestamo_id").eq("fecha_pago", hoy);
   const idsConPagoHoy = (pagosDelDia || []).map(p => p.prestamo_id);
+  const clientesVisitadosHoy = new Set(idsConPagoHoy).size;
   const pendientes = prestamos.filter(p => !idsConPagoHoy.includes(p.id));
 
   pintarCapitalInicioHero();
 
   const metaJornada = totalCobradoHoy + pendientes.reduce((s, p) => s + Number(p.cuota || 0), 0);
   const pctCobrado = metaJornada ? Math.min((totalCobradoHoy / metaJornada) * 100, 100) : 0;
+  const totalClientesHoy = prestamos.length;
+  const pctClientes = totalClientesHoy ? Math.min((clientesVisitadosHoy / totalClientesHoy) * 100, 100) : 0;
   const progreso = document.getElementById("progreso-cobro-principal");
+  // Antes esto era un solo % de dinero, que mezclaba "cuántos clientes ya
+  // pagaron" con "cuánto dinero entró" en un solo número — un abono
+  // parcial contaba igual que un pago completo, y eso confundía. Ahora son
+  // dos barras separadas: una cuenta clientes, la otra cuenta dinero, cada
+  // una responde una pregunta distinta sin mezclarse.
   if (progreso) progreso.innerHTML = `
-    <div class="progreso-cobro-cabecera"><span>Progreso de cobro</span><b>${Math.round(pctCobrado)}%</b></div>
-    <div class="progreso-cobro-valores"><span><small>Cobrado</small><b>${formatoPesos(totalCobradoHoy)}</b></span><span><small>Pendiente</small><b>${formatoPesos(Math.max(metaJornada - totalCobradoHoy, 0))}</b></span></div>
-    <div class="progreso-cobro-fondo"><div style="width:${pctCobrado}%"></div></div>`;
+    <div class="progreso-cobro-fila">
+      <div class="progreso-cobro-cabecera"><span>Clientes visitados hoy</span><b>${clientesVisitadosHoy} / ${totalClientesHoy}</b></div>
+      <div class="progreso-cobro-fondo mini"><div style="width:${pctClientes}%"></div></div>
+    </div>
+    <div class="progreso-cobro-fila progreso-cobro-fila-ultima">
+      <div class="progreso-cobro-cabecera"><span>Dinero cobrado</span><b>${formatoPesos(totalCobradoHoy)} <small>de ${formatoPesos(metaJornada)}</small></b></div>
+      <div class="progreso-cobro-fondo mini"><div style="width:${pctCobrado}%"></div></div>
+    </div>`;
 
   // Cartera activa total + préstamos en mora (una sola consulta para todos los pagos, no una por préstamo)
   let carteraActiva = 0;

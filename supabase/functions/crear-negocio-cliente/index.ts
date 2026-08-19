@@ -1,35 +1,25 @@
-// Edge Function: crear-negocio
-// ⚠️ ESTA FUNCIÓN ES SOLO PARA TI (el vendedor de la app), no la llama la
-// app desde el navegador. Con ella creas un negocio nuevo + su primer
-// usuario "dueño" cada vez que le vendas la app a alguien, con el correo
-// y la contraseña que tú definas.
-//
-// Protegida por una clave secreta propia (variable de entorno ADMIN_SECRET),
-// nunca por sesión de usuario, porque tú no eres dueño de ningún negocio
-// del sistema.
-//
-// CONFIGURAR EL SECRETO (una sola vez):
-//   supabase secrets set ADMIN_SECRET=elige-algo-largo-y-dificil-de-adivinar
-//
-// USO para crear un cliente nuevo:
-//   curl -X POST https://TU-PROYECTO.supabase.co/functions/v1/crear-negocio \
-//     -H "Content-Type: application/json" \
-//     -H "x-admin-secret: elige-algo-largo-y-dificil-de-adivinar" \
-//     -d '{
-//       "nombre_negocio": "Cobros Doña María",
-//       "correo": "maria@correo.com",
-//       "contraseña": "unaClaveTemporalSegura123"
-//     }'
+// Edge Function: crear-negocio-cliente
+// Crea un negocio nuevo + su primer usuario "dueño" cada vez que le
+// vendas la app a alguien. Solo la puede llamar quien esté logueado con
+// un correo dentro de ADMIN_EMAILS (tú) — igual candado que usan
+// listar-negocios-cliente, actualizar-perfil-negocio,
+// actualizar-suscripcion-negocio y eliminar-negocio-cliente, para que
+// las 5 funcionen de forma consistente cuando la app las llama con tu
+// sesión normal (no hace falta ninguna clave secreta aparte ni curl).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// Debe coincidir con ADMIN_EMAILS de las demás funciones de admin y con
+// CORREOS_ADMIN_PLATAFORMA en js/usuarios.js.
+const ADMIN_EMAILS = ["wilneb199910@gmail.com"];
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ADMIN_SECRET = Deno.env.get("ADMIN_SECRET")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, x-admin-secret",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -43,11 +33,6 @@ function respuesta(cuerpo: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
-  const secretoRecibido = req.headers.get("x-admin-secret");
-  if (!ADMIN_SECRET || secretoRecibido !== ADMIN_SECRET) {
-    return respuesta({ error: "No autorizado." }, 401);
-  }
-
   try {
     const { nombre_negocio, correo, contraseña } = await req.json();
 
@@ -58,18 +43,51 @@ Deno.serve(async (req) => {
       return respuesta({ error: "La contraseña debe tener al menos 6 caracteres." }, 400);
     }
 
+    // Confirmar que quien llama eres tú (el administrador de la
+    // plataforma), usando tu sesión normal — igual que en las otras
+    // funciones de este panel.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const clienteLlamador = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: datosUsuario, error: errorUsuario } = await clienteLlamador.auth.getUser();
+    if (errorUsuario || !datosUsuario?.user) {
+      return respuesta({ error: "No se pudo identificar quién está haciendo la solicitud." }, 401);
+    }
+    const correoQuienLlama = (datosUsuario.user.email ?? "").toLowerCase();
+    if (!ADMIN_EMAILS.map((c) => c.toLowerCase()).includes(correoQuienLlama)) {
+      return respuesta({ error: "No tienes permiso para crear negocios." }, 403);
+    }
+
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+    // Si el correo ya existía (por ejemplo, de un negocio que borraste
+    // hace poco pero el correo quedó huérfano en Auth), lo recuperamos en
+    // vez de fallar — mismo mecanismo que ya usa "crear-cobrador".
+    let idDueño: string;
     const { data: nuevoUsuario, error: errorCrear } = await admin.auth.admin.createUser({
       email: correo,
       password: contraseña,
       email_confirm: true,
       user_metadata: { nombre: nombre_negocio ?? correo, rol: "dueño" },
     });
+
     if (errorCrear) {
-      return respuesta({ error: "No se pudo crear el usuario: " + errorCrear.message }, 400);
+      const yaExistia = /already.*registered/i.test(errorCrear.message ?? "");
+      if (!yaExistia) {
+        return respuesta({ error: "No se pudo crear el usuario: " + errorCrear.message }, 400);
+      }
+      const { data: idEncontrado } = await admin.rpc("buscar_usuario_por_correo", { p_correo: correo });
+      if (!idEncontrado) {
+        return respuesta({ error: "Ese correo ya está registrado, pero no se pudo recuperar el usuario. Bórralo manualmente en Supabase → Authentication → Users e inténtalo de nuevo." }, 400);
+      }
+      // Ya que recuperamos el usuario, le actualizamos la contraseña a la
+      // nueva que escribiste, para que puedas entregársela al cliente.
+      await admin.auth.admin.updateUserById(idEncontrado, { password: contraseña, email_confirm: true });
+      idDueño = idEncontrado;
+    } else {
+      idDueño = nuevoUsuario.user.id;
     }
-    const idDueño = nuevoUsuario.user.id;
 
     const { data: negocio, error: errorNegocio } = await admin
       .from("negocios")
@@ -77,20 +95,20 @@ Deno.serve(async (req) => {
       .select("id")
       .single();
     if (errorNegocio) {
-      await admin.auth.admin.deleteUser(idDueño);
+      if (!errorCrear) await admin.auth.admin.deleteUser(idDueño);
       return respuesta({ error: "No se pudo crear el negocio: " + errorNegocio.message }, 400);
     }
 
     const { error: errorMiembro } = await admin
       .from("miembros_negocio")
-      .insert({ negocio_id: negocio.id, user_id: idDueño, rol: "dueño", activo: true });
+      .upsert({ negocio_id: negocio.id, user_id: idDueño, rol: "dueño", activo: true }, { onConflict: "negocio_id,user_id" });
     if (errorMiembro) {
       return respuesta({ error: "El negocio se creó, pero no se pudo vincular al dueño: " + errorMiembro.message }, 400);
     }
 
     // Perfil legible (nombre + correo), igual que se hace para cada
-    // cobrador — así "Gestión de usuarios" puede mostrar quién es quién
-    // sin depender de auth.users, que el navegador no puede leer.
+    // cobrador — así "Mis clientes" puede mostrar quién es quién sin
+    // depender de auth.users, que el navegador no puede leer.
     const { error: errorPerfil } = await admin.from("perfiles").upsert({
       id: idDueño,
       negocio_id: negocio.id,
